@@ -1,0 +1,17 @@
+{
+  "name": "streamchat-client",
+  "version": "1.0.0",
+  "description": "Cliente de StreamChat para Kick",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^30.0.0"
+  },
+  "dependencies": {}
+}

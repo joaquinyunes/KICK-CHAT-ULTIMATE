@@ -1,0 +1,5 @@
+{
+  "serverUrl":    "https://tu-servidor.com",
+  "channelName":  "nombre-del-canal",
+  "sendInterval": 5
+}

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StreamChat Bridge – Chat</title>
+  <link rel="stylesheet" href="../styles/main.css" />
+</head>
+<body class="chat-page">
+
+  <!-- ── Header ─────────────────────────────────────── -->
+  <header class="app-header">
+    <span class="app-title">StreamChat Bridge</span>
+
+    <div class="connection-status">
+      <span id="status-badge" class="status-dot status-disconnected"></span>
+      <span id="status-label">Desconectado</span>
+    </div>
+  </header>
+
+  <!-- ── Tabs ───────────────────────────────────────── -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="chat">Chat</button>
+    <button class="tab-btn"        data-tab="settings">Ajustes</button>
+  </nav>
+
+  <!-- ── Panel: Chat ────────────────────────────────── -->
+  <section id="panel-chat" class="tab-panel active">
+
+    <div class="toolbar">
+      <button id="load-file-btn" class="btn btn-secondary">
+        📂 Cargar archivo .txt
+      </button>
+      <span id="file-info" class="file-info"></span>
+    </div>
+
+    <p id="file-error" class="error-msg" hidden aria-live="polite"></p>
+
+    <!-- Progreso de envío -->
+    <div class="progress-track">
+      <div id="progress-bar" class="progress-bar" style="width:0%" role="progressbar"
+           aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+    </div>
+
+    <!-- Lista de mensajes -->
+    <ul id="msg-list" class="msg-list" data-count="0">
+      <li class="empty-state">Sin mensajes cargados.</li>
+    </ul>
+
+    <!-- Controles de envío -->
+    <footer class="send-controls">
+      <span id="send-status" class="send-status"></span>
+      <div class="send-btns">
+        <button id="send-once-btn" class="btn btn-ghost" disabled>Enviar siguiente</button>
+        <button id="start-btn"     class="btn btn-primary" disabled>▶ Iniciar</button>
+        <button id="stop-btn"      class="btn btn-danger"  disabled>■ Detener</button>
+      </div>
+    </footer>
+
+  </section>
+
+  <!-- ── Panel: Settings ────────────────────────────── -->
+  <section id="panel-settings" class="tab-panel">
+
+    <div class="settings-form">
+
+      <div class="field">
+        <label for="cfg-server-url">URL del Servidor</label>
+        <input id="cfg-server-url" type="url" placeholder="https://mi-servidor.com"
+               spellcheck="false" />
+      </div>
+
+      <div class="field">
+        <label for="cfg-channel">Canal de destino</label>
+        <input id="cfg-channel" type="text" placeholder="nombre-del-canal"
+               spellcheck="false" />
+      </div>
+
+      <div class="field">
+        <label for="cfg-interval">Intervalo de envío (segundos)</label>
+        <input id="cfg-interval" type="number" min="1" max="3600" value="5" />
+      </div>
+
+      <button id="save-settings-btn" class="btn btn-primary">Guardar</button>
+      <p id="settings-msg" class="settings-msg" hidden aria-live="polite"></p>
+
+    </div>
+
+  </section>
+
+  <script type="module" src="./chat-ui.js"></script>
+
+</body>
+</html>
