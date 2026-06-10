@@ -1,163 +1,112 @@
-// server-engine.ts - Entry point Express mas rutas
 /**
  * server-engine.ts
  * ─────────────────────────────────────────────────────────────────────────────
  * Entry point del servidor Express.
- * Configura middleware global, define rutas y arranca el proceso.
- *
- * ARQUITECTURA:
- *   POST /auth/register  → auth-manager (registro)
- *   POST /auth/login     → auth-manager (login + JWT)
- *   POST /chat/send      → requireAuth → chatRateLimiter → chat.controller
+ * Fase 3: Modo "Envío Bajo Demanda" (Sin Scheduler interno)
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import express, {
-  type Request,
-  type Response,
-  type NextFunction,
-} from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import rateLimit from "express-rate-limit";
 
-import { env }             from "./config/env";
+import { env } from "./config/env";
 import { loginUser, registerUser } from "./services/auth-manager";
-import { loadBearers }     from "./services/security";
-import { requireAuth }     from "./middleware/jwt.middleware";
-import { chatRateLimiter } from "./middleware/rate-limiter";
-import { handleChatSend }  from "./controllers/chat.controller";
+import { loadBearers } from "./services/security";
+import { requireAuth } from "./middleware/jwt.middleware";
+import { RateLimiter } from "./rate-limiter"; // ◄ Importación Fase 3
+import { handleChatSend } from "./controllers/chat.controller";
 import { validate, LoginSchema, RegisterSchema } from "./utils/validators";
 
 const app = express();
 
-// ─── Middleware Global ─────────────────────────────────────────────────────────
-
-app.use(express.json({ limit: "16kb" })); // evitar payloads gigantes
+app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: false }));
-
-// Ocultar información de tecnología
 app.disable("x-powered-by");
 
-// Rate limiting global (contra DoS / escaneo de endpoints)
-const globalLimiter = rateLimit({
-  windowMs:         60_000,   // 1 minuto
-  max:              60,       // máx 60 peticiones/min por IP
-  standardHeaders:  true,
-  legacyHeaders:    false,
-  message: {
-    error:   "Demasiadas solicitudes",
-    message: "Por favor espera un momento antes de continuar.",
-  },
-});
+// ─── Limiters ─────────────────────────────────────────────────────────────────
+
+const globalLimiter = rateLimit({ windowMs: 60_000, max: 60 });
 app.use(globalLimiter);
 
-// Rate limiting más estricto para endpoints de auth (contra brute-force)
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max:      10,              // máx 10 intentos de login por IP
-  standardHeaders: true,
-  legacyHeaders:   false,
-  message: {
-    error:   "Demasiados intentos",
-    message: "Cuenta bloqueada temporalmente. Intenta en 15 minutos.",
-  },
-});
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10 });
 
 // ─── Rutas de Autenticación ───────────────────────────────────────────────────
 
-/**
- * POST /auth/register
- * Registra un nuevo usuario. En producción considera proteger este endpoint
- * con una clave de admin o deshabilitarlo una vez creados los usuarios.
- */
-app.post(
-  "/auth/register",
-  authLimiter,
-  async (req: Request, res: Response) => {
-    const v = validate(RegisterSchema, req.body);
-    if (!v.success) {
-      res.status(400).json({ error: "Datos inválidos", fields: v.errors });
-      return;
-    }
-
-    try {
-      const user = await registerUser(v.data.username, v.data.password);
-      res.status(201).json({
-        message:  "Usuario registrado correctamente",
-        username: user.username,
-      });
-    } catch (err) {
-      const message = (err as Error).message;
-      // Distinguir conflicto de nombre vs error interno
-      if (message.includes("ya existe")) {
-        res.status(409).json({ error: "Conflicto", message });
-      } else {
-        console.error("[server] Error en /auth/register:", err);
-        res.status(500).json({ error: "Error interno del servidor" });
-      }
-    }
+app.post("/auth/register", authLimiter, async (req: Request, res: Response) => {
+  const v = validate(RegisterSchema, req.body);
+  if (!v.success) return res.status(400).json({ error: "Datos inválidos", fields: v.errors });
+  
+  try {
+    const user = await registerUser(v.data.username, v.data.password);
+    res.status(201).json({ message: "Usuario registrado", username: user.username });
+  } catch (err) {
+    res.status(500).json({ error: "Error interno" });
   }
-);
+});
 
-/**
- * POST /auth/login
- * Valida credenciales y retorna el JWT de 24 horas.
- */
-app.post(
-  "/auth/login",
-  authLimiter,
-  async (req: Request, res: Response) => {
-    const v = validate(LoginSchema, req.body);
-    if (!v.success) {
-      res.status(400).json({ error: "Datos inválidos", fields: v.errors });
-      return;
-    }
+app.post("/auth/login", authLimiter, async (req: Request, res: Response) => {
+  const v = validate(LoginSchema, req.body);
+  if (!v.success) return res.status(400).json({ error: "Datos inválidos", fields: v.errors });
 
-    const ip = req.ip ?? req.socket.remoteAddress;
-
-    try {
-      const result = await loginUser(v.data.username, v.data.password, ip);
-      res.status(200).json({
-        token:     result.token,
-        expiresAt: result.expiresAt,
-        tokenType: "Bearer",
-      });
-    } catch (err) {
-      // Mensaje genérico — no revelar si el usuario existe o no
-      res.status(401).json({
-        error:   "No autorizado",
-        message: "Credenciales inválidas",
-      });
-    }
+  try {
+    const result = await loginUser(v.data.username, v.data.password, req.ip);
+    res.status(200).json({ token: result.token, expiresAt: result.expiresAt, tokenType: "Bearer" });
+  } catch (err) {
+    res.status(401).json({ error: "No autorizado", message: "Credenciales inválidas" });
   }
-);
+});
 
-// ─── Rutas Protegidas ─────────────────────────────────────────────────────────
+// ─── Rutas Protegidas (Fase 3: Envío Bajo Demanda) ─────────────────────────────
 
 /**
  * POST /chat/send
- * Envía un mensaje al chat de Kick.
- * Requiere JWT válido + respeta rate limit de 1 msg / 30s por usuario.
+ * El servidor NO tiene scheduler. Solo reacciona a esta petición.
+ * Protegido por: 1. JWT, 2. RateLimiter centralizado.
  */
-app.post(
-  "/chat/send",
-  requireAuth,
-  chatRateLimiter,
-  handleChatSend
-);
+app.post("/chat/send", requireAuth, async (req: Request, res: Response) => {
+  // sessionId viene en el body enviado por el cliente (BridgeClient)
+  const { sessionId } = req.body;
+
+  if (!sessionId) {
+    return res.status(400).json({ error: "sessionId es requerido." });
+  }
+
+  // Verificar Rate Limiter central
+  if (!RateLimiter.canSend(sessionId)) {
+    const wait = RateLimiter.secondsUntilNext(sessionId);
+    return res.status(429).json({ 
+      error: "Rate limit alcanzado.", 
+      retryAfterSeconds: wait 
+    });
+  }
+
+  // Ejecutar envío
+  await handleChatSend(req, res);
+  
+  // Si handleChatSend fue exitoso (200), marcamos el envío
+  if (res.statusCode === 200) {
+    RateLimiter.recordSend(sessionId);
+  }
+});
+
+/**
+ * DELETE /session/:sessionId
+ * Endpoint para que el cliente Electron limpie su estado al cerrar.
+ */
+app.delete("/session/:sessionId", (req: Request, res: Response) => {
+  RateLimiter.clearSession(req.params.sessionId);
+  res.status(200).json({ success: true, message: "Sesión cerrada" });
+});
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
 
 app.get("/health", (_req: Request, res: Response) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+  res.json({ status: "ok", mode: "on-demand", timestamp: new Date().toISOString() });
 });
 
-// ─── 404 Handler ──────────────────────────────────────────────────────────────
+// ─── Error Handlers ───────────────────────────────────────────────────────────
 
-app.use((_req: Request, res: Response) => {
-  res.status(404).json({ error: "Ruta no encontrada" });
-});
-
-// ─── Error Handler Global ─────────────────────────────────────────────────────
+app.use((_req: Request, res: Response) => res.status(404).json({ error: "Ruta no encontrada" }));
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error("[server] Error no manejado:", err);
@@ -167,21 +116,16 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 // ─── Arranque ─────────────────────────────────────────────────────────────────
 
 async function bootstrap(): Promise<void> {
-  // Verificar que los bearers se pueden descifrar ANTES de aceptar tráfico
-  console.log("🔐  Verificando archivo de bearers cifrado...");
-  loadBearers(); // lanza si hay error — falla rápido
+  console.log("🔐 Verificando bearers...");
+  loadBearers();
 
   app.listen(env.PORT, () => {
-    console.log(`\n🚀  StreamChat Bridge corriendo en puerto ${env.PORT}`);
-    console.log(`    Entorno: ${env.NODE_ENV}`);
-    console.log(`    Endpoints:`);
-    console.log(`      POST /auth/register`);
-    console.log(`      POST /auth/login`);
-    console.log(`      POST /chat/send  (🔒 JWT + Rate Limit)\n`);
+    console.log(`\n🚀 StreamChat Bridge (Fase 3) en puerto ${env.PORT}`);
+    console.log(`   Modo: On-Demand | Rate Limit: ${RateLimiter.getIntervalMs() / 1000}s\n`);
   });
 }
 
 bootstrap().catch((err) => {
-  console.error("❌  Error fatal al arrancar el servidor:", err);
+  console.error("❌ Error fatal:", err);
   process.exit(1);
 });

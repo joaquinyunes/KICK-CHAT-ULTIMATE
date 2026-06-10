@@ -1,39 +1,37 @@
 /**
- * bridge-client.ts  –  StreamChat Bridge FASE 2
- *
- * Responsabilidades:
- *  - Adjuntar el JWT de sesión en cada petición al servidor.
- *  - Detectar 401 (token expirado) → borrar sesión y redirigir al login.
- *  - Detectar fallos de red (servidor offline) → emitir evento 'disconnected'.
- *  - NUNCA almacena tokens Bearer de Kick ni importa módulos de cifrado.
+ * bridge-client.ts – StreamChat Bridge (Fase 3)
+ * * Responsabilidades:
+ * 1. Gestión de sesiones (JWT) y peticiones base.
+ * 2. Automatización cliente-side (setInterval + sendToKick).
+ * 3. Limpieza de sesión en el servidor al desconectar.
  */
 
-// ──────────────────────────────────────────────────────────────
-// Tipos
-// ──────────────────────────────────────────────────────────────
+import { v4 as uuidv4 } from 'uuid';
+
+// ── Tipos ─────────────────────────────────────────────────────────────────────
 
 export type ConnectionStatus = 'connected' | 'disconnected' | 'checking';
 
 export interface BridgeResponse<T = unknown> {
-  ok:    boolean;
+  ok: boolean;
   data?: T;
   error?: string;
   status?: number;
 }
 
-export interface SendMessagePayload {
-  channel:  string;
-  message:  string;
-  platform: string;
+export interface BridgeClientConfig {
+  serverUrl: string;
+  serverSecret: string;
+  kickApiToken: string;
+  kickChannel: string;
+  intervalMs?: number;
+  messageFactory: () => string;
 }
 
-// ──────────────────────────────────────────────────────────────
-// Almacén de estado del Bridge (módulo singleton)
-// ──────────────────────────────────────────────────────────────
+// ── Almacén de estado (Singleton) ─────────────────────────────────────────────
 
 type StatusListener = (status: ConnectionStatus) => void;
-
-let _status: ConnectionStatus        = 'disconnected';
+let _status: ConnectionStatus = 'disconnected';
 const _listeners: Set<StatusListener> = new Set();
 
 function setStatus(next: ConnectionStatus): void {
@@ -42,177 +40,93 @@ function setStatus(next: ConnectionStatus): void {
   _listeners.forEach(fn => fn(next));
 }
 
-// ──────────────────────────────────────────────────────────────
-// Helpers internos
-// ──────────────────────────────────────────────────────────────
+// ── Clase para Automatización (Fase 3) ───────────────────────────────────────
 
-/**
- * Obtiene el JWT almacenado en sessionStorage.
- * sessionStorage es volátil: se borra al cerrar la ventana.
- */
-function getToken(): string | null {
-  return sessionStorage.getItem('scb_jwt');
-}
+const SERVER_INTERVAL_MS = 30_000;
+const DEFAULT_INTERVAL_MS = 35_000;
 
-/**
- * Destruye la sesión y redirige al login.
- * Se llama cuando el servidor responde 401.
- */
-function destroySessionAndRedirect(): void {
-  sessionStorage.removeItem('scb_jwt');
-  setStatus('disconnected');
-  // window.bridge viene del preload.js (contextBridge)
-  (window as any).bridge?.navigate('login.html');
-}
+export class BridgeClient {
+  private readonly sessionId: string;
+  private readonly config: Required<BridgeClientConfig>;
+  private intervalHandle: ReturnType<typeof setInterval> | null = null;
+  private isRunning = false;
 
-/**
- * Lee la URL base del servidor desde sessionStorage (se carga al iniciar).
- */
-function getServerUrl(): string {
-  return sessionStorage.getItem('scb_server_url') ?? '';
-}
-
-// ──────────────────────────────────────────────────────────────
-// Petición base
-// ──────────────────────────────────────────────────────────────
-
-/**
- * Realiza una petición fetch al servidor con el JWT adjunto.
- * Maneja 401, errores de red y timeouts.
- */
-async function request<T = unknown>(
-  method:  'GET' | 'POST' | 'PUT' | 'DELETE',
-  path:    string,
-  body?:   object,
-  timeoutMs = 8000,
-): Promise<BridgeResponse<T>> {
-
-  const serverUrl = getServerUrl();
-  if (!serverUrl) {
-    return { ok: false, error: 'URL del servidor no configurada.' };
+  constructor(config: BridgeClientConfig) {
+    this.sessionId = uuidv4();
+    const requestedInterval = config.intervalMs ?? DEFAULT_INTERVAL_MS;
+    this.config = { 
+      ...config, 
+      intervalMs: Math.max(requestedInterval, SERVER_INTERVAL_MS) 
+    };
   }
 
-  const token = getToken();
-  if (!token) {
-    destroySessionAndRedirect();
-    return { ok: false, error: 'Sin sesión activa.' };
+  startAutomation(): void {
+    if (this.isRunning) return;
+    this.isRunning = true;
+    this.sendToKick();
+    this.intervalHandle = setInterval(() => this.sendToKick(), this.config.intervalMs);
   }
 
-  const controller = new AbortController();
-  const timeoutId  = setTimeout(() => controller.abort(), timeoutMs);
+  stopAutomation(): void {
+    if (this.intervalHandle) clearInterval(this.intervalHandle);
+    this.isRunning = false;
+  }
 
-  const headers: Record<string, string> = {
-    'Content-Type':  'application/json',
-    'Authorization': `Bearer ${token}`,   // JWT del servidor, NUNCA token de Kick
-  };
-
-  try {
-    const res = await fetch(`${serverUrl}${path}`, {
-      method,
-      headers,
-      body:   body ? JSON.stringify(body) : undefined,
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    // Token expirado → destruir sesión
-    if (res.status === 401) {
-      destroySessionAndRedirect();
-      return { ok: false, error: 'Sesión expirada. Vuelve a iniciar sesión.', status: 401 };
+  async cleanup(): Promise<void> {
+    this.stopAutomation();
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      await fetch(`${this.config.serverUrl}/session/${this.sessionId}`, {
+        method: 'DELETE',
+        headers: { 'x-server-secret': this.config.serverSecret },
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+    } catch (err) {
+      console.warn(`[BridgeClient] Fallo en cleanup: ${err}`);
     }
+  }
 
-    setStatus('connected');
-
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      return {
-        ok:     false,
-        error:  (errData as any)?.message ?? `Error ${res.status}`,
-        status: res.status,
-      };
-    }
-
-    const data = await res.json() as T;
-    return { ok: true, data, status: res.status };
-
-  } catch (err: any) {
-    clearTimeout(timeoutId);
-
-    const isOffline =
-      err.name === 'AbortError'  ||   // Timeout
-      err.name === 'TypeError'   ||   // Failed to fetch (red caída)
-      err.message?.includes('Failed to fetch');
-
-    if (isOffline) {
+  private async sendToKick(): Promise<void> {
+    try {
+      const response = await fetch(`${this.config.serverUrl}/chat/send`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-server-secret': this.config.serverSecret 
+        },
+        body: JSON.stringify({
+          sessionId: this.sessionId,
+          message: this.config.messageFactory(),
+          channel: this.config.kickChannel,
+          apiToken: this.config.kickApiToken,
+        }),
+      });
+      setStatus(response.ok ? 'connected' : 'disconnected');
+    } catch {
       setStatus('disconnected');
-      return { ok: false, error: 'Servidor no disponible. Verifica tu conexión.' };
     }
-
-    return { ok: false, error: `Error inesperado: ${err.message}` };
   }
 }
 
-// ──────────────────────────────────────────────────────────────
-// API pública del módulo
-// ──────────────────────────────────────────────────────────────
+// ── API pública original ──────────────────────────────────────────────────────
 
-/**
- * Suscribe un listener al estado de conexión.
- * Devuelve la función de cancelación.
- */
 export function onStatusChange(fn: StatusListener): () => void {
   _listeners.add(fn);
-  fn(_status);  // emite el estado actual inmediatamente
+  fn(_status);
   return () => _listeners.delete(fn);
 }
 
-/** Estado de conexión actual */
-export function getStatus(): ConnectionStatus {
-  return _status;
-}
-
-/**
- * Verifica si el servidor está vivo (ping).
- * Se llama periódicamente desde la UI.
- */
 export async function ping(): Promise<boolean> {
   setStatus('checking');
-  const res = await request('GET', '/health');
-  return res.ok;
-}
-
-/**
- * Envía un mensaje al servidor para su reenvío a la plataforma destino.
- * El servidor es quien gestiona la autenticación con la plataforma (Kick, etc.).
- */
-export async function sendMessage(
-  payload: SendMessagePayload,
-): Promise<BridgeResponse> {
-  return request('POST', '/messages/send', payload);
-}
-
-/**
- * Obtiene el estado actual del canal en el servidor.
- */
-export async function getChannelStatus(
-  channel: string,
-): Promise<BridgeResponse> {
-  return request('GET', `/channels/${encodeURIComponent(channel)}/status`);
-}
-
-/**
- * Obtiene la lista de plataformas disponibles en el servidor.
- */
-export async function getPlatforms(): Promise<BridgeResponse> {
-  return request('GET', '/platforms');
-}
-
-/**
- * Carga la URL del servidor en sessionStorage.
- * Se llama desde settings o login, nunca almacena tokens de plataforma.
- */
-export function setServerUrl(url: string): void {
-  const sanitized = url.replace(/\/+$/, '');  // quita slash final
-  sessionStorage.setItem('scb_server_url', sanitized);
+  try {
+    const res = await fetch(`${sessionStorage.getItem('scb_server_url')}/health`);
+    const ok = res.ok;
+    setStatus(ok ? 'connected' : 'disconnected');
+    return ok;
+  } catch {
+    setStatus('disconnected');
+    return false;
+  }
 }
