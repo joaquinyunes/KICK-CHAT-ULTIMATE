@@ -15,8 +15,8 @@ export const LoginSchema = z.object({
     .min(3, "El username debe tener al menos 3 caracteres")
     .max(32, "El username no puede superar 32 caracteres")
     .regex(
-      /^[a-zA-Z0-9_]+$/,
-      "El username solo puede contener letras, números y guiones bajos"
+      /^[a-zA-Z0-9_.@-]+$/,
+      "El username solo puede contener letras, números, guiones bajos, @, . y -"
     ),
   password: z
     .string()
@@ -49,6 +49,9 @@ export const ChatSendSchema = z.object({
 
   /** Nombre del bot a usar (opcional, si no se envía se usa uno aleatorio) */
   bot_name: z.string().optional(),
+
+  /** ID numérico del chatroom en Kick (opcional, si no se envía se intenta obtener automáticamente) */
+  chatroom_id: z.coerce.number().int().positive().optional(),
 });
 
 // ─── Tipos inferidos ───────────────────────────────────────────────────────────

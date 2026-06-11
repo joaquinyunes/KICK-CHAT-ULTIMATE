@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SCB – Admin</title>
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body class="chat-page">
+  <header class="app-header">
+    <span class="app-title">StreamChat Bridge · Admin</span>
+    <div class="connection-status">
+      <span id="status-badge" class="status-dot status-disconnected"></span>
+      <span id="status-label">Desconectado</span>
+      <button id="logout-btn" class="btn btn-ghost" style="margin-left:12px">Cerrar sesión</button>
+    </div>
+  </header>
+
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="bots">Bots</button>
+    <button class="tab-btn" data-tab="clientes">Clientes</button>
+  </nav>
+
+  <!-- ─── TAB: Bots ──────────────────────────────────────────── -->
+  <section id="panel-bots" class="tab-panel active">
+    <div class="admin-grid">
+      <div class="admin-card">
+        <h3 class="admin-card-title">Agregar Bot</h3>
+        <div class="field">
+          <label for="adm-bot-name">Nombre del Bot</label>
+          <input id="adm-bot-name" type="text" placeholder="ej: bot1" />
+        </div>
+        <div class="field">
+          <label for="adm-bot-bearer">Bearer Token de Kick</label>
+          <input id="adm-bot-bearer" type="password" placeholder="••••••••" />
+        </div>
+        <button id="adm-add-bot-btn" class="btn btn-primary">Agregar Bot</button>
+        <p id="adm-bot-msg" class="settings-msg" hidden></p>
+      </div>
+
+      <div class="admin-card admin-card-wide">
+        <h3 class="admin-card-title">Todos los Bots</h3>
+        <div id="adm-bot-list">
+          <p style="opacity:0.6;font-style:italic">Cargando...</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── TAB: Clientes ──────────────────────────────────────── -->
+  <section id="panel-clientes" class="tab-panel">
+    <div class="admin-grid">
+      <div class="admin-card">
+        <h3 class="admin-card-title">Crear Cliente</h3>
+        <div class="field">
+          <label for="adm-client-name">Nombre de usuario</label>
+          <input id="adm-client-name" type="text" placeholder="ej: cliente1" />
+        </div>
+        <div class="field">
+          <label for="adm-client-pass">Contraseña</label>
+          <input id="adm-client-pass" type="password" placeholder="••••••••" />
+        </div>
+        <button id="adm-create-client-btn" class="btn btn-primary">Crear Cliente</button>
+        <p id="adm-client-msg" class="settings-msg" hidden></p>
+      </div>
+
+      <div class="admin-card admin-card-wide">
+        <h3 class="admin-card-title">Todos los Clientes</h3>
+        <div id="adm-client-list">
+          <p style="opacity:0.6;font-style:italic">Cargando...</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script type="module" src="js/admin.js"></script>
+</body>
+</html>

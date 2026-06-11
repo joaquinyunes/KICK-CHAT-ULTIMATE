@@ -78,10 +78,16 @@ async function initDb(): Promise<SqlJsDatabase> {
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
       bot_name         TEXT    NOT NULL UNIQUE,
       encrypted_bearer TEXT    NOT NULL,
+      oauth_refresh_token TEXT,
+      oauth_access_token  TEXT,
+      oauth_token_expires_at INTEGER,
       is_active        INTEGER NOT NULL DEFAULT 1,
       created_at       INTEGER NOT NULL DEFAULT (unixepoch())
     )
   `);
+  try { db.run("ALTER TABLE bots ADD COLUMN oauth_refresh_token TEXT"); } catch {}
+  try { db.run("ALTER TABLE bots ADD COLUMN oauth_access_token TEXT"); } catch {}
+  try { db.run("ALTER TABLE bots ADD COLUMN oauth_token_expires_at INTEGER"); } catch {}
 
   db.run(`
     CREATE TABLE IF NOT EXISTS bot_assignments (
@@ -184,6 +190,9 @@ export interface BotRow {
   id: number;
   bot_name: string;
   encrypted_bearer: string;
+  oauth_refresh_token: string | null;
+  oauth_access_token: string | null;
+  oauth_token_expires_at: number | null;
   is_active: number;
   created_at: number;
 }
@@ -227,6 +236,10 @@ export const stmts = {
     `SELECT * FROM bots WHERE bot_name = ? LIMIT 1`
   ),
 
+  findBotById: prepareStmt<[number], BotRow>(
+    `SELECT * FROM bots WHERE id = ? LIMIT 1`
+  ),
+
   listActiveBots: prepareStmt<never, BotRow>(
     `SELECT * FROM bots WHERE is_active = 1 ORDER BY bot_name ASC`
   ),
@@ -258,6 +271,14 @@ export const stmts = {
 
   insertUserWithRole: prepareStmt<{ username: string; password_hash: string; role: string }, UserRow>(
     `INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)`
+  ),
+
+  updateBotOAuthTokens: prepareStmt<{ q_refresh: string | null; q_access: string | null; q_expires: number | null; q_id: number }, any>(
+    `UPDATE bots SET oauth_refresh_token = ?, oauth_access_token = ?, oauth_token_expires_at = ? WHERE id = ?`
+  ),
+
+  unassignBotFromUser: prepareStmt<{ q_bot_id: number; q_user_id: number }, any>(
+    `DELETE FROM bot_assignments WHERE bot_id = ? AND user_id = ?`
   ),
 };
 

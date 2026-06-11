@@ -54,6 +54,7 @@ export async function sendMessage(payload) {
     if (!url || !token) return { ok: false, error: 'Not authenticated', status: 401 };
     const body = { sessionId: crypto.randomUUID?.() || Date.now().toString(), message: payload.message, channel: payload.channel };
     if (payload.bot_name) body.bot_name = payload.bot_name;
+    if (payload.chatroom_id) body.chatroom_id = payload.chatroom_id;
     const res = await fetch(`${url}/chat/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },

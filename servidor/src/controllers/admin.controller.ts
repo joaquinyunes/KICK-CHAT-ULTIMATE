@@ -110,3 +110,35 @@ export function adminGetAssignments(req: Request, res: Response): void {
   const bots = stmts.listBotsForUser.all(userId);
   res.json({ success: true, userId, bots });
 }
+
+export function adminUnassignBot(req: Request, res: Response): void {
+  const { bot_id, username } = req.body;
+  if (!bot_id || typeof bot_id !== "number") {
+    res.status(400).json({ error: "bot_id (number) es requerido" });
+    return;
+  }
+  if (!username || typeof username !== "string") {
+    res.status(400).json({ error: "username es requerido" });
+    return;
+  }
+  const user = stmts.findUserByUsernameExact.get(username);
+  if (!user) {
+    res.status(404).json({ error: "Usuario no encontrado" });
+    return;
+  }
+  stmts.unassignBotFromUser.run({ q_bot_id: bot_id, q_user_id: user.id });
+  res.json({ success: true, bot_id, username });
+}
+
+export function adminUsersWithBots(_req: Request, res: Response): void {
+  const users = stmts.listAllUsers.all();
+  const result = users.map(u => ({
+    id: u.id,
+    username: u.username,
+    role: u.role,
+    is_active: u.is_active,
+    created_at: u.created_at,
+    bots: stmts.listBotsForUser.all(u.id).map(b => ({ id: b.id, bot_name: b.bot_name })),
+  }));
+  res.json({ success: true, users: result });
+}
