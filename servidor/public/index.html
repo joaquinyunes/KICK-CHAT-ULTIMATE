@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StreamChat Bridge – Login</title>
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body class="login-page">
+  <div class="login-card">
+    <header class="login-header">
+      <div class="logo-mark">SCB</div>
+      <h1>StreamChat Bridge</h1>
+      <p class="subtitle">Panel de Administración</p>
+    </header>
+    <form id="login-form" novalidate autocomplete="off">
+      <div class="field">
+        <label for="server-url">URL del Servidor</label>
+        <input id="server-url" type="text" placeholder="http://localhost:3000" autocomplete="off" spellcheck="false" />
+      </div>
+      <div class="field">
+        <label for="username">Usuario</label>
+        <input id="username" type="text" placeholder="usuario" autocomplete="off" spellcheck="false" />
+      </div>
+      <div class="field">
+        <label for="password">Contraseña</label>
+        <input id="password" type="password" placeholder="••••••••" autocomplete="new-password" />
+      </div>
+      <p id="error-msg" class="error-msg" hidden aria-live="polite"></p>
+      <button id="submit-btn" type="submit" class="btn btn-primary">
+        <span id="spinner" class="spinner" hidden></span>
+        Iniciar sesión
+      </button>
+    </form>
+  </div>
+  <script type="module" src="js/login.js"></script>
+</body>
+</html>

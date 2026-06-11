@@ -9,6 +9,7 @@
 import express, { type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
+import path from "path";
 
 import { env } from "./config/env";
 import { loginUser, registerUser } from "./services/auth-manager";
@@ -24,7 +25,7 @@ import {
   adminGetAssignments,
 } from "./controllers/admin.controller";
 import { RateLimiter } from "./middleware/rate-limiter";
-import { handleChatSend } from "./controllers/chat.controller";
+import { handleChatSend, handleListMyBots } from "./controllers/chat.controller";
 import { validate, LoginSchema, RegisterSchema, LoginInput, RegisterInput } from "./utils/validators";
 import { requestLogger, metricsRouter, recordMessage } from "./telemetry";
 import type { GenericResponse } from "./types/response";
@@ -36,6 +37,9 @@ app.use(cors());
 app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: false }));
 app.disable("x-powered-by");
+
+// ─── Static files (Web UI) ───────────────────────────────────────────────────
+app.use(express.static(path.join(__dirname, "..", "public")));
 
 // ─── Telemetry ─────────────────────────────────────────────────────────────────
 app.use(requestLogger);
@@ -112,6 +116,12 @@ app.post("/chat/send", requireAuth, async (req: Request, res: Response) => {
     recordMessage();
   }
 });
+
+/**
+ * GET /me/bots
+ * Lista los bots asignados al usuario autenticado.
+ */
+app.get("/me/bots", requireAuth, handleListMyBots);
 
 /**
  * DELETE /session/:sessionId

@@ -10,7 +10,15 @@ import type { Request, Response } from "express";
 import { sendToKick }            from "../services/proxy-controller";
 import { logChatActivity }       from "../services/auth-manager";
 import { validate, ChatSendSchema, ChatSendInput } from "../utils/validators";
+import { stmts }                 from "../models/database";
 import type { GenericResponse }  from "../types/response";
+
+export function handleListMyBots(req: Request, res: Response): void {
+  const userId = parseInt(req.user!.sub, 10);
+  const bots = stmts.listBotsForUser.all(userId);
+  const safe = bots.map((b) => ({ id: b.id, bot_name: b.bot_name }));
+  res.json({ success: true, bots: safe });
+}
 
 export async function handleChatSend(
   req: Request,
@@ -27,12 +35,12 @@ export async function handleChatSend(
     return;
   }
 
-  const { channel, message } = validation.data as ChatSendInput;
+  const { channel, message, bot_name } = validation.data as ChatSendInput;
   const userId = parseInt(req.user!.sub, 10);
   const ip     = req.ip ?? req.socket.remoteAddress;
 
-  // 2. Delegar al proxy (nunca expone el Bearer al cliente)
-  const result = await sendToKick({ channel, message, userId });
+  // 2. Delegar al proxy con el bot específico
+  const result = await sendToKick({ channel, message, userId, botName: bot_name });
 
   if (!result.success) {
     res.status(502).json({
