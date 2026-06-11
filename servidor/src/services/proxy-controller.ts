@@ -16,7 +16,8 @@
  */
 
 import { env } from "../config/env";
-import { getRandomBearer } from "./security";
+import { getRandomBearer, decryptFromHex } from "./security";
+import { stmts } from "../models/database";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,8 @@ export interface ProxyRequest {
   channel: string;
   message: string;
   userId: number;
+  /** Nombre del bot específico a usar (opcional) */
+  botName?: string;
 }
 
 export interface ProxyResult {
@@ -48,10 +51,26 @@ const REQUEST_TIMEOUT_MS = 8_000;
 export async function sendToKick(req: ProxyRequest): Promise<ProxyResult> {
   const sentAt = Date.now();
 
-  // 1. Obtener Bearer (descifrado en memoria, nunca en texto plano en disco)
+  // 1. Obtener Bearer
   let bearer: string;
   try {
-    bearer = getRandomBearer();
+    if (req.botName) {
+      // Usar un bot específico asignado al usuario
+      const bot = stmts.findBotByName.get(req.botName);
+      if (!bot) {
+        return { success: false, reason: `Bot "${req.botName}" no encontrado`, sentAt };
+      }
+      // Verificar que el usuario tenga asignado este bot
+      const userBots = stmts.listBotsForUser.all(req.userId);
+      const hasBot = userBots.some((b) => b.bot_name === req.botName);
+      if (!hasBot) {
+        return { success: false, reason: "No tienes este bot asignado", sentAt };
+      }
+      bearer = decryptFromHex(bot.encrypted_bearer);
+    } else {
+      // Fallback: bearer aleatorio del pool global
+      bearer = getRandomBearer();
+    }
   } catch (err) {
     console.error("[proxy-controller] Error al obtener Bearer:", err);
     return {

@@ -46,6 +46,9 @@ export const ChatSendSchema = z.object({
     .string()
     .min(1, "El mensaje no puede estar vacío")
     .max(500, "El mensaje no puede superar 500 caracteres"),
+
+  /** Nombre del bot a usar (opcional, si no se envía se usa uno aleatorio) */
+  bot_name: z.string().optional(),
 });
 
 // ─── Tipos inferidos ───────────────────────────────────────────────────────────
