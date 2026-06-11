@@ -13,7 +13,7 @@ function requireAdminSecret(req: Request, res: Response, next: NextFunction): vo
     return;
   }
 
-  const provided = req.headers["x-admin-secret"];
+  const provided = String(req.headers["x-admin-secret"] ?? "");
 
   if (!provided) {
     res.status(401).json({ error: "Missing required header: x-admin-secret" });

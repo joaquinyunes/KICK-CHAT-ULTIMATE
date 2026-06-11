@@ -51,6 +51,10 @@ export class BridgeClient {
   private intervalHandle: ReturnType<typeof setInterval> | null = null;
   private isRunning = false;
 
+  get running(): boolean {
+    return this.isRunning;
+  }
+
   constructor(config: BridgeClientConfig) {
     this.sessionId = uuidv4();
     const requestedInterval = config.intervalMs ?? DEFAULT_INTERVAL_MS;

@@ -140,3 +140,19 @@ export function getRandomBearer(): string {
   const idx = crypto.randomInt(0, bearers.length);
   return bearers[idx];
 }
+
+// ─── Helpers para almacenar tokens cifrados en DB ────────────────────────────
+
+/**
+ * Cifra un texto y devuelve una cadena hex para almacenar en DB.
+ */
+export function encryptToHex(plaintext: string): string {
+  return encrypt(plaintext).toString("hex");
+}
+
+/**
+ * Descifra una cadena hex (previamente cifrada con encryptToHex).
+ */
+export function decryptFromHex(hex: string): string {
+  return decrypt(Buffer.from(hex, "hex"));
+}

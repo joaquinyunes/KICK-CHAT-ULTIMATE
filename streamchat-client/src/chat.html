@@ -24,6 +24,7 @@
   <nav class="tab-nav">
     <button class="tab-btn active" data-tab="chat">Chat</button>
     <button class="tab-btn"        data-tab="settings">Ajustes</button>
+    <button class="tab-btn"        data-tab="admin" id="admin-tab-btn" hidden>Admin</button>
   </nav>
 
   <!-- ── Panel: Chat ────────────────────────────────── -->
@@ -85,6 +86,60 @@
 
       <button id="save-settings-btn" class="btn btn-primary">Guardar</button>
       <p id="settings-msg" class="settings-msg" hidden aria-live="polite"></p>
+
+    </div>
+
+  </section>
+
+  <!-- ── Panel: Admin ──────────────────────────────── -->
+  <section id="panel-admin" class="tab-panel">
+
+    <div class="admin-grid">
+
+      <!-- ── Crear Bot ── -->
+      <div class="admin-card">
+        <h3 class="admin-card-title">Agregar Bot</h3>
+        <div class="field">
+          <label for="adm-bot-name">Nombre del Bot</label>
+          <input id="adm-bot-name" type="text" placeholder="ej: bot1" />
+        </div>
+        <div class="field">
+          <label for="adm-bot-bearer">Bearer Token de Kick</label>
+          <input id="adm-bot-bearer" type="password" placeholder="••••••••" />
+        </div>
+        <button id="adm-add-bot-btn" class="btn btn-primary">Agregar Bot</button>
+        <p id="adm-bot-msg" class="settings-msg" hidden></p>
+      </div>
+
+      <!-- ── Crear Cliente ── -->
+      <div class="admin-card">
+        <h3 class="admin-card-title">Crear Cliente</h3>
+        <div class="field">
+          <label for="adm-client-name">Nombre de usuario</label>
+          <input id="adm-client-name" type="text" placeholder="ej: cliente1" />
+        </div>
+        <div class="field">
+          <label for="adm-client-pass">Contraseña</label>
+          <input id="adm-client-pass" type="password" placeholder="••••••••" />
+        </div>
+        <button id="adm-create-client-btn" class="btn btn-primary">Crear Cliente</button>
+        <p id="adm-client-msg" class="settings-msg" hidden></p>
+      </div>
+
+      <!-- ── Asignar Bot ── -->
+      <div class="admin-card">
+        <h3 class="admin-card-title">Asignar Bot a Cliente</h3>
+        <div class="field">
+          <label for="adm-assign-bot-name">Nombre del Bot</label>
+          <input id="adm-assign-bot-name" type="text" placeholder="ej: bot1" />
+        </div>
+        <div class="field">
+          <label for="adm-assign-client">Nombre del Cliente</label>
+          <input id="adm-assign-client" type="text" placeholder="ej: cliente1" />
+        </div>
+        <button id="adm-assign-btn" class="btn btn-primary">Asignar</button>
+        <p id="adm-assign-msg" class="settings-msg" hidden></p>
+      </div>
 
     </div>
 

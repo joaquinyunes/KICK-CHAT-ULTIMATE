@@ -12,7 +12,7 @@
  * NUNCA se importan módulos de cifrado.
  */
 
-import { setServerUrl } from './bridge-client.js';
+import { setServerUrl } from '../bridge-client';
 
 // ──────────────────────────────────────────────────────────────
 // Referencias al DOM (se resuelven en init())
@@ -97,6 +97,14 @@ async function handleSubmit(e: Event): Promise<void> {
 
     // Almacena JWT de forma volátil (se borra al cerrar la ventana)
     sessionStorage.setItem('scb_jwt', token);
+
+    // Guardar rol desde el payload del JWT
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      sessionStorage.setItem('scb_role', payload.role || 'client');
+    } catch {
+      sessionStorage.setItem('scb_role', 'client');
+    }
 
     // Persiste la URL del servidor en disco para próximas sesiones
     const currentSettings = await (window as any).bridge?.settingsRead();

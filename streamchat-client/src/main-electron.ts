@@ -15,7 +15,7 @@ let bridge: BridgeClient | null = null;
 
 // Configuración inicial del Bridge
 const initBridge = () => {
-  bridge = BridgeClient.getInstance({
+  bridge = new BridgeClient({
     serverUrl:    process.env.SERVER_URL || 'http://localhost:3000',
     serverSecret: process.env.SERVER_SECRET || 'streamchat-dev-secret',
     kickApiToken: process.env.KICK_API_TOKEN || '',
