@@ -39,20 +39,20 @@ function formatLog(entry: {
 function requestLogger(req: Request, res: Response, next: NextFunction): void {
   const startedAt = process.hrtime.bigint();
 
-  res.on("finish", () => {
+  (res as any).on("finish", () => {
     const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
 
     const userId =
-      (req.user as Record<string, unknown> | undefined)?.id as string | undefined ||
-      (req as Record<string, unknown>).userId as string | undefined ||
-      req.headers["x-user-id"] as string | undefined ||
+      req.user?.id as string | undefined ||
+      (req as any).userId as string | undefined ||
+      String(req.headers["x-user-id"] ?? "") ||
       null;
 
     const sessionId =
-      ((req as Record<string, unknown>).session as Record<string, unknown> | undefined)
+      ((req as any).session as Record<string, unknown> | undefined)
         ?.id as string | undefined ||
-      (req as Record<string, unknown>).sessionId as string | undefined ||
-      req.headers["x-session-id"] as string | undefined ||
+      (req as any).sessionId as string | undefined ||
+      String(req.headers["x-session-id"] ?? "") ||
       null;
 
     const entry = {

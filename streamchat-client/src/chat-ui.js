@@ -325,11 +325,119 @@ function switchTab(name) {
 }
 
 // ──────────────────────────────────────────────────────────────
+// Admin panel
+// ──────────────────────────────────────────────────────────────
+
+function isAdmin() {
+  return sessionStorage.getItem('scb_role') === 'admin';
+}
+
+function getAuthHeaders() {
+  const token = sessionStorage.getItem('scb_jwt');
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': token ? `Bearer ${token}` : '',
+  };
+}
+
+function getServerUrl() {
+  return (sessionStorage.getItem('scb_server_url') || '').replace(/\/+$/, '');
+}
+
+function showAdminMsg(elId, msg, type) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.textContent = msg;
+  el.dataset.type = type;
+  el.hidden = false;
+  setTimeout(() => { el.hidden = true; }, 3000);
+}
+
+async function handleAdminAddBot() {
+  const botName = document.getElementById('adm-bot-name')?.value?.trim();
+  const bearer = document.getElementById('adm-bot-bearer')?.value?.trim();
+  if (!botName || !bearer) { showAdminMsg('adm-bot-msg', 'Completa todos los campos.', 'error'); return; }
+
+  try {
+    const res = await fetch(`${getServerUrl()}/admin/bots`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ bot_name: botName, bearer }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showAdminMsg('adm-bot-msg', `✅ Bot "${botName}" agregado.`, 'success');
+      document.getElementById('adm-bot-name').value = '';
+      document.getElementById('adm-bot-bearer').value = '';
+    } else {
+      showAdminMsg('adm-bot-msg', `❌ ${data.error || 'Error'}`, 'error');
+    }
+  } catch { showAdminMsg('adm-bot-msg', '❌ Error de conexión.', 'error'); }
+}
+
+async function handleAdminCreateClient() {
+  const username = document.getElementById('adm-client-name')?.value?.trim();
+  const password = document.getElementById('adm-client-pass')?.value?.trim();
+  if (!username || !password) { showAdminMsg('adm-client-msg', 'Completa todos los campos.', 'error'); return; }
+  if (password.length < 6) { showAdminMsg('adm-client-msg', 'La contraseña debe tener al menos 6 caracteres.', 'error'); return; }
+
+  try {
+    const res = await fetch(`${getServerUrl()}/admin/users`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showAdminMsg('adm-client-msg', `✅ Cliente "${username}" creado.`, 'success');
+      document.getElementById('adm-client-name').value = '';
+      document.getElementById('adm-client-pass').value = '';
+    } else {
+      showAdminMsg('adm-client-msg', `❌ ${data.error || 'Error'}`, 'error');
+    }
+  } catch { showAdminMsg('adm-client-msg', '❌ Error de conexión.', 'error'); }
+}
+
+async function handleAdminAssign() {
+  const botName = document.getElementById('adm-assign-bot-name')?.value?.trim();
+  const username = document.getElementById('adm-assign-client')?.value?.trim();
+  if (!botName || !username) { showAdminMsg('adm-assign-msg', 'Completa todos los campos.', 'error'); return; }
+
+  try {
+    // Primero obtenemos el listado de bots para encontrar el ID
+    const botsRes = await fetch(`${getServerUrl()}/admin/bots`, { headers: getAuthHeaders() });
+    const botsData = await botsRes.json();
+    if (!botsData.success) { showAdminMsg('adm-assign-msg', '❌ No se pudieron obtener los bots.', 'error'); return; }
+
+    const bot = botsData.bots.find(b => b.bot_name === botName);
+    if (!bot) { showAdminMsg('adm-assign-msg', `❌ Bot "${botName}" no encontrado.`, 'error'); return; }
+
+    const res = await fetch(`${getServerUrl()}/admin/assign`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ bot_id: bot.id, username }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showAdminMsg('adm-assign-msg', `✅ Bot "${botName}" asignado a "${username}".`, 'success');
+      document.getElementById('adm-assign-bot-name').value = '';
+      document.getElementById('adm-assign-client').value = '';
+    } else {
+      showAdminMsg('adm-assign-msg', `❌ ${data.error || 'Error'}`, 'error');
+    }
+  } catch { showAdminMsg('adm-assign-msg', '❌ Error de conexión.', 'error'); }
+}
+
+// ──────────────────────────────────────────────────────────────
 // Bootstrap
 // ──────────────────────────────────────────────────────────────
 
 export function initChatUI() {
   initTabs();
+
+  // Mostrar tab Admin solo si el rol es admin
+  const adminTabBtn = document.getElementById('admin-tab-btn');
+  if (adminTabBtn) adminTabBtn.hidden = !isAdmin();
 
   // Conexión al estado del bridge
   onStatusChange(updateStatusUI);
@@ -343,6 +451,11 @@ export function initChatUI() {
 
   // Settings
   dom.saveSettBtn()?.addEventListener('click', handleSaveSettings);
+
+  // Admin
+  document.getElementById('adm-add-bot-btn')?.addEventListener('click', handleAdminAddBot);
+  document.getElementById('adm-create-client-btn')?.addEventListener('click', handleAdminCreateClient);
+  document.getElementById('adm-assign-btn')?.addEventListener('click', handleAdminAssign);
 
   loadSettings().then(() => {
     renderMessageList();

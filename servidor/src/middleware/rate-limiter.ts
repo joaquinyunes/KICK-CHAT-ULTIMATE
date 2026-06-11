@@ -46,6 +46,10 @@ export class RateLimiter {
   static clearSession(sessionId: string): void {
     store.delete(sessionId);
   }
+
+  static getIntervalMs(): number {
+    return INTERVAL_MS;
+  }
 }
 
 /**

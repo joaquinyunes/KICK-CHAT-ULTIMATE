@@ -9,7 +9,8 @@
 import type { Request, Response } from "express";
 import { sendToKick }            from "../services/proxy-controller";
 import { logChatActivity }       from "../services/auth-manager";
-import { validate, ChatSendSchema } from "../utils/validators";
+import { validate, ChatSendSchema, ChatSendInput } from "../utils/validators";
+import type { GenericResponse }  from "../types/response";
 
 export async function handleChatSend(
   req: Request,
@@ -19,13 +20,14 @@ export async function handleChatSend(
   const validation = validate(ChatSendSchema, req.body);
   if (!validation.success) {
     res.status(400).json({
+      success: false,
       error:  "Datos inválidos",
-      fields: validation.errors,
-    });
+      fields: (validation as any).errors,
+    } as GenericResponse);
     return;
   }
 
-  const { channel, message } = validation.data;
+  const { channel, message } = validation.data as ChatSendInput;
   const userId = parseInt(req.user!.sub, 10);
   const ip     = req.ip ?? req.socket.remoteAddress;
 
@@ -34,9 +36,10 @@ export async function handleChatSend(
 
   if (!result.success) {
     res.status(502).json({
+      success: false,
       error:   "Error al enviar mensaje",
       message: result.reason,
-    });
+    } as GenericResponse);
     return;
   }
 
@@ -46,5 +49,5 @@ export async function handleChatSend(
   res.status(200).json({
     success: true,
     message: "Mensaje enviado correctamente",
-  });
+  } as GenericResponse);
 }

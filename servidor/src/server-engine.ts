@@ -7,19 +7,32 @@
  */
 
 import express, { type Request, type Response, type NextFunction } from "express";
+import cors from "cors";
 import rateLimit from "express-rate-limit";
 
 import { env } from "./config/env";
 import { loginUser, registerUser } from "./services/auth-manager";
 import { loadBearers } from "./services/security";
 import { requireAuth } from "./middleware/jwt.middleware";
-import { RateLimiter } from "./rate-limiter"; // ◄ Importación Fase 3
+import { requireAdmin } from "./middleware/admin.middleware";
+import {
+  adminCreateBot,
+  adminListBots,
+  adminCreateUser,
+  adminListUsers,
+  adminAssignBot,
+  adminGetAssignments,
+} from "./controllers/admin.controller";
+import { RateLimiter } from "./middleware/rate-limiter";
 import { handleChatSend } from "./controllers/chat.controller";
-import { validate, LoginSchema, RegisterSchema } from "./utils/validators";
+import { validate, LoginSchema, RegisterSchema, LoginInput, RegisterInput } from "./utils/validators";
 import { requestLogger, metricsRouter, recordMessage } from "./telemetry";
+import type { GenericResponse } from "./types/response";
+import { initDatabase } from "./models/database";
 
 const app = express();
 
+app.use(cors());
 app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: false }));
 app.disable("x-powered-by");
@@ -38,11 +51,14 @@ const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10 });
 
 app.post("/auth/register", authLimiter, async (req: Request, res: Response) => {
   const v = validate(RegisterSchema, req.body);
-  if (!v.success) return res.status(400).json({ error: "Datos inválidos", fields: v.errors });
+  if (!v.success) {
+    return res.status(400).json({ success: false, error: "Datos inválidos", fields: (v as any).errors } as GenericResponse);
+  }
   
   try {
-    const user = await registerUser(v.data.username, v.data.password);
-    res.status(201).json({ message: "Usuario registrado", username: user.username });
+    const data = v.data as RegisterInput;
+    const user = await registerUser(data.username, data.password);
+    res.status(201).json({ success: true, message: "Usuario registrado", username: user.username } as GenericResponse);
   } catch (err) {
     res.status(500).json({ error: "Error interno" });
   }
@@ -50,11 +66,14 @@ app.post("/auth/register", authLimiter, async (req: Request, res: Response) => {
 
 app.post("/auth/login", authLimiter, async (req: Request, res: Response) => {
   const v = validate(LoginSchema, req.body);
-  if (!v.success) return res.status(400).json({ error: "Datos inválidos", fields: v.errors });
+  if (!v.success) {
+    return res.status(400).json({ success: false, error: "Datos inválidos", fields: (v as any).errors } as GenericResponse);
+  }
 
   try {
-    const result = await loginUser(v.data.username, v.data.password, req.ip);
-    res.status(200).json({ token: result.token, expiresAt: result.expiresAt, tokenType: "Bearer" });
+    const data = v.data as LoginInput;
+    const result = await loginUser(data.username, data.password, req.ip);
+    res.status(200).json({ success: true, token: result.token, expiresAt: result.expiresAt, tokenType: "Bearer" } as GenericResponse);
   } catch (err) {
     res.status(401).json({ error: "No autorizado", message: "Credenciales inválidas" });
   }
@@ -103,6 +122,15 @@ app.delete("/session/:sessionId", (req: Request, res: Response) => {
   res.status(200).json({ success: true, message: "Sesión cerrada" });
 });
 
+// ─── Rutas de Administración (solo admin) ─────────────────────────────────────
+
+app.post("/admin/bots",         requireAuth, requireAdmin, adminCreateBot);
+app.get("/admin/bots",          requireAuth, requireAdmin, adminListBots);
+app.post("/admin/users",        requireAuth, requireAdmin, adminCreateUser);
+app.get("/admin/users",         requireAuth, requireAdmin, adminListUsers);
+app.post("/admin/assign",       requireAuth, requireAdmin, adminAssignBot);
+app.get("/admin/assignments/:userId", requireAuth, requireAdmin, adminGetAssignments);
+
 // ─── Metrics Router ────────────────────────────────────────────────────────────
 app.use(metricsRouter);
 
@@ -124,6 +152,9 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 // ─── Arranque ─────────────────────────────────────────────────────────────────
 
 async function bootstrap(): Promise<void> {
+  console.log("🗄️  Inicializando base de datos...");
+  await initDatabase();
+
   console.log("🔐 Verificando bearers...");
   loadBearers();
 

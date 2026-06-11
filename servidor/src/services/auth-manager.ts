@@ -27,6 +27,7 @@ export interface AuthResult {
 export interface TokenPayload extends JwtPayload {
   sub: string;       // user ID (string por convención JWT)
   username: string;
+  role: string;
 }
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
@@ -100,6 +101,7 @@ export async function loginUser(
   const payload: TokenPayload = {
     sub:      String(user.id),
     username: user.username,
+    role:     user.role,
     iat:      now,
     exp:      expiresAt,       // Expiración FIJA de 24 horas
   };
