@@ -55,12 +55,14 @@ async function handleSubmit(e) {
     if (!token) { showError('El servidor no devolvió un token válido.'); return; }
 
     sessionStorage.setItem('scb_jwt', token);
+    let role = 'client';
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
-      sessionStorage.setItem('scb_role', payload.role || 'client');
+      role = payload.role || 'client';
+      sessionStorage.setItem('scb_role', role);
     } catch { sessionStorage.setItem('scb_role', 'client'); }
 
-    window.location.href = '/chat.html';
+    window.location.href = role === 'admin' ? '/admin.html' : '/chat.html';
   } catch (err) {
     showError(err?.name === 'TypeError' ? 'No se puede conectar al servidor.' : `Error: ${err?.message || 'desconocido'}`);
   } finally {

@@ -18,96 +18,76 @@
   <nav class="tab-nav">
     <button class="tab-btn active" data-tab="chat">Chat</button>
     <button class="tab-btn" data-tab="settings">Ajustes</button>
-    <button class="tab-btn" data-tab="admin" id="admin-tab-btn" hidden>Admin</button>
   </nav>
 
   <section id="panel-chat" class="tab-panel active">
-    <div class="toolbar">
-      <button id="load-file-btn" class="btn btn-secondary">📂 Cargar archivo .txt</button>
-      <span id="file-info" class="file-info"></span>
-      <div class="field" style="margin:0;flex-direction:row;align-items:center;gap:8px">
-        <label for="bot-select" style="margin:0">Bot:</label>
-        <select id="bot-select" class="bot-select"></select>
-      </div>
+
+    <!-- Bots disponibles -->
+    <div class="bots-bar">
+      <span id="bots-info" class="bots-info">Cargando bots...</span>
     </div>
+
+    <!-- Archivos cargados -->
+    <div class="files-section">
+      <div class="files-header">
+        <span class="files-title">Archivos de mensajes</span>
+        <button id="load-file-btn" class="btn btn-secondary btn-sm">+ Agregar .txt</button>
+      </div>
+      <ul id="file-list" class="file-list">
+        <li class="empty-state">Sin archivos cargados.</li>
+      </ul>
+    </div>
+
+    <!-- Progreso -->
     <div class="progress-track">
       <div id="progress-bar" class="progress-bar" style="width:0%"></div>
     </div>
+
+    <!-- Mensajes del archivo activo -->
+    <div class="msg-preview-header">
+      <span id="active-file-name" class="active-file-name">Ningún archivo seleccionado</span>
+      <span id="msg-count" class="msg-count"></span>
+    </div>
     <ul id="msg-list" class="msg-list">
-      <li class="empty-state">Sin mensajes cargados.</li>
+      <li class="empty-state">Cargá un archivo .txt para empezar.</li>
     </ul>
+
+    <!-- Controles de envío -->
     <footer class="send-controls">
       <span id="send-status" class="send-status"></span>
       <div class="send-btns">
         <button id="send-once-btn" class="btn btn-ghost" disabled>Enviar siguiente</button>
-        <button id="start-btn" class="btn btn-primary" disabled>▶ Iniciar</button>
-        <button id="stop-btn" class="btn btn-danger" disabled>■ Detener</button>
+        <button id="start-btn"     class="btn btn-primary" disabled>▶ Iniciar</button>
+        <button id="stop-btn"      class="btn btn-danger"  disabled>■ Detener</button>
       </div>
     </footer>
+
   </section>
 
   <section id="panel-settings" class="tab-panel">
     <div class="settings-form">
       <div class="field">
-        <label for="cfg-server-url">URL del Servidor</label>
-        <input id="cfg-server-url" type="url" placeholder="http://localhost:3000" spellcheck="false" />
-      </div>
-      <div class="field">
         <label for="cfg-channel">Canal de destino</label>
         <input id="cfg-channel" type="text" placeholder="nombre-del-canal" spellcheck="false" />
       </div>
       <div class="field">
-        <label for="cfg-interval">Intervalo de envío (segundos)</label>
-        <input id="cfg-interval" type="number" min="1" max="3600" value="5" />
+        <label for="cfg-interval-min">Intervalo mínimo (segundos)</label>
+        <input id="cfg-interval-min" type="number" min="1" max="3600" value="3" />
+      </div>
+      <div class="field">
+        <label for="cfg-interval-max">Intervalo máximo (segundos)</label>
+        <input id="cfg-interval-max" type="number" min="1" max="3600" value="8" />
+      </div>
+      <div class="field">
+        <label for="cfg-chatroom-id">Chatroom ID (opcional)</label>
+        <input id="cfg-chatroom-id" type="number" placeholder="ej: 20548413" />
       </div>
       <button id="save-settings-btn" class="btn btn-primary">Guardar</button>
       <p id="settings-msg" class="settings-msg" hidden></p>
     </div>
   </section>
 
-  <section id="panel-admin" class="tab-panel">
-    <div class="admin-grid">
-      <div class="admin-card">
-        <h3 class="admin-card-title">Agregar Bot</h3>
-        <div class="field">
-          <label for="adm-bot-name">Nombre del Bot</label>
-          <input id="adm-bot-name" type="text" placeholder="ej: bot1" />
-        </div>
-        <div class="field">
-          <label for="adm-bot-bearer">Bearer Token de Kick</label>
-          <input id="adm-bot-bearer" type="password" placeholder="••••••••" />
-        </div>
-        <button id="adm-add-bot-btn" class="btn btn-primary">Agregar Bot</button>
-        <p id="adm-bot-msg" class="settings-msg" hidden></p>
-      </div>
-      <div class="admin-card">
-        <h3 class="admin-card-title">Crear Cliente</h3>
-        <div class="field">
-          <label for="adm-client-name">Nombre de usuario</label>
-          <input id="adm-client-name" type="text" placeholder="ej: cliente1" />
-        </div>
-        <div class="field">
-          <label for="adm-client-pass">Contraseña</label>
-          <input id="adm-client-pass" type="password" placeholder="••••••••" />
-        </div>
-        <button id="adm-create-client-btn" class="btn btn-primary">Crear Cliente</button>
-        <p id="adm-client-msg" class="settings-msg" hidden></p>
-      </div>
-      <div class="admin-card">
-        <h3 class="admin-card-title">Asignar Bot a Cliente</h3>
-        <div class="field">
-          <label for="adm-assign-bot-name">Nombre del Bot</label>
-          <input id="adm-assign-bot-name" type="text" placeholder="ej: bot1" />
-        </div>
-        <div class="field">
-          <label for="adm-assign-client">Nombre del Cliente</label>
-          <input id="adm-assign-client" type="text" placeholder="ej: cliente1" />
-        </div>
-        <button id="adm-assign-btn" class="btn btn-primary">Asignar</button>
-        <p id="adm-assign-msg" class="settings-msg" hidden></p>
-      </div>
-    </div>
-  </section>
+
 
   <script type="module" src="js/chat-ui.js"></script>
 </body>

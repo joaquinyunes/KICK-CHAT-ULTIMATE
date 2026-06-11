@@ -1,12 +1,14 @@
-import { onStatusChange, ping, sendMessage, setServerUrl, fetchMyBots } from './bridge-client.js';
+import { onStatusChange, ping, sendMessage, fetchMyBots } from './bridge-client.js';
 
-let messageQueue = [];
-let currentIndex = 0;
-let sendInterval = 5;
-let channelName = '';
+let files = [];
+let currentFileIndex = -1;
 let intervalId = null;
+let channelName = '';
+let intervalMin = 3;
+let intervalMax = 8;
+let chatroomId = '';
 
-// ── Tabs ────────────────────────────────────────────
+
 function initTabs() {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -18,7 +20,6 @@ function initTabs() {
   });
 }
 
-// ── Connection status ───────────────────────────────
 function updateStatusUI(status) {
   const badge = document.getElementById('status-badge');
   const label = document.getElementById('status-label');
@@ -27,110 +28,162 @@ function updateStatusUI(status) {
   label.textContent = status === 'connected' ? 'Conectado' : status === 'checking' ? 'Verificando…' : 'Desconectado';
 }
 
-function startPingLoop() {
-  ping();
-  setInterval(() => ping(), 15000);
+function startPingLoop() { ping(); setInterval(() => ping(), 15000); }
+
+async function loadBotsInfo() {
+  const el = document.getElementById('bots-info');
+  if (!el) return;
+  const bots = await fetchMyBots();
+  el.textContent = bots.length === 0
+    ? 'No tenés bots asignados. Contactá al administrador.'
+    : `${bots.length} bot(es) asignado(s) — se usan automáticamente`;
 }
 
-// ── File loading ────────────────────────────────────
-function renderMessageList() {
-  const list = document.getElementById('msg-list');
+function renderFileList() {
+  const list = document.getElementById('file-list');
   if (!list) return;
-  list.innerHTML = '';
-  if (messageQueue.length === 0) {
-    list.innerHTML = '<li class="empty-state">Sin mensajes cargados.</li>';
+  if (files.length === 0) {
+    list.innerHTML = '<li class="empty-state">Sin archivos cargados.</li>';
+    document.getElementById('active-file-name').textContent = 'Ningún archivo seleccionado';
+    document.getElementById('msg-count').textContent = '';
     return;
   }
-  messageQueue.forEach((msg, i) => {
-    const li = document.createElement('li');
-    li.className = `msg-item${i === currentIndex ? ' msg-current' : ''}`;
-    li.innerHTML = `<span class="msg-num">${i + 1}</span><span class="msg-text">${msg}</span>`;
-    list.appendChild(li);
+  list.innerHTML = files.map((f, i) => `
+    <li class="file-item${i === currentFileIndex ? ' file-active' : ''}" data-index="${i}">
+      <span class="file-name">${f.name}</span>
+      <span class="file-count">${f.messages.length} msgs</span>
+    </li>
+  `).join('');
+  list.querySelectorAll('.file-item').forEach(el => {
+    el.addEventListener('click', () => {
+      currentFileIndex = parseInt(el.dataset.index, 10);
+      renderFileList();
+      renderMessageList();
+      updateButtonStates();
+    });
   });
+}
+
+function renderMessageList() {
+  const list = document.getElementById('msg-list');
+  const nameEl = document.getElementById('active-file-name');
+  const countEl = document.getElementById('msg-count');
+  if (!list) return;
+  if (currentFileIndex < 0 || currentFileIndex >= files.length) {
+    list.innerHTML = '<li class="empty-state">Seleccioná un archivo de la lista.</li>';
+    if (nameEl) nameEl.textContent = 'Ningún archivo seleccionado';
+    if (countEl) countEl.textContent = '';
+    return;
+  }
+  const file = files[currentFileIndex];
+  if (nameEl) nameEl.textContent = file.name;
+  if (countEl) countEl.textContent = `${file.currentIndex + 1 || 0}/${file.messages.length}`;
+  if (file.messages.length === 0) {
+    list.innerHTML = '<li class="empty-state">Archivo vacío.</li>';
+    return;
+  }
+  list.innerHTML = file.messages.map((msg, i) => `
+    <li class="msg-item${i === (file.currentIndex || 0) ? ' msg-current' : ''}">
+      <span class="msg-num">${i + 1}</span>
+      <span class="msg-text">${msg}</span>
+    </li>
+  `).join('');
   updateProgress();
-  updateButtonStates();
+}
+
+function saveFiles() {
+  try { localStorage.setItem('scb_files', JSON.stringify(files)); } catch {}
+}
+
+function loadSavedFiles() {
+  try {
+    const saved = localStorage.getItem('scb_files');
+    if (saved) files = JSON.parse(saved);
+  } catch {}
 }
 
 function handleLoadFile() {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = '.txt';
+  input.multiple = true;
   input.addEventListener('change', async () => {
-    const file = input.files?.[0];
-    if (!file) return;
-    const text = await file.text();
-    messageQueue = text.split('\n').filter(l => l.trim());
-    currentIndex = 0;
-    document.getElementById('file-info').textContent = `${file.name} · ${messageQueue.length} mensaje(s)`;
+    const fileList = input.files;
+    if (!fileList || fileList.length === 0) return;
+    for (const file of fileList) {
+      const text = await file.text();
+      const messages = text.split('\n').filter(l => l.trim());
+      files.push({ name: file.name, messages, currentIndex: 0 });
+    }
+    if (currentFileIndex < 0) currentFileIndex = 0;
+    saveFiles();
+    renderFileList();
     renderMessageList();
+    updateButtonStates();
   });
   input.click();
 }
 
-// ── Bot selector ────────────────────────────────────
-async function loadMyBots() {
-  const select = document.getElementById('bot-select');
-  if (!select) return;
-  select.innerHTML = '<option value="">Cargando...</option>';
-  const bots = await fetchMyBots();
-  if (bots.length === 0) {
-    select.innerHTML = '<option value="">Sin bots asignados</option>';
-    return;
-  }
-  select.innerHTML = bots.map(b => `<option value="${b.bot_name}">${b.bot_name}</option>`).join('');
+function getRandomInterval() {
+  const min = Math.min(intervalMin, intervalMax);
+  const max = Math.max(intervalMin, intervalMax);
+  return (Math.random() * (max - min) + min) * 1000;
 }
 
-function getSelectedBot() {
-  const select = document.getElementById('bot-select');
-  return select?.value || '';
-}
-
-// ── Sending ─────────────────────────────────────────
 async function sendCurrentMessage() {
-  if (messageQueue.length === 0 || currentIndex >= messageQueue.length) return;
-  const message = messageQueue[currentIndex];
+  if (currentFileIndex < 0 || currentFileIndex >= files.length) return;
+  const file = files[currentFileIndex];
+  if (!file.messages || file.messages.length === 0) return;
+  if ((file.currentIndex || 0) >= file.messages.length) return;
+  const idx = file.currentIndex || 0;
+  const message = file.messages[idx];
   const statusEl = document.getElementById('send-status');
-  if (statusEl) statusEl.textContent = `Enviando (${currentIndex + 1}/${messageQueue.length})…`;
-
-  const botName = getSelectedBot();
-  if (!botName) {
-    if (statusEl) statusEl.textContent = '✘ Seleccioná un bot primero.';
-    stopAutoSend();
-    return;
-  }
-  const res = await sendMessage({ channel: channelName, message, bot_name: botName });
-
+  if (statusEl) statusEl.textContent = `Enviando (${idx + 1}/${file.messages.length})…`;
+  const res = await sendMessage({ channel: channelName, message, chatroom_id: chatroomId || undefined });
   if (res.ok) {
-    if (statusEl) statusEl.textContent = `✔ Enviado: "${message.substring(0, 40)}…"`;
-    currentIndex++;
+    if (statusEl) statusEl.textContent = `Enviado: "${message.substring(0, 40)}…"`;
+    file.currentIndex = idx + 1;
+    saveFiles();
     renderMessageList();
-    if (currentIndex >= messageQueue.length) {
+    if ((file.currentIndex) >= file.messages.length) {
       stopAutoSend();
-      if (statusEl) statusEl.textContent = '✔ Todos los mensajes enviados.';
+      if (statusEl) statusEl.textContent = 'Todos los mensajes enviados.';
     }
   } else {
-    if (statusEl) statusEl.textContent = `✘ Error: ${res.error}`;
+    if (statusEl) statusEl.textContent = `Error: ${res.message || res.error}`;
     if (res.status !== 401) stopAutoSend();
   }
 }
 
 function startAutoSend() {
   if (intervalId !== null) return;
-  if (messageQueue.length === 0) { alert('Carga un archivo de mensajes primero.'); return; }
-  if (!channelName) { alert('Configura el nombre del canal en Ajustes.'); switchTab('settings'); return; }
-  intervalId = setInterval(sendCurrentMessage, sendInterval * 1000);
+  if (currentFileIndex < 0 || files.length === 0) { alert('Cargá archivos .txt primero.'); return; }
+  if (!channelName) { alert('Configurá el canal en Ajustes.'); switchTab('settings'); return; }
+  const send = async () => {
+    await sendCurrentMessage();
+    if (intervalId !== null) {
+      clearInterval(intervalId);
+      intervalId = setInterval(send, getRandomInterval());
+      updateButtonStates();
+    }
+  };
+  send();
+  intervalId = setInterval(send, getRandomInterval());
   updateButtonStates();
 }
 
 function stopAutoSend() {
   if (intervalId !== null) { clearInterval(intervalId); intervalId = null; }
   updateButtonStates();
+  document.getElementById('send-status')?.removeAttribute('data-running');
 }
 
 function updateProgress() {
+  if (currentFileIndex < 0 || currentFileIndex >= files.length) return;
+  const file = files[currentFileIndex];
   const bar = document.getElementById('progress-bar');
-  if (!bar || messageQueue.length === 0) return;
-  const pct = Math.round((currentIndex / messageQueue.length) * 100);
+  if (!bar || !file.messages || file.messages.length === 0) return;
+  const pct = Math.round(((file.currentIndex || 0) / file.messages.length) * 100);
   bar.style.width = `${pct}%`;
 }
 
@@ -138,35 +191,34 @@ function updateButtonStates() {
   const start = document.getElementById('start-btn');
   const stop = document.getElementById('stop-btn');
   const sendOnce = document.getElementById('send-once-btn');
-  const hasQueue = messageQueue.length > 0 && currentIndex < messageQueue.length;
+  const hasQueue = currentFileIndex >= 0 && files[currentFileIndex]?.messages?.length > 0 &&
+    (files[currentFileIndex].currentIndex || 0) < files[currentFileIndex].messages.length;
   const running = intervalId !== null;
   if (start) start.disabled = running || !hasQueue;
   if (stop) stop.disabled = !running;
   if (sendOnce) sendOnce.disabled = running || !hasQueue;
 }
 
-// ── Settings ────────────────────────────────────────
 function loadSettings() {
-  const serverUrl = localStorage.getItem('scb_server_url');
   const saved = JSON.parse(localStorage.getItem('scb_settings') || '{}');
-  if (serverUrl) { document.getElementById('cfg-server-url').value = serverUrl; setServerUrl(serverUrl); }
   if (saved.channelName) { document.getElementById('cfg-channel').value = saved.channelName; channelName = saved.channelName; }
-  if (saved.sendInterval) { document.getElementById('cfg-interval').value = saved.sendInterval; sendInterval = saved.sendInterval; }
+  if (saved.intervalMin) { document.getElementById('cfg-interval-min').value = saved.intervalMin; intervalMin = saved.intervalMin; }
+  if (saved.intervalMax) { document.getElementById('cfg-interval-max').value = saved.intervalMax; intervalMax = saved.intervalMax; }
+  if (saved.chatroomId) { document.getElementById('cfg-chatroom-id').value = saved.chatroomId; chatroomId = saved.chatroomId; }
 }
 
 function handleSaveSettings() {
-  const url = document.getElementById('cfg-server-url')?.value.trim() || '';
   const channel = document.getElementById('cfg-channel')?.value.trim() || '';
-  const interval = parseInt(document.getElementById('cfg-interval')?.value || '5', 10);
-  if (!url) { showSettingsMsg('Ingresa la URL del servidor.', 'error'); return; }
-  if (!channel) { showSettingsMsg('Ingresa el nombre del canal.', 'error'); return; }
-  if (interval < 1) { showSettingsMsg('El intervalo mínimo es 1 seg.', 'error'); return; }
-
-  localStorage.setItem('scb_server_url', url.replace(/\/+$/, ''));
-  localStorage.setItem('scb_settings', JSON.stringify({ channelName: channel, sendInterval: interval }));
+  const min = parseInt(document.getElementById('cfg-interval-min')?.value || '3', 10);
+  const max = parseInt(document.getElementById('cfg-interval-max')?.value || '8', 10);
+  const roomId = document.getElementById('cfg-chatroom-id')?.value.trim() || '';
+  if (!channel) { showSettingsMsg('Ingresá el nombre del canal.', 'error'); return; }
+  if (min < 1 || max < 1) { showSettingsMsg('Los intervalos mínimos son 1 seg.', 'error'); return; }
+  localStorage.setItem('scb_settings', JSON.stringify({ channelName: channel, intervalMin: min, intervalMax: max, chatroomId: roomId }));
   channelName = channel;
-  sendInterval = interval;
-  setServerUrl(url);
+  intervalMin = min;
+  intervalMax = max;
+  chatroomId = roomId;
   showSettingsMsg('Configuración guardada.', 'success');
   ping();
 }
@@ -182,76 +234,17 @@ function switchTab(name) {
   document.querySelector(`[data-tab="${name}"]`)?.click();
 }
 
-// ── Admin panel ─────────────────────────────────────
-function isAdmin() { return sessionStorage.getItem('scb_role') === 'admin'; }
-
-function getAuthHeaders() {
-  const token = sessionStorage.getItem('scb_jwt');
-  return { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' };
-}
-
-function getServerUrl() { return (sessionStorage.getItem('scb_server_url') || '').replace(/\/+$/, ''); }
-function getLocalServerUrl() { return (localStorage.getItem('scb_server_url') || '').replace(/\/+$/, ''); }
-
-function showAdminMsg(elId, msg, type) {
-  const el = document.getElementById(elId);
-  if (!el) return;
-  el.textContent = msg; el.dataset.type = type; el.hidden = false;
-  setTimeout(() => { el.hidden = true; }, 3000);
-}
-
-async function handleAdminAddBot() {
-  const botName = document.getElementById('adm-bot-name')?.value?.trim();
-  const bearer = document.getElementById('adm-bot-bearer')?.value?.trim();
-  if (!botName || !bearer) { showAdminMsg('adm-bot-msg', 'Completa todos los campos.', 'error'); return; }
-  try {
-    const res = await fetch(`${getServerUrl()}/admin/bots`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ bot_name: botName, bearer }) });
-    const data = await res.json();
-    if (res.ok) { showAdminMsg('adm-bot-msg', `✅ Bot "${botName}" agregado.`, 'success'); document.getElementById('adm-bot-name').value = ''; document.getElementById('adm-bot-bearer').value = ''; }
-    else { showAdminMsg('adm-bot-msg', `❌ ${data.error || 'Error'}`, 'error'); }
-  } catch { showAdminMsg('adm-bot-msg', '❌ Error de conexión.', 'error'); }
-}
-
-async function handleAdminCreateClient() {
-  const username = document.getElementById('adm-client-name')?.value?.trim();
-  const password = document.getElementById('adm-client-pass')?.value?.trim();
-  if (!username || !password) { showAdminMsg('adm-client-msg', 'Completa todos los campos.', 'error'); return; }
-  if (password.length < 6) { showAdminMsg('adm-client-msg', 'La contraseña debe tener al menos 6 caracteres.', 'error'); return; }
-  try {
-    const res = await fetch(`${getServerUrl()}/admin/users`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ username, password }) });
-    const data = await res.json();
-    if (res.ok) { showAdminMsg('adm-client-msg', `✅ Cliente "${username}" creado.`, 'success'); document.getElementById('adm-client-name').value = ''; document.getElementById('adm-client-pass').value = ''; }
-    else { showAdminMsg('adm-client-msg', `❌ ${data.error || 'Error'}`, 'error'); }
-  } catch { showAdminMsg('adm-client-msg', '❌ Error de conexión.', 'error'); }
-}
-
-async function handleAdminAssign() {
-  const botName = document.getElementById('adm-assign-bot-name')?.value?.trim();
-  const username = document.getElementById('adm-assign-client')?.value?.trim();
-  if (!botName || !username) { showAdminMsg('adm-assign-msg', 'Completa todos los campos.', 'error'); return; }
-  try {
-    const base = getServerUrl();
-    const botsRes = await fetch(`${base}/admin/bots`, { headers: getAuthHeaders() });
-    const botsData = await botsRes.json();
-    if (!botsData.success) { showAdminMsg('adm-assign-msg', '❌ No se pudieron obtener los bots.', 'error'); return; }
-    const bot = botsData.bots.find(b => b.bot_name === botName);
-    if (!bot) { showAdminMsg('adm-assign-msg', `❌ Bot "${botName}" no encontrado.`, 'error'); return; }
-    const res = await fetch(`${base}/admin/assign`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ bot_id: bot.id, username }) });
-    const data = await res.json();
-    if (res.ok) { showAdminMsg('adm-assign-msg', `✅ Bot "${botName}" asignado a "${username}".`, 'success'); document.getElementById('adm-assign-bot-name').value = ''; document.getElementById('adm-assign-client').value = ''; }
-    else { showAdminMsg('adm-assign-msg', `❌ ${data.error || 'Error'}`, 'error'); }
-  } catch { showAdminMsg('adm-assign-msg', '❌ Error de conexión.', 'error'); }
-}
-
-// ── Init ────────────────────────────────────────────
 export function initChatUI() {
   initTabs();
 
-  const adminTabBtn = document.getElementById('admin-tab-btn');
-  if (adminTabBtn) adminTabBtn.hidden = !isAdmin();
+  if (sessionStorage.getItem('scb_role') === 'admin') {
+    window.location.href = '/admin.html';
+    return;
+  }
 
   onStatusChange(updateStatusUI);
   startPingLoop();
+  loadBotsInfo();
 
   document.getElementById('load-file-btn')?.addEventListener('click', handleLoadFile);
   document.getElementById('start-btn')?.addEventListener('click', startAutoSend);
@@ -259,12 +252,10 @@ export function initChatUI() {
   document.getElementById('send-once-btn')?.addEventListener('click', sendCurrentMessage);
   document.getElementById('save-settings-btn')?.addEventListener('click', handleSaveSettings);
 
-  document.getElementById('adm-add-bot-btn')?.addEventListener('click', handleAdminAddBot);
-  document.getElementById('adm-create-client-btn')?.addEventListener('click', handleAdminCreateClient);
-  document.getElementById('adm-assign-btn')?.addEventListener('click', handleAdminAssign);
-
   loadSettings();
-  loadMyBots();
+  loadSavedFiles();
+  if (files.length > 0 && currentFileIndex < 0) currentFileIndex = 0;
+  renderFileList();
   renderMessageList();
   updateButtonStates();
 }

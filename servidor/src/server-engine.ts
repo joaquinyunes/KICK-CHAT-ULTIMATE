@@ -6,6 +6,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import crypto from "crypto";
 import express, { type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
@@ -23,6 +24,8 @@ import {
   adminListUsers,
   adminAssignBot,
   adminGetAssignments,
+  adminUnassignBot,
+  adminUsersWithBots,
 } from "./controllers/admin.controller";
 import { RateLimiter } from "./middleware/rate-limiter";
 import { handleChatSend, handleListMyBots } from "./controllers/chat.controller";
@@ -30,8 +33,17 @@ import { validate, LoginSchema, RegisterSchema, LoginInput, RegisterInput } from
 import { requestLogger, metricsRouter, recordMessage } from "./telemetry";
 import type { GenericResponse } from "./types/response";
 import { initDatabase } from "./models/database";
+import { stmts } from "./models/database";
+import {
+  getAuthorizationUrl,
+  generateCodeVerifier,
+  exchangeCode,
+} from "./services/kick-oauth";
 
 const app = express();
+
+// ─── OAuth state store (in-memory, PKCE verifiers) ────
+const oauthStates = new Map<string, { verifier: string; botId: number }>();
 
 app.use(cors());
 app.use(express.json({ limit: "16kb" }));
@@ -40,6 +52,11 @@ app.disable("x-powered-by");
 
 // ─── Static files (Web UI) ───────────────────────────────────────────────────
 app.use(express.static(path.join(__dirname, "..", "public")));
+
+// Ruta bonita para el admin
+app.get("/admin", (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, "..", "public", "admin.html"));
+});
 
 // ─── Telemetry ─────────────────────────────────────────────────────────────────
 app.use(requestLogger);
@@ -139,7 +156,55 @@ app.get("/admin/bots",          requireAuth, requireAdmin, adminListBots);
 app.post("/admin/users",        requireAuth, requireAdmin, adminCreateUser);
 app.get("/admin/users",         requireAuth, requireAdmin, adminListUsers);
 app.post("/admin/assign",       requireAuth, requireAdmin, adminAssignBot);
+app.delete("/admin/unassign",   requireAuth, requireAdmin, adminUnassignBot);
 app.get("/admin/assignments/:userId", requireAuth, requireAdmin, adminGetAssignments);
+app.get("/admin/users-with-bots", requireAuth, requireAdmin, adminUsersWithBots);
+
+// ─── Kick OAuth Routes ─────────────────────────────────────────
+
+app.get("/auth/kick/login", (req: Request, res: Response) => {
+  const botId = parseInt(req.query.botId as string, 10);
+  if (!botId) {
+    return res.status(400).json({ error: "botId es requerido" });
+  }
+  const bot = stmts.findBotById.get([botId]);
+  if (!bot) {
+    return res.status(404).json({ error: "Bot no encontrado" });
+  }
+  const verifier = generateCodeVerifier();
+  const state = crypto.randomBytes(16).toString("hex");
+  oauthStates.set(state, { verifier, botId });
+  setTimeout(() => oauthStates.delete(state), 10 * 60_000);
+  res.redirect(getAuthorizationUrl(state, verifier));
+});
+
+app.get("/auth/kick/callback", async (req: Request, res: Response) => {
+  const { code, state, error } = req.query as Record<string, string>;
+  if (error || !code || !state) {
+    return res.redirect("/admin.html?oauth=error&reason=" + encodeURIComponent(error || "missing_params"));
+  }
+  const stored = oauthStates.get(state);
+  if (!stored) {
+    return res.redirect("/admin.html?oauth=error&reason=state_expired");
+  }
+  oauthStates.delete(state);
+
+  const result = await exchangeCode(code, stored.verifier);
+  if (!result) {
+    return res.redirect("/admin.html?oauth=error&reason=token_exchange_failed");
+  }
+
+  const { botId } = stored;
+  stmts.updateBotOAuthTokens.run({
+    q_refresh: result.refresh_token,
+    q_access: result.access_token,
+    q_expires: Math.floor(Date.now() / 1000) + result.expires_in,
+    q_id: botId,
+  });
+
+  console.log(`[OAuth] Bot ${botId} conectado a Kick OK`);
+  res.redirect("/admin.html?oauth=success&botId=" + botId);
+});
 
 // ─── Metrics Router ────────────────────────────────────────────────────────────
 app.use(metricsRouter);
