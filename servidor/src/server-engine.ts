@@ -16,12 +16,16 @@ import { requireAuth } from "./middleware/jwt.middleware";
 import { RateLimiter } from "./rate-limiter"; // ◄ Importación Fase 3
 import { handleChatSend } from "./controllers/chat.controller";
 import { validate, LoginSchema, RegisterSchema } from "./utils/validators";
+import { requestLogger, metricsRouter, recordMessage } from "./telemetry";
 
 const app = express();
 
 app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: false }));
 app.disable("x-powered-by");
+
+// ─── Telemetry ─────────────────────────────────────────────────────────────────
+app.use(requestLogger);
 
 // ─── Limiters ─────────────────────────────────────────────────────────────────
 
@@ -86,6 +90,7 @@ app.post("/chat/send", requireAuth, async (req: Request, res: Response) => {
   // Si handleChatSend fue exitoso (200), marcamos el envío
   if (res.statusCode === 200) {
     RateLimiter.recordSend(sessionId);
+    recordMessage();
   }
 });
 
@@ -97,6 +102,9 @@ app.delete("/session/:sessionId", (req: Request, res: Response) => {
   RateLimiter.clearSession(req.params.sessionId);
   res.status(200).json({ success: true, message: "Sesión cerrada" });
 });
+
+// ─── Metrics Router ────────────────────────────────────────────────────────────
+app.use(metricsRouter);
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
 
