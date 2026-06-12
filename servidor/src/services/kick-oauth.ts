@@ -20,7 +20,7 @@ export function getAuthorizationUrl(state: string, verifier: string): string {
     response_type: "code",
     client_id: env.KICK_CLIENT_ID,
     redirect_uri: env.KICK_REDIRECT_URI,
-    scope: "chat:write",
+    scope: "chat:write user:read",
     state,
     code_challenge: generateCodeChallenge(verifier),
     code_challenge_method: "S256",
@@ -90,6 +90,18 @@ export async function getBotAccessToken(botId: number): Promise<string | null> {
   });
 
   return result.access_token;
+}
+
+// ── Get username from Kick API ────────────────────────
+export async function getKickUsername(accessToken: string): Promise<string | null> {
+  try {
+    const res = await fetch("https://api.kick.com/public/v1/users", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.data?.username || data?.username || null;
+  } catch { return null; }
 }
 
 // ── Send message via official Kick API ────────────────
