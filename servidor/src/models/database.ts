@@ -37,12 +37,15 @@ async function initDb(): Promise<SqlJsDatabase> {
       password_hash TEXT  NOT NULL,
       role        TEXT    NOT NULL DEFAULT 'client',
       created_at  INTEGER NOT NULL DEFAULT (unixepoch()),
-      is_active   INTEGER NOT NULL DEFAULT 1
+      is_active   INTEGER NOT NULL DEFAULT 1,
+      link_url    TEXT,
+      expires_at  INTEGER
     )
   `);
 
-  // Migración: agregar columna role en DBs existentes
   try { db.run("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'client'"); } catch {}
+  try { db.run("ALTER TABLE users ADD COLUMN link_url TEXT"); } catch {}
+  try { db.run("ALTER TABLE users ADD COLUMN expires_at INTEGER"); } catch {}
 
   // Sembrar admin por defecto si no existe
   const adminExists = db.exec("SELECT id FROM users WHERE username = 'admin' LIMIT 1");
@@ -98,6 +101,21 @@ async function initDb(): Promise<SqlJsDatabase> {
       UNIQUE(bot_id, user_id)
     )
   `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS message_log (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      bot_id          INTEGER REFERENCES bots(id),
+      user_id         INTEGER REFERENCES users(id),
+      channel         TEXT,
+      message_preview TEXT,
+      success         INTEGER NOT NULL DEFAULT 0,
+      error_reason    TEXT,
+      sent_at         INTEGER NOT NULL DEFAULT (unixepoch())
+    )
+  `);
+
+  db.run(`CREATE INDEX IF NOT EXISTS idx_message_log_sent_at ON message_log(sent_at DESC)`);
 
   saveDb();
   return db;
@@ -175,6 +193,19 @@ export interface UserRow {
   role: string;
   created_at: number;
   is_active: number;
+  link_url: string | null;
+  expires_at: number | null;
+}
+
+export interface MessageLogRow {
+  id: number;
+  bot_id: number | null;
+  user_id: number | null;
+  channel: string | null;
+  message_preview: string | null;
+  success: number;
+  error_reason: string | null;
+  sent_at: number;
 }
 
 export interface ActivityLogRow {
@@ -271,6 +302,26 @@ export const stmts = {
 
   insertUserWithRole: prepareStmt<{ username: string; password_hash: string; role: string }, UserRow>(
     `INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)`
+  ),
+
+  insertUserFull: prepareStmt<{ username: string; password_hash: string; role: string; link_url: string | null; expires_at: number | null }, UserRow>(
+    `INSERT INTO users (username, password_hash, role, link_url, expires_at) VALUES (?, ?, ?, ?, ?)`
+  ),
+
+  updateUser: prepareStmt<{ q_link: string | null; q_expires: number | null; q_active: number; q_id: number }, any>(
+    `UPDATE users SET link_url = ?, expires_at = ?, is_active = ? WHERE id = ?`
+  ),
+
+  deleteUser: prepareStmt<{ q_id: number }, any>(
+    `DELETE FROM users WHERE id = ? AND role != 'admin'`
+  ),
+
+  insertMessageLog: prepareStmt<{ bot_id: number | null; user_id: number | null; channel: string | null; message_preview: string | null; success: number; error_reason: string | null }, MessageLogRow>(
+    `INSERT INTO message_log (bot_id, user_id, channel, message_preview, success, error_reason) VALUES (?, ?, ?, ?, ?, ?)`
+  ),
+
+  getRecentMessages: prepareStmt<[number], MessageLogRow & { bot_name?: string }>(
+    `SELECT ml.*, b.bot_name FROM message_log ml LEFT JOIN bots b ON b.id = ml.bot_id ORDER BY ml.sent_at DESC LIMIT ?`
   ),
 
   updateBotOAuthTokens: prepareStmt<{ q_refresh: string | null; q_access: string | null; q_expires: number | null; q_id: number }, any>(

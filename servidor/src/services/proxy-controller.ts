@@ -4,6 +4,19 @@ import { stmts } from "../models/database";
 import path from "path";
 import { getBotAccessToken, sendViaOfficialApi } from "./kick-oauth";
 
+function logMessage(botId: number | null, userId: number, channel: string, message: string, success: boolean, errorReason?: string): void {
+  try {
+    stmts.insertMessageLog.run({
+      bot_id: botId,
+      user_id: userId,
+      channel,
+      message_preview: message.substring(0, 100),
+      success: success ? 1 : 0,
+      error_reason: errorReason || null,
+    });
+  } catch {}
+}
+
 export interface ProxyRequest {
   channel: string;
   message: string;
@@ -81,20 +94,24 @@ export async function sendToKick(req: ProxyRequest): Promise<ProxyResult> {
       const result = await sendViaOfficialApi(accessToken, req.message);
       if (result.ok) {
         console.log(`[proxy-controller] Oficial OK → channel=${req.channel}`);
+        logMessage(botId, req.userId, req.channel, req.message, true);
         return { success: true, sentAt };
       }
+      logMessage(botId, req.userId, req.channel, req.message, false, `OAuth ${result.status}`);
       console.warn(`[proxy-controller] Oficial falló (${result.status}), intentando Python...`);
     }
   }
 
   // ── Fallback: Python con bearer ──
   if (!bearer) {
+    logMessage(null, req.userId, req.channel, req.message, false, "No token");
     return { success: false, reason: "No hay token disponible para enviar", sentAt };
   }
 
   const chatroomId = req.chatroomId ?? await getChatroomId(bearer, req.channel);
   if (!chatroomId) {
     console.warn(`[proxy-controller] No se pudo obtener chatroomId para channel=${req.channel}`);
+    logMessage(null, req.userId, req.channel, req.message, false, "No chatroomId");
     return { success: false, reason: "El canal no existe o no se pudo verificar", sentAt };
   }
 
@@ -102,12 +119,15 @@ export async function sendToKick(req: ProxyRequest): Promise<ProxyResult> {
     const result = pyExec("send", bearer, String(chatroomId), req.message);
     if (result.status === 200) {
       console.log(`[proxy-controller] Python OK → channel=${req.channel}`);
+      logMessage(botId, req.userId, req.channel, req.message, true);
       return { success: true, sentAt };
     }
     console.warn(`[proxy-controller] Kick rechazó → status=${result.status} body=${(result.body || "").substring(0, 200)}`);
+    logMessage(botId, req.userId, req.channel, req.message, false, mapKickError(result.status));
     return { success: false, reason: mapKickError(result.status), sentAt };
   } catch (err: any) {
     console.error("[proxy-controller] Error Python:", err.message);
+    logMessage(null, req.userId, req.channel, req.message, false, "Python error");
     return { success: false, reason: "Error al enviar el mensaje", sentAt };
   }
 }

@@ -26,6 +26,9 @@ import {
   adminGetAssignments,
   adminUnassignBot,
   adminUsersWithBots,
+  adminUpdateUser,
+  adminDeleteUser,
+  adminDashboard,
 } from "./controllers/admin.controller";
 import { RateLimiter } from "./middleware/rate-limiter";
 import { handleChatSend, handleListMyBots } from "./controllers/chat.controller";
@@ -38,12 +41,14 @@ import {
   getAuthorizationUrl,
   generateCodeVerifier,
   exchangeCode,
+  getKickUsername,
 } from "./services/kick-oauth";
 
 const app = express();
 
 // ─── OAuth state store (in-memory, PKCE verifiers) ────
-const oauthStates = new Map<string, { verifier: string; botId: number }>();
+interface OAuthState { verifier: string; botId?: number; autoCreate?: boolean }
+const oauthStates = new Map<string, OAuthState>();
 
 app.use(cors());
 app.use(express.json({ limit: "16kb" }));
@@ -159,23 +164,34 @@ app.post("/admin/assign",       requireAuth, requireAdmin, adminAssignBot);
 app.delete("/admin/unassign",   requireAuth, requireAdmin, adminUnassignBot);
 app.get("/admin/assignments/:userId", requireAuth, requireAdmin, adminGetAssignments);
 app.get("/admin/users-with-bots", requireAuth, requireAdmin, adminUsersWithBots);
+app.put("/admin/users/:userId", requireAuth, requireAdmin, adminUpdateUser);
+app.delete("/admin/users/:userId", requireAuth, requireAdmin, adminDeleteUser);
+app.get("/admin/dashboard", requireAuth, requireAdmin, adminDashboard);
 
 // ─── Kick OAuth Routes ─────────────────────────────────────────
 
 app.get("/auth/kick/login", (req: Request, res: Response) => {
   const botId = parseInt(req.query.botId as string, 10);
-  if (!botId) {
-    return res.status(400).json({ error: "botId es requerido" });
-  }
-  const bot = stmts.findBotById.get([botId]);
-  if (!bot) {
-    return res.status(404).json({ error: "Bot no encontrado" });
-  }
   const verifier = generateCodeVerifier();
   const state = crypto.randomBytes(16).toString("hex");
-  oauthStates.set(state, { verifier, botId });
+  if (botId) {
+    const bot = stmts.findBotById.get([botId]);
+    if (!bot) return res.status(404).json({ error: "Bot no encontrado" });
+    oauthStates.set(state, { verifier, botId });
+  } else {
+    oauthStates.set(state, { verifier, autoCreate: true });
+  }
   setTimeout(() => oauthStates.delete(state), 10 * 60_000);
   res.redirect(getAuthorizationUrl(state, verifier));
+});
+
+// POST /auth/kick/start — usado por el botón "Conectar con Kick" del admin
+app.post("/auth/kick/start", (req: Request, res: Response) => {
+  const verifier = generateCodeVerifier();
+  const state = crypto.randomBytes(16).toString("hex");
+  oauthStates.set(state, { verifier, autoCreate: true });
+  setTimeout(() => oauthStates.delete(state), 10 * 60_000);
+  res.json({ url: getAuthorizationUrl(state, verifier) });
 });
 
 app.get("/auth/kick/callback", async (req: Request, res: Response) => {
@@ -194,16 +210,51 @@ app.get("/auth/kick/callback", async (req: Request, res: Response) => {
     return res.redirect("/admin.html?oauth=error&reason=token_exchange_failed");
   }
 
-  const { botId } = stored;
+  // ── Obtener username de Kick ──
+  const username = await getKickUsername(result.access_token);
+  if (!username && stored.autoCreate) {
+    return res.redirect("/admin.html?oauth=error&reason=no_username");
+  }
+
+  if (stored.botId) {
+    // Conectar a bot existente
+    stmts.updateBotOAuthTokens.run({
+      q_refresh: result.refresh_token,
+      q_access: result.access_token,
+      q_expires: Math.floor(Date.now() / 1000) + result.expires_in,
+      q_id: stored.botId,
+    });
+    console.log(`[OAuth] Bot ${stored.botId} conectado a Kick OK`);
+    return res.redirect("/admin.html?oauth=success&botId=" + stored.botId);
+  }
+
+  // ── Auto-crear bot ──
+  const existing = stmts.findBotByName.get(username!);
+  if (existing) {
+    // Ya existe, solo actualizar tokens
+    stmts.updateBotOAuthTokens.run({
+      q_refresh: result.refresh_token,
+      q_access: result.access_token,
+      q_expires: Math.floor(Date.now() / 1000) + result.expires_in,
+      q_id: existing.id,
+    });
+    console.log(`[OAuth] Bot existente "${username}" actualizado`);
+    return res.redirect("/admin.html?oauth=success&botId=" + existing.id);
+  }
+
+  // Crear nuevo bot con bearer vacío y tokens OAuth
+  const newBot = stmts.insertBot.run({
+    bot_name: username!,
+    encrypted_bearer: "", // sin bearer, solo OAuth
+  });
   stmts.updateBotOAuthTokens.run({
     q_refresh: result.refresh_token,
     q_access: result.access_token,
     q_expires: Math.floor(Date.now() / 1000) + result.expires_in,
-    q_id: botId,
+    q_id: newBot.lastInsertRowid as number,
   });
-
-  console.log(`[OAuth] Bot ${botId} conectado a Kick OK`);
-  res.redirect("/admin.html?oauth=success&botId=" + botId);
+  console.log(`[OAuth] Bot "${username}" creado automáticamente`);
+  res.redirect("/admin.html?oauth=success&botId=" + newBot.lastInsertRowid);
 });
 
 // ─── Metrics Router ────────────────────────────────────────────────────────────
