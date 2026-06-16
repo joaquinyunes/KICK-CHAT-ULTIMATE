@@ -1,10 +1,96 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>StreamChat Bridge – Chat</title>
-  <link rel="stylesheet" href="css/main.css" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StreamChat – Cliente</title>
+<link rel="stylesheet" href="css/main.css" />
+<style>
+/* Overrides for simulator inside chat */
+.sim-layout { display:flex; flex:1; overflow:hidden; height:100%; }
+.sim-left { width:240px; flex-shrink:0; border-right:1px solid var(--border); display:flex; flex-direction:column; background:var(--surface); overflow:hidden; }
+.sim-center { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+.sim-right { width:150px; flex-shrink:0; border-left:1px solid var(--border); background:var(--surface); display:flex; flex-direction:column; overflow:hidden; }
+.sim-ptitle { padding:6px 10px; font-size:8px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.sim-scroll { flex:1; overflow-y:auto; }
+.sim-hdr { padding:6px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; background:var(--surface); flex-shrink:0; }
+.sim-hdr-title { font-size:12px; font-weight:700; }
+.sim-msgs { flex:1; overflow-y:auto; padding:2px 0; }
+.sim-msgs::-webkit-scrollbar{width:3px}
+.sim-msgs::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.msg { padding:2px 14px; display:flex; gap:6px; align-items:flex-start; font-size:12px; line-height:1.4; animation:fadeIn .18s ease; }
+@keyframes fadeIn{from{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}
+.msg-time { font-size:9px; color:var(--text-muted); flex-shrink:0; margin-top:2px; min-width:32px; }
+.msg-user { font-weight:700; flex-shrink:0; }
+.msg-sep { color:var(--text-muted); margin:0 1px; }
+.msg-text { color:var(--text); word-break:break-word; }
+.emote { display:inline-block; background:rgba(109,90,252,.15); border:1px solid rgba(109,90,252,.3); border-radius:3px; padding:0 4px; font-size:10px; color:var(--accent); font-weight:600; margin:0 1px; vertical-align:middle; }
+.sim-ctx-wrap { padding:6px 10px; flex-shrink:0; }
+.sim-ctx-row { display:flex; gap:4px; align-items:stretch; margin-bottom:4px; }
+.sim-ctx-inp { flex:1; background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:6px 8px; color:var(--text); font-size:11px; resize:none; height:48px; font-family:inherit; }
+.sim-ctx-inp:focus { outline:none; border-color:var(--accent); }
+.sim-ctx-inp:disabled { opacity:.4; }
+.sim-ctx-inp::placeholder { color:var(--text-muted); }
+.sim-auto { font-size:9px; background:var(--surface2); border:1px solid var(--border); color:var(--text-muted); padding:2px 8px; border-radius:4px; cursor:pointer; font-family:inherit; white-space:nowrap; transition:all .15s; }
+.sim-auto.on { border-color:var(--accent); color:var(--accent); background:rgba(109,90,252,.1); }
+.sim-section { padding:4px 10px; flex-shrink:0; }
+.sim-section label { font-size:9px; color:var(--text-muted); font-weight:600; display:block; margin-bottom:3px; }
+.sim-tags { display:flex; gap:3px; flex-wrap:wrap; }
+.stag { background:var(--surface2); border:1px solid var(--border); color:var(--text-muted); font-size:8px; padding:2px 6px; border-radius:3px; cursor:pointer; font-family:inherit; transition:all .1s; }
+.stag:hover { border-color:var(--accent); color:var(--accent); }
+.stag.active { border-color:var(--accent); background:rgba(109,90,252,.1); color:var(--accent); }
+.sim-energy { display:flex; gap:3px; }
+.sebtn { flex:1; background:var(--surface2); border:1px solid var(--border); color:var(--text-muted); font-size:8px; padding:3px 2px; border-radius:3px; cursor:pointer; font-family:inherit; text-align:center; transition:all .1s; font-weight:600; }
+.sebtn:hover { border-color:var(--accent); }
+.sebtn.active { border-color:var(--accent); background:rgba(109,90,252,.1); color:var(--accent); }
+.sebtn.opt-tranquilo.active { border-color:#6b7280; background:rgba(107,114,128,.15); color:#d1d5db; }
+.sebtn.opt-hype.active { border-color:var(--yellow); background:rgba(245,158,11,.15); color:#fbbf24; }
+.sebtn.opt-caotico.active { border-color:var(--red); background:rgba(239,68,68,.15); color:#fca5a5; }
+.sim-qtabs { display:flex; gap:2px; margin-bottom:3px; flex-wrap:wrap; }
+.sim-qtab { background:var(--surface2); border:1px solid var(--border); color:var(--text-muted); font-size:7px; padding:2px 6px; border-radius:3px; cursor:pointer; font-family:inherit; transition:all .1s; }
+.sim-qtab:hover { color:var(--text); }
+.sim-qtab.active { border-color:var(--accent); color:var(--accent); }
+.sim-qbtns { display:flex; flex-wrap:wrap; gap:2px; }
+.qb { background:var(--surface2); border:1px solid var(--border); color:var(--text-muted); font-size:7px; padding:2px 5px; border-radius:2px; cursor:pointer; font-family:inherit; transition:all .1s; }
+.qb:hover { border-color:var(--accent); color:var(--accent); }
+.sim-cr { padding:6px 10px; border-top:1px solid var(--border); flex-shrink:0; display:flex; flex-direction:column; gap:3px; }
+.sim-cr-row { display:flex; gap:4px; align-items:center; }
+.sim-cr-row label { font-size:8px; color:var(--text-muted); flex-shrink:0; }
+.sim-cr-row select { background:var(--surface2); border:1px solid var(--border); border-radius:3px; color:var(--text); font-size:9px; padding:2px 3px; font-family:inherit; flex:1; }
+.sim-gen { width:100%; background:var(--accent); color:#fff; border:none; padding:7px; border-radius:5px; font-size:11px; font-weight:700; cursor:pointer; font-family:inherit; display:flex;align-items:center;justify-content:center;gap:6px; transition:background .15s; }
+.sim-gen:hover { background:#4338ca; }
+.sim-gen:disabled { opacity:.5; cursor:not-allowed; }
+.sim-brow { display:flex; gap:4px; }
+.sim-autobtn { flex:1; background:transparent; border:1px solid var(--border); color:var(--text-muted); padding:5px; border-radius:4px; font-size:9px; font-weight:600; cursor:pointer; font-family:inherit; transition:all .15s; }
+.sim-autobtn:hover { border-color:var(--accent); color:var(--accent); }
+.sim-autobtn.run { border-color:var(--success); color:var(--success); background:rgba(0,179,126,.07); }
+.sim-clrbtn { flex:1; background:transparent; border:1px solid var(--border); color:var(--text-muted); padding:5px; border-radius:4px; font-size:9px; cursor:pointer; font-family:inherit; transition:all .15s; }
+.sim-clrbtn:hover { color:var(--danger); border-color:var(--danger); }
+.sim-stat { padding:6px 12px; border-bottom:1px solid var(--border); }
+.sim-stat-label { font-size:8px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.5px; }
+.sim-stat-val { font-size:16px; font-weight:800; }
+.sim-stat-sub { font-size:9px; color:var(--text-muted); }
+.sim-news { padding:4px 10px; border-top:1px solid var(--border); flex-shrink:0; }
+.sim-news-row { display:flex; gap:4px; align-items:center; }
+.sim-news-box { flex:1; background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:3px 5px; min-height:24px; max-height:44px; overflow-y:auto; font-size:8px; color:var(--text-muted); line-height:1.3; }
+.sim-news-box .n-item { padding:1px 0; }
+.n-badge { display:inline-block; font-size:7px; padding:1px 3px; border-radius:2px; margin-right:2px; font-weight:700; }
+.n-badge.sport { background:rgba(59,130,246,.25); color:#60a5fa; }
+.n-badge.trend { background:rgba(145,71,255,.25); color:var(--accent); }
+.n-badge.news { background:rgba(245,158,11,.25); color:var(--yellow); }
+.sim-nbtn { background:var(--surface3); border:1px solid var(--border); color:var(--text-muted); font-size:8px; padding:3px 5px; border-radius:3px; cursor:pointer; font-family:inherit; white-space:nowrap; }
+.sim-nbtn:hover { border-color:#3b82f6; color:#3b82f6; }
+.sim-api { padding:4px 12px; border-top:1px solid var(--border); font-size:8px; color:var(--text-muted); }
+.sim-api.ok { color:var(--success); }
+.sim-api.err { color:var(--danger); }
+.sim-ru { padding:3px 12px; font-size:8px; color:var(--text-muted); display:flex; align-items:center; gap:4px; border-bottom:1px solid rgba(255,255,255,.02); }
+.ru-dot { width:4px;height:4px;border-radius:50%;flex-shrink:0; }
+#panel-simular { display:none; padding:0; overflow:hidden; }
+#panel-simular.active { display:flex; flex-direction:column; height:100%; }
+#panel-chat, #panel-settings { display:none; }
+#panel-chat.active, #panel-settings.active { display:flex; flex-direction:column; }
+#panel-chat.active { flex:1; overflow:hidden; }
+</style>
 </head>
 <body class="chat-page">
   <header class="app-header">
@@ -16,18 +102,16 @@
   </header>
 
   <nav class="tab-nav">
-    <button class="tab-btn active" data-tab="chat">Chat</button>
-    <button class="tab-btn" data-tab="settings">Ajustes</button>
+    <button class="tab-btn active" data-tab="chat">💬 Chat</button>
+    <button class="tab-btn" data-tab="simular">🤖 Simular</button>
+    <button class="tab-btn" data-tab="settings">⚙️ Ajustes</button>
   </nav>
 
+  <!-- ─── CHAT TAB ─── -->
   <section id="panel-chat" class="tab-panel active">
-
-    <!-- Bots disponibles -->
     <div class="bots-bar">
       <span id="bots-info" class="bots-info">Cargando bots...</span>
     </div>
-
-    <!-- Archivos cargados -->
     <div class="files-section">
       <div class="files-header">
         <span class="files-title">Archivos de mensajes</span>
@@ -37,13 +121,9 @@
         <li class="empty-state">Sin archivos cargados.</li>
       </ul>
     </div>
-
-    <!-- Progreso -->
     <div class="progress-track">
       <div id="progress-bar" class="progress-bar" style="width:0%"></div>
     </div>
-
-    <!-- Mensajes del archivo activo -->
     <div class="msg-preview-header">
       <span id="active-file-name" class="active-file-name">Ningún archivo seleccionado</span>
       <span id="msg-count" class="msg-count"></span>
@@ -51,8 +131,6 @@
     <ul id="msg-list" class="msg-list">
       <li class="empty-state">Cargá un archivo .txt para empezar.</li>
     </ul>
-
-    <!-- Controles de envío -->
     <footer class="send-controls">
       <span id="send-status" class="send-status"></span>
       <div class="send-btns">
@@ -61,9 +139,126 @@
         <button id="stop-btn"      class="btn btn-danger"  disabled>■ Detener</button>
       </div>
     </footer>
-
   </section>
 
+  <!-- ─── SIMULAR TAB ─── -->
+  <section id="panel-simular" class="tab-panel">
+    <div class="sim-layout">
+      <!-- LEFT -->
+      <div class="sim-left">
+        <div class="sim-ptitle">Contexto</div>
+        <div class="sim-ctx-wrap">
+          <div class="sim-ctx-row">
+            <textarea class="sim-ctx-inp" id="simCtx" placeholder="¿Qué pasa en el stream?"></textarea>
+            <button class="sim-auto" id="simAutoBtn" onclick="togAuto()">🤖 Auto</button>
+          </div>
+        </div>
+
+        <div class="sim-section">
+          <label>Categoría</label>
+          <div class="sim-tags" id="simCats"></div>
+        </div>
+
+        <div class="sim-section">
+          <label>Energía</label>
+          <div class="sim-energy">
+            <button class="sebtn opt-tranquilo" onclick="setEn(this,'tranquilo')">😴 Tranq</button>
+            <button class="sebtn opt-normal active" onclick="setEn(this,'normal')">😐 Normal</button>
+            <button class="sebtn opt-hype" onclick="setEn(this,'hype')">😤 Hype</button>
+            <button class="sebtn opt-caotico" onclick="setEn(this,'caotico')">🔥 Caos</button>
+          </div>
+        </div>
+
+        <div class="sim-section">
+          <label>Evento</label>
+          <div class="sim-tags" id="simEvents"></div>
+        </div>
+
+        <div class="sim-section">
+          <label>Contextos rápidos</label>
+          <div class="sim-qtabs" id="simQtabs"></div>
+          <div class="sim-qbtns" id="simQbtns"></div>
+        </div>
+
+        <div class="sim-news">
+          <div class="sim-news-row">
+            <div class="sim-news-box" id="simNewsBox"><span style="color:var(--text-muted)">Sin noticias</span></div>
+            <button class="sim-nbtn" id="simNewsBtn" onclick="buscarNews()">🔍</button>
+          </div>
+        </div>
+
+        <div class="sim-cr">
+          <div class="sim-cr-row">
+            <label>Cant:</label>
+            <select id="simCant">
+              <option value="20">20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="200">200</option>
+              <option value="600" selected>600</option>
+            </select>
+            <label>Temp:</label>
+            <select id="simTemp" style="flex:0.6">
+              <option value="0.55">0.55</option>
+              <option value="0.75" selected>0.75</option>
+              <option value="0.85">0.85</option>
+              <option value="0.92">0.92</option>
+            </select>
+          </div>
+          <div class="sim-cr-row">
+            <label>Auto c/</label>
+            <input type="number" id="simInterval" value="15" style="width:36px;background:var(--surface2);border:1px solid var(--border);border-radius:3px;color:var(--text);font-size:9px;padding:2px 4px;font-family:inherit">
+            <label>seg</label>
+          </div>
+          <button class="sim-gen" id="simGenBtn" onclick="genSim()">✨ Generar</button>
+          <div class="sim-brow">
+            <button class="sim-autobtn" id="simAutoGenBtn" onclick="togAutoGen()">⏱ Auto</button>
+            <button class="sim-clrbtn" onclick="limpiarSim()">🗑 Limpiar</button>
+          </div>
+          <button class="sim-gen" id="simSendBtn" onclick="enviarSimAKick()" style="background:var(--success);font-size:10px">📤 Enviar a Kick</button>
+        </div>
+      </div>
+
+      <!-- CENTER -->
+      <div class="sim-center">
+        <div class="sim-hdr">
+          <span class="sim-hdr-title">💬 Chat simulado</span>
+          <span class="sim-hdr-title" id="simMsgCount" style="font-size:10px;color:var(--text-muted);font-weight:400">0 mensajes</span>
+        </div>
+        <div class="sim-msgs" id="simMsgs">
+          <div style="text-align:center;padding:40px 16px;color:var(--text-muted);font-size:13px">Configurá el contexto y generá mensajes</div>
+        </div>
+        <div style="padding:3px 14px;color:var(--text-muted);font-size:10px;height:20px;display:flex;align-items:center;gap:5px;flex-shrink:0" id="simTyping">
+          <span id="simTypingName" style="font-weight:600"></span>
+          <span class="dots"><span></span><span></span><span></span></span>
+        </div>
+      </div>
+
+      <!-- RIGHT -->
+      <div class="sim-right">
+        <div class="sim-ptitle" style="border-bottom:none;padding:6px 12px 2px">Stats</div>
+        <div class="sim-stat">
+          <div class="sim-stat-label">Mensajes</div>
+          <div class="sim-stat-val" id="simStatMsgs">0</div>
+          <div class="sim-stat-sub">generados</div>
+        </div>
+        <div class="sim-stat">
+          <div class="sim-stat-label">Usuarios</div>
+          <div class="sim-stat-val" id="simStatUsers">0</div>
+          <div class="sim-stat-sub">de 50</div>
+        </div>
+        <div class="sim-stat">
+          <div class="sim-stat-label">Energía</div>
+          <div class="sim-stat-val" id="simStatEnergy" style="font-size:12px">Normal</div>
+        </div>
+        <div class="sim-ptitle" style="border-bottom:none;padding:6px 12px 2px">Activos</div>
+        <div style="flex:1;overflow-y:auto" id="simRecent"></div>
+        <div class="sim-api" id="simApiStatus">● Esperando...</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── SETTINGS TAB ─── -->
   <section id="panel-settings" class="tab-panel">
     <div class="settings-form">
       <div class="field">
@@ -84,11 +279,196 @@
       </div>
       <button id="save-settings-btn" class="btn btn-primary">Guardar</button>
       <p id="settings-msg" class="settings-msg" hidden></p>
+      <div class="field" style="margin-top:16px">
+        <label>API Key Gemini (para simulador)</label>
+        <input id="simKeyInput" type="password" placeholder="Pegá tu API Key acá">
+        <button class="btn btn-secondary btn-sm" onclick="guardarKey()" style="margin-top:4px">Guardar Key</button>
+      </div>
     </div>
   </section>
 
-
-
   <script type="module" src="js/chat-ui.js"></script>
+  <script>
+  // ─── SIMULATOR STATE ───
+  const USERS = [
+    { name:"tutossj",color:"#ff6b6b" },{ name:"ChaskyBoom",color:"#ff4444" },{ name:"LukaaF",color:"#ff8c69" },
+    { name:"laverde99",color:"#ff6b35" },{ name:"Reixzer",color:"#ffa07a" },{ name:"Andrestoby12",color:"#ff7f50" },
+    { name:"aarturoo00",color:"#ff6347" },{ name:"lautacc",color:"#fb7185" },{ name:"elmascapito3001",color:"#ff4500" },
+    { name:"moritari",color:"#f9a8d4" },{ name:"j00p_t7",color:"#9147ff" },{ name:"Stebwb",color:"#bf94ff" },
+    { name:"SANGREJJAPONESA",color:"#7c3aed" },{ name:"J0lteonn",color:"#8b5cf6" },{ name:"Leito_Diaz_999",color:"#a78bfa" },
+    { name:"DanielaSleep",color:"#6d28d9" },{ name:"valentinaaa_ssj",color:"#7c3aed" },{ name:"CumbiaG0RD4",color:"#9333ea" },
+    { name:"Manzanirou",color:"#6bcb77" },{ name:"royluis",color:"#4ade80" },{ name:"Damian777_Mc",color:"#22c55e" },
+    { name:"Cristianv7",color:"#16a34a" },{ name:"INFODK",color:"#15803d" },{ name:"Graffi10k",color:"#fda4af" },
+    { name:"Gino_TN",color:"#ffd93d" },{ name:"iCopito",color:"#fbbf24" },{ name:"dekoredd",color:"#f59e0b" },
+    { name:"Janthz",color:"#d97706" },{ name:"ElYaSoy",color:"#b45309" },{ name:"yeremisonda",color:"#facc15" },
+    { name:"KuroiiNekoo",color:"#fde047" },{ name:"Mariiana_013",color:"#eab308" },{ name:"maxii123mdcdd",color:"#e11d48" },
+    { name:"bomboclat_0",color:"#9d174d" },{ name:"Elsopapas",color:"#4d96ff" },{ name:"nazawein",color:"#3b82f6" },
+    { name:"ThiaGOAT1177",color:"#2563eb" },{ name:"WiteRoom111",color:"#1e40af" },{ name:"chuchiti",color:"#60a5fa" },
+    { name:"nyxalth",color:"#1d4ed8" },{ name:"GallitoXTZ",color:"#f97316" },{ name:"Kul_zu",color:"#ec4899" },
+    { name:"FernetArgento",color:"#be185d" },{ name:"0800milton",color:"#831843" },{ name:"mrloggio",color:"#c4b5fd" },
+    { name:"martinmacflay",color:"#166534" },{ name:"Eloski12",color:"#14532d" },{ name:"Aidansitou",color:"#4ade80" },
+    { name:"francebvb",color:"#f43f5e" },{ name:"TimberoRafa",color:"#f97316" },{ name:"BotRix",color:"#9147ff" },
+  ];
+  const CATEGORIAS = { justchatting:"💬", gaming:"🎮", irl:"🌍", music:"🎵", deportes:"⚽", noticias:"📰", arte:"🎨", evento:"🎉" };
+  const QUICK_CTX = {
+    justchatting: [
+      ["💬 Contá tu día","Hoy me pasó algo increíble en la calle, casi me chocan y después me encontré un amigo"],
+      ["🗣️ Debate","Estoy re caliente con el tema político de hoy, quiero leer sus opiniones sin hate"],
+      ["🤔 Preguntas","Abro ronda de preguntas, respondo lo que sea, no tengo filtro hoy"],
+    ],
+    gaming: [
+      ["🎮 LoL","Jugando League of Legends ranked, acabo de subir a Diamante con una jugada increíble"],
+      ["🔫 CS2","Jugando CS2 en torneo, acabo de hacer un 1v5 con AWP, el equipo está imparable"],
+      ["😡 Rage","NO PUEDO CREER LO QUE PASÓ, 40 MIN DE PARTIDA PARA PERDER ASÍ"],
+    ],
+    irl: [["🌭 Comiendo","Comiendo los mejores panchos de San Fernando en vivo, calificando cada uno del 1 al 10"],["✈️ Viaje","PRIMER VEZ EN LA KICK HOUSE EN MIAMI, estoy flipando"],["🚶 Caminata","Caminando por el centro, hace un calor de locos"]],
+    music: [["🎤 Cantando","Voy a cantar unos temas, no sé si va a ser lindo o terrible"],["🎧 React","Reaccionando a música nueva que salió"]],
+    deportes: [["⚽ Mundial","Reaccionando al Mundial 2026, mi equipo va ganando 2-1 y hay 16k apostados"],["🥊 Boxeo","Mirando boxeo en vivo, pelea épica"],["🏆 Apuesta","Tengo 50k apostados a que Argentina gana"]],
+    noticias: [["📰 Actualidad","Reaccionando a las noticias más locas del día"],["💰 Economía","Dólar blue a cuánto está hoy, se fue todo al carajo"]],
+    arte: [["🎨 Dibujando","Voy a dibujar algo en vivo, ustedes me dan ideas"]],
+    evento: [["🎂 Cumple","ES MI CUMPLEAÑOSSS, GRACIAS A TODOS"],["🎁 Sorteo","VAMOS A REGALAR COSAS, 50 SUBS"],["🏁 Final","Fin del stream después de 8 horas, gracias a todos"]],
+  };
+  const EVENTOS = ["normal","gol","clutch","muerte","inicio","fin","raid","hito","gameplay_peak","gameplay_error"];
+
+  let simMsgs = [], simCount = 0, simUsers = new Set(), simStart = Date.now();
+  let simAuto = false, simIntervalId = null, simEnergy = "normal", simCat = "justchatting", simEvent = "normal";
+  let simGenerando = false, simNews = [];
+
+  function initSim() {
+    // cats
+    const catsEl = document.getElementById("simCats");
+    catsEl.innerHTML = Object.entries(CATEGORIAS).map(([k,v]) => `<button class="stag ${k==='justchatting'?'active':''}" onclick="setCat('${k}')">${v} ${k}</button>`).join("");
+    // events
+    const evEl = document.getElementById("simEvents");
+    evEl.innerHTML = EVENTOS.map(e => `<button class="stag ${e==='normal'?'active':''}" onclick="setEv('${e}')">${e}</button>`).join("");
+    // quick tabs
+    const qtEl = document.getElementById("simQtabs");
+    qtEl.innerHTML = Object.keys(QUICK_CTX).map(c => `<button class="sim-qtab ${c==='justchatting'?'active':''}" onclick="switchQ('${c}')">${CATEGORIAS[c]}</button>`).join("");
+    renderQ("justchatting");
+    document.getElementById("simKeyInput").value = localStorage.getItem('gemini_api_key') || '';
+  }
+
+  function renderQ(cat) {
+    const items = QUICK_CTX[cat] || [];
+    document.getElementById("simQbtns").innerHTML = items.map(i => `<button class="qb" onclick="setCtx('${i[1].replace(/'/g,"\\'")}')">${i[0]}</button>`).join("");
+    document.querySelectorAll(".sim-qtab").forEach(b => b.classList.toggle("active",b.textContent.trim()===CATEGORIAS[cat]));
+  }
+  function switchQ(c) { renderQ(c); setCat(c); }
+  function setCat(c) { simCat=c; document.querySelectorAll("#simCats .stag").forEach(b=>b.classList.toggle("active",b.textContent.includes(c)||b.textContent.trim()===c||Object.values(CATEGORIAS).some((v,i)=>v===b.textContent.trim()&&Object.keys(CATEGORIAS)[i]===c))); }
+  function setEv(e) { simEvent=e; document.querySelectorAll("#simEvents .stag").forEach(b=>b.classList.toggle("active",b.textContent.trim()===e)); }
+  function setEn(el,e) { simEnergy=e; document.querySelectorAll(".sebtn").forEach(b=>b.classList.remove("active")); el.classList.add("active"); const lbl={tranquilo:"😴 Tranquilo",normal:"😐 Normal",hype:"😤 Hype",caotico:"🔥 Caótico"}; document.getElementById("simStatEnergy").textContent=lbl[e]||"Normal"; }
+  function setCtx(t) { document.getElementById("simCtx").value=t; if(simAuto) togAuto(); }
+  function togAuto() { simAuto=!simAuto; const b=document.getElementById("simAutoBtn"),ta=document.getElementById("simCtx"); b.textContent=simAuto?"🤖 Auto":"✏️ Manual"; b.className="sim-auto"+(simAuto?" on":""); ta.disabled=simAuto; if(simAuto) ta.value=""; }
+
+  // NEWS
+  async function buscarNews() {
+    const key = localStorage.getItem('gemini_api_key');
+    if(!key){alert("Configurá la API Key en Ajustes");return}
+    const b=document.getElementById("simNewsBtn"); b.disabled=true;
+    document.getElementById("simNewsBox").innerHTML='<span style="color:var(--text-muted)">Buscando...</span>';
+    try {
+      const r=await fetch('/api/chat/news',{method:'POST',headers:{'Content-Type':'application/json','x-gemini-key':key}});
+      const d=await r.json();
+      if(d.noticias&&d.noticias.length>0){simNews=d.noticias;document.getElementById("simNewsBox").innerHTML=d.noticias.map(n=>`<div class="n-item"><span class="n-badge ${n.tipo}">${n.tipo}</span>${n.texto}</div>`).join("")}
+      else document.getElementById("simNewsBox").innerHTML='<span style="color:var(--text-muted)">Sin noticias</span>';
+    }catch(e){document.getElementById("simNewsBox").innerHTML='<span style="color:var(--text-muted)">Error</span>'}
+    b.disabled=false;
+  }
+
+  // GENERATE
+  async function genSim() {
+    if(simGenerando) return;
+    const key = localStorage.getItem('gemini_api_key');
+    if(!key){alert("Configurá la API Key en Ajustes");return}
+    const ctx=document.getElementById("simCtx").value.trim();
+    if(!ctx&&!simAuto){alert("Escribí un contexto o activá Auto");return}
+    const cant=parseInt(document.getElementById("simCant").value);
+    const temp=parseFloat(document.getElementById("simTemp").value);
+    simGenerando=true;
+    const btn=document.getElementById("simGenBtn");btn.disabled=true;btn.innerHTML='<div class="spinner"></div> Generando...';
+    mostrarTyping(cant>100);
+    try {
+      const r=await fetch('/api/chat/generate',{method:'POST',headers:{'Content-Type':'application/json','x-gemini-key':key},body:JSON.stringify({stream_context:simAuto?'auto':ctx,categoria_stream:simCat,cantidad:cant,energia_chat:simEnergy,temperature:temp})});
+      const d=await r.json();
+      ocultarTyping();
+      if(!r.ok){btn.disabled=false;btn.innerHTML='✨ Generar';document.getElementById("simApiStatus").textContent='● Error';document.getElementById("simApiStatus").className='sim-api err';simGenerando=false;return}
+      const msgs=d.mensajes||[];
+      const delay=msgs.length>200?3:msgs.length>100?8:msgs.length>50?15:30;
+      for(let i=0;i<msgs.length;i++){mostrarMsg(msgs[i]);if(i<msgs.length-1)await sleep(delay+Math.random()*delay)}
+      document.getElementById("simApiStatus").textContent='● OK';document.getElementById("simApiStatus").className='sim-api ok';
+      // add to chat file list
+      const name = `IA ${simCat} ${new Date().toLocaleTimeString()}`;
+      window.addGeneratedMessages(msgs, name);
+    }catch(e){ocultarTyping();document.getElementById("simApiStatus").textContent='● Error conexión';document.getElementById("simApiStatus").className='sim-api err'}
+    simGenerando=false;btn.disabled=false;btn.innerHTML='✨ Generar';
+  }
+
+  function mostrarMsg(d) {
+    const el=document.getElementById("simMsgs");
+    const empty=el.querySelector(".empty-state");if(empty)empty.remove();
+    const u=USERS.find(x=>x.name===d.user)||{name:d.user,color:"#adadb8"};
+    let txt=(d.message||"").replace(/\[([A-Za-z0-9_]+)\]/g,(_,e)=>`<span class="emote">${e}</span>`);
+    const emoOnly=/^(\s*\[[A-Za-z0-9_]+\]\s*)+$/.test(d.message||"");
+    const t=new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"});
+    const div=document.createElement("div");div.className="msg"+(emoOnly?" emote-only":"");
+    div.innerHTML=`<span class="msg-time">${t}</span><span class="msg-user" style="color:${u.color}">${d.user}</span><span class="msg-sep">:</span><span class="msg-text">${txt}</span>`;
+    el.appendChild(div);simMsgs.push(d);simCount++;simUsers.add(d.user);
+    el.scrollTop=el.scrollHeight;
+    document.getElementById("simStatMsgs").textContent=simCount;
+    document.getElementById("simStatUsers").textContent=simUsers.size;
+    document.getElementById("simMsgCount").textContent=`${simCount} mensajes`;
+  }
+
+  function mostrarTyping(l){const n=[...USERS].sort(()=>Math.random()-.5).slice(0,l?5:3).map(u=>u.name).join(", ");document.getElementById("simTypingName").textContent=n;document.getElementById("simTyping").style.display="flex"}
+  function ocultarTyping(){document.getElementById("simTyping").style.display="none"}
+  function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+
+  function togAutoGen(){
+    const b=document.getElementById("simAutoGenBtn");
+    if(simIntervalId){clearInterval(simIntervalId);simIntervalId=null;b.textContent="⏱ Auto";b.className="sim-autobtn"}
+    else{const s=parseInt(document.getElementById("simInterval").value)||15;genSim();simIntervalId=setInterval(()=>{if(!simGenerando)genSim()},s*1000);b.textContent="⏹ Detener";b.className="sim-autobtn run"}
+  }
+
+  function limpiarSim(){
+    document.getElementById("simMsgs").innerHTML='<div style="text-align:center;padding:40px 16px;color:var(--text-muted);font-size:13px">Configurá el contexto y generá mensajes</div>';
+    simMsgs=[];simCount=0;simUsers.clear();simStart=Date.now();
+    document.getElementById("simStatMsgs").textContent="0";document.getElementById("simStatUsers").textContent="0";document.getElementById("simMsgCount").textContent="0 mensajes";
+    document.getElementById("simApiStatus").textContent="● Esperando...";document.getElementById("simApiStatus").className="sim-api";
+    document.getElementById("simRecent").innerHTML="";
+  }
+
+  function guardarKey(){const v=document.getElementById("simKeyInput").value.trim();if(v){localStorage.setItem('gemini_api_key',v);alert("API Key guardada")}}
+
+  // ─── SEND SIMULATED MESSAGES TO KICK ───
+  async function enviarSimAKick() {
+    if(simMsgs.length===0){alert("No hay mensajes generados para enviar");return}
+    const token=sessionStorage.getItem('scb_jwt');
+    const url=sessionStorage.getItem('scb_server_url');
+    if(!token||!url){alert("No estás autenticado. Iniciá sesión primero.");return}
+    const settings=JSON.parse(localStorage.getItem('scb_settings')||'{}');
+    const channel=settings.channelName;
+    if(!channel){alert("Configurá el canal en Ajustes primero");return}
+    const chatroomId=settings.chatroomId||'';
+    const btn=document.getElementById("simSendBtn");
+    btn.disabled=true;btn.textContent='📤 Enviando...';
+    let ok=0,fail=0;
+    for(let i=0;i<simMsgs.length;i++){
+      const msg=simMsgs[i];
+      if(!msg.message||!msg.user)continue;
+      const body={sessionId:Date.now()+'_'+i,message:`${msg.user}: ${msg.message}`,channel};
+      if(chatroomId)body.chatroom_id=parseInt(chatroomId);
+      try{
+        const r=await fetch(url+'/chat/send',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify(body)});
+        if(r.ok)ok++;else fail++;
+      }catch{fail++}
+      btn.textContent=`📤 ${i+1}/${simMsgs.length} (${ok} ok, ${fail} fail)`;
+      await sleep(Math.max(1000,Math.random()*3000+2000));
+    }
+    btn.textContent=`📤 Enviado: ${ok} ok, ${fail} fail`;
+    btn.disabled=false;
+  }
+
+  initSim();
+  </script>
 </body>
 </html>

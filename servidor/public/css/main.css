@@ -165,3 +165,20 @@ input:focus, select:focus { border-color: var(--accent); }
 .dash-card-expired .dash-num { color: var(--danger); }
 .dash-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
 .dash-section { min-height: 200px; }
+
+/* Simulador */
+.simulador { padding:12px; display:flex; flex-direction:column; gap:8px; }
+.sim-row { display:flex; gap:6px; align-items:stretch; }
+.sim-ctx { flex:1; background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:8px 10px; color:var(--text); font-size:12px; resize:none; height:48px; font-family:inherit; }
+.sim-ctx:focus { outline:none; border-color:var(--accent); }
+.sim-auto-btn { background:var(--surface2); border:1px solid var(--border); color:var(--text-muted); font-size:10px; padding:4px 10px; border-radius:6px; cursor:pointer; font-family:inherit; white-space:nowrap; transition:all .15s; }
+.sim-auto-btn.on { border-color:var(--accent); color:var(--accent); background:rgba(109,90,252,.1); }
+.sim-tags { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+.sim-label { font-size:10px; color:var(--text-muted); font-weight:600; }
+.sim-tags select { background:var(--surface2); border:1px solid var(--border); border-radius:4px; color:var(--text); font-size:10px; padding:3px 5px; font-family:inherit; }
+.sim-actions { display:flex; align-items:center; gap:8px; }
+.sim-status { font-size:11px; color:var(--text-muted); }
+.sim-preview { background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:8px 10px; max-height:180px; overflow-y:auto; font-size:11px; color:var(--text-muted); line-height:1.5; }
+.sim-preview .sp { padding:2px 0; border-bottom:1px solid var(--border); }
+.sim-preview .sp:last-child { border-bottom:none; }
+.sim-preview .sp-user { font-weight:700; color:var(--accent); }

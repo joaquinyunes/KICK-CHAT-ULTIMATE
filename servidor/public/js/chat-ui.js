@@ -260,6 +260,17 @@ export function initChatUI() {
   updateButtonStates();
 }
 
+// ─── Simulator integration ─────────────────────────────────────
+window.addGeneratedMessages = function (msgs, name) {
+  const msgLines = msgs.map(m => `${m.user}: ${m.message}`);
+  files.push({ name: name || `IA - ${new Date().toLocaleTimeString()}`, messages: msgLines, currentIndex: 0 });
+  if (currentFileIndex < 0) currentFileIndex = files.length - 1;
+  saveFiles();
+  renderFileList();
+  renderMessageList();
+  updateButtonStates();
+};
+
 if (typeof window !== 'undefined') {
   window.addEventListener('DOMContentLoaded', initChatUI);
 }
