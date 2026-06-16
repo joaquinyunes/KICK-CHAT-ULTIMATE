@@ -117,6 +117,57 @@ async function initDb(): Promise<SqlJsDatabase> {
 
   db.run(`CREATE INDEX IF NOT EXISTS idx_message_log_sent_at ON message_log(sent_at DESC)`);
 
+  // ─── Stream Simulator tables ────────────────────────────────
+  db.run(`
+    CREATE TABLE IF NOT EXISTS sim_sessions (
+      id              TEXT PRIMARY KEY,
+      created_at      INTEGER NOT NULL DEFAULT (unixepoch()),
+      stream_context  TEXT NOT NULL,
+      total_mensajes  INTEGER DEFAULT 0,
+      ultimo_bloque   INTEGER,
+      temas_activos   TEXT,
+      apuestas        TEXT,
+      usuarios_vistos TEXT
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS sim_mensajes (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id      TEXT NOT NULL REFERENCES sim_sessions(id),
+      bloque_numero   INTEGER NOT NULL,
+      posicion        INTEGER NOT NULL,
+      user_name       TEXT NOT NULL,
+      message         TEXT NOT NULL,
+      tipo            TEXT NOT NULL,
+      timestamp_gen   INTEGER NOT NULL DEFAULT (unixepoch()),
+      noticias_usadas TEXT
+    )
+  `);
+
+  db.run(`CREATE INDEX IF NOT EXISTS idx_sim_mensajes_session ON sim_mensajes(session_id, bloque_numero)`);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS sim_noticias_cache (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id      TEXT NOT NULL REFERENCES sim_sessions(id),
+      query_usada     TEXT NOT NULL,
+      resultado       TEXT NOT NULL,
+      buscado_at      INTEGER NOT NULL DEFAULT (unixepoch()),
+      usado_en_bloque INTEGER
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS sim_usuarios (
+      username        TEXT PRIMARY KEY,
+      personalidad    TEXT NOT NULL,
+      veces_aparecio  INTEGER DEFAULT 0,
+      ultima_aparicion INTEGER DEFAULT (unixepoch()),
+      memoria         TEXT
+    )
+  `);
+
   saveDb();
   return db;
 }

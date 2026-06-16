@@ -32,6 +32,7 @@ import {
 } from "./controllers/admin.controller";
 import { RateLimiter } from "./middleware/rate-limiter";
 import { handleChatSend, handleListMyBots } from "./controllers/chat.controller";
+import { generateChat, getHistory, fetchNews } from "./controllers/stream-simulator.controller";
 import { validate, LoginSchema, RegisterSchema, LoginInput, RegisterInput } from "./utils/validators";
 import { requestLogger, metricsRouter, recordMessage } from "./telemetry";
 import type { GenericResponse } from "./types/response";
@@ -259,6 +260,16 @@ app.get("/auth/kick/callback", async (req: Request, res: Response) => {
 
 // ─── Metrics Router ────────────────────────────────────────────────────────────
 app.use(metricsRouter);
+
+// ─── Stream Simulator Routes ───────────────────────────────────────────────────
+
+app.get("/simulator", (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, "..", "public", "stream-simulator.html"));
+});
+
+app.post("/api/chat/generate", generateChat);
+app.get("/api/chat/history", getHistory);
+app.post("/api/chat/news", fetchNews);
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
 

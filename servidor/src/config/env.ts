@@ -13,6 +13,7 @@ interface EnvConfig {
   KICK_CLIENT_ID: string;
   KICK_CLIENT_SECRET: string;
   KICK_REDIRECT_URI: string;
+  GEMINI_API_KEY: string;
 }
 
 export const env: EnvConfig = {
@@ -25,4 +26,5 @@ export const env: EnvConfig = {
   KICK_CLIENT_ID: process.env.KICK_CLIENT_ID || "",
   KICK_CLIENT_SECRET: process.env.KICK_CLIENT_SECRET || "",
   KICK_REDIRECT_URI: process.env.KICK_REDIRECT_URI || "",
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY || "",
 };
