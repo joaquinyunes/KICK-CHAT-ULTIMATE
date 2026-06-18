@@ -154,5 +154,6 @@ export function encryptToHex(plaintext: string): string {
  * Descifra una cadena hex (previamente cifrada con encryptToHex).
  */
 export function decryptFromHex(hex: string): string {
+  if (!hex) return "";
   return decrypt(Buffer.from(hex, "hex"));
 }

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SCB – Bots</title>
+  <link rel="stylesheet" href="../css/main.css" />
+</head>
+<body class="chat-page">
+  <header class="app-header">
+    <span class="app-title">StreamChat Bridge · Bots</span>
+    <div class="connection-status">
+      <span id="status-badge" class="status-dot status-disconnected"></span>
+      <span id="status-label">Desconectado</span>
+      <button id="logout-btn" class="btn btn-ghost" style="margin-left:12px">Cerrar sesión</button>
+    </div>
+  </header>
+
+  <nav class="tab-nav">
+    <a href="/admin/dashboard" class="tab-btn">Dashboard</a>
+    <a href="/admin/bots" class="tab-btn active">Bots</a>
+    <a href="/admin/clientes" class="tab-btn">Clientes</a>
+  </nav>
+
+  <section class="tab-panel active">
+    <div class="admin-grid">
+      <div class="admin-card">
+        <h3 class="admin-card-title">Agregar Bot (individual)</h3>
+        <div class="field">
+          <label for="adm-bot-name">Nombre del Bot</label>
+          <input id="adm-bot-name" type="text" placeholder="ej: bot1" />
+        </div>
+        <div class="field">
+          <label for="adm-bot-bearer">Bearer Token de Kick</label>
+          <input id="adm-bot-bearer" type="password" placeholder="••••••••" />
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button id="adm-add-bot-btn" class="btn btn-primary">Agregar Bot</button>
+          <button id="adm-oauth-name-btn" class="btn btn-secondary">＋ Conectar cuenta de Kick</button>
+        </div>
+        <p id="adm-bot-msg" class="settings-msg" hidden></p>
+      </div>
+
+      <div class="admin-card">
+        <h3 class="admin-card-title">Carga masiva</h3>
+        <div class="field">
+          <label for="adm-bulk-bots">Uno por línea: <code>nombre|bearer</code></label>
+          <textarea id="adm-bulk-bots" class="bulk-textarea" rows="6" placeholder="bot1|token_de_bot1&#10;bot2|token_de_bot2&#10;bot3|token_de_bot3"></textarea>
+        </div>
+        <button id="adm-bulk-add-btn" class="btn btn-primary">Agregar todos</button>
+        <p id="adm-bulk-msg" class="settings-msg" hidden></p>
+      </div>
+
+      <div class="admin-card admin-card-wide">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <h3 class="admin-card-title" style="margin-bottom:0">Todos los Bots</h3>
+          <button id="adm-oauth-connect-btn" class="btn btn-primary btn-small">＋ Conectar cuenta de Kick</button>
+        </div>
+        <div id="adm-oauth-url-area" style="margin-bottom:12px">
+          <p id="adm-oauth-url-label" class="oauth-url-label" hidden>
+            Abrí este link en el navegador donde quieras autorizar:
+          </p>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <a id="adm-oauth-link" href="#" target="_blank" hidden class="oauth-url-link"></a>
+            <div style="display:flex;gap:6px">
+              <input id="adm-oauth-url" class="oauth-url-input" readonly hidden />
+              <button id="adm-oauth-copy" class="btn btn-secondary btn-small" hidden>Copiar</button>
+            </div>
+          </div>
+        </div>
+        <div id="adm-bot-list">
+          <p style="opacity:0.6;font-style:italic">Cargando...</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script type="module" src="../js/admin-bots.js"></script>
+</body>
+</html>

@@ -237,8 +237,8 @@ function switchTab(name) {
 export function initChatUI() {
   initTabs();
 
-  if (sessionStorage.getItem('scb_role') === 'admin') {
-    window.location.href = '/admin.html';
+  if ((sessionStorage.getItem('scb_role') || localStorage.getItem('scb_role')) === 'admin') {
+    window.location.href = '/admin/dashboard';
     return;
   }
 

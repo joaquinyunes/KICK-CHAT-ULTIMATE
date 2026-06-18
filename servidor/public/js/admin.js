@@ -2,10 +2,11 @@ import { onStatusChange, ping } from './bridge-client.js';
 
 let editingUserId = null;
 
-function isAdmin() { return sessionStorage.getItem('scb_role') === 'admin'; }
-function getServerUrl() { return (sessionStorage.getItem('scb_server_url') || '').replace(/\/+$/, ''); }
+function ss(key) { return sessionStorage.getItem(key) || localStorage.getItem(key) || ''; }
+function isAdmin() { return (sessionStorage.getItem('scb_role') || localStorage.getItem('scb_role')) === 'admin'; }
+function getServerUrl() { return ss('scb_server_url').replace(/\/+$/, ''); }
 function getAuthHeaders() {
-  const token = sessionStorage.getItem('scb_jwt');
+  const token = ss('scb_jwt');
   return { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' };
 }
 
@@ -158,8 +159,10 @@ async function startKickOAuth() {
     if (data.url) {
       const box = document.getElementById('adm-oauth-url');
       const copyBtn = document.getElementById('adm-oauth-copy');
+      const link = document.getElementById('adm-oauth-link');
       if (box) { box.value = data.url; box.hidden = false; box.select(); }
       if (copyBtn) copyBtn.hidden = false;
+      if (link) { link.href = data.url; link.textContent = data.url; link.hidden = false; }
       document.getElementById('adm-oauth-url-label')?.removeAttribute('hidden');
     } else alert('Error al iniciar OAuth');
   } catch { alert('Error de conexión.'); }
@@ -172,6 +175,28 @@ function copyOAuthUrl() {
   navigator.clipboard?.writeText(box.value);
   const btn = document.getElementById('adm-oauth-copy');
   if (btn) { btn.textContent = '✓ Copiado'; setTimeout(() => { btn.textContent = 'Copiar'; }, 2000); }
+}
+
+async function startKickOAuthWithName() {
+  const nameInput = document.getElementById('adm-bot-name');
+  const name = nameInput?.value?.trim();
+  if (!name) { alert('Primero escribí un nombre para el bot.'); nameInput?.focus(); return; }
+  try {
+    const res = await fetch(`${getServerUrl()}/auth/kick/start`, {
+      method: 'POST', headers: getAuthHeaders(),
+      body: JSON.stringify({ bot_name: name }),
+    });
+    const data = await res.json();
+    if (data.url) {
+      const box = document.getElementById('adm-oauth-url');
+      const copyBtn = document.getElementById('adm-oauth-copy');
+      const link = document.getElementById('adm-oauth-link');
+      if (box) { box.value = data.url; box.hidden = false; box.select(); }
+      if (copyBtn) copyBtn.hidden = false;
+      if (link) { link.href = data.url; link.textContent = data.url; link.hidden = false; }
+      document.getElementById('adm-oauth-url-label')?.removeAttribute('hidden');
+    } else alert('Error al iniciar OAuth');
+  } catch { alert('Error de conexión.'); }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -339,6 +364,9 @@ function checkOAuthResult() {
 
 function handleLogout() {
   sessionStorage.clear();
+  localStorage.removeItem('scb_jwt');
+  localStorage.removeItem('scb_role');
+  localStorage.removeItem('scb_server_url');
   window.location.href = '/';
 }
 
@@ -347,9 +375,12 @@ function handleLogout() {
 // ════════════════════════════════════════════════════════════════
 
 window.addEventListener('DOMContentLoaded', () => {
+  // Migrate session → local for cross-tab support
+  ['scb_jwt','scb_role','scb_server_url'].forEach(k => {
+    const s = sessionStorage.getItem(k);
+    if (s && !localStorage.getItem(k)) localStorage.setItem(k, s);
+  });
   if (!isAdmin()) { window.location.href = '/chat.html'; return; }
-
-  history.replaceState({}, '', '/admin');
 
   onStatusChange(updateStatusUI);
   ping();
@@ -361,6 +392,7 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('adm-add-bot-btn')?.addEventListener('click', handleAddBot);
   document.getElementById('adm-bulk-add-btn')?.addEventListener('click', handleBulkAddBots);
   document.getElementById('adm-oauth-connect-btn')?.addEventListener('click', startKickOAuth);
+  document.getElementById('adm-oauth-name-btn')?.addEventListener('click', startKickOAuthWithName);
   document.getElementById('adm-oauth-copy')?.addEventListener('click', copyOAuthUrl);
   document.getElementById('adm-create-client-btn')?.addEventListener('click', handleCreateClient);
   document.getElementById('logout-btn')?.addEventListener('click', handleLogout);

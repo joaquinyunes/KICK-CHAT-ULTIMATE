@@ -45,14 +45,14 @@ export async function registerUser(
   username: string,
   password: string
 ): Promise<{ id: number; username: string }> {
-  const existing = stmts.findUserByUsername.get(username);
+  const existing = stmts.findUserByUsernameExact.get(username);
   if (existing) {
     throw new Error(`El usuario '${username}' ya existe`);
   }
 
   const password_hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
-  const result = stmts.insertUser.run({ username, password_hash });
+  const result = stmts.insertUser.run([username, password_hash]);
   const newId  = result.lastInsertRowid as number;
 
   console.log(`[auth-manager] Usuario registrado → id=${newId} username=${username}`);
@@ -84,12 +84,7 @@ export async function loginUser(
   if (!user || !isValid) {
     // Log del intento fallido si el usuario existe
     if (user) {
-      stmts.insertLog.run({
-        user_id:    user.id,
-        action:     "login_failed",
-        ip_address: ipAddress ?? null,
-        meta:       null,
-      });
+      stmts.insertLog.run([user.id, "login_failed", ipAddress ?? null, null]);
     }
     throw new Error("Credenciales inválidas");
   }
@@ -109,12 +104,7 @@ export async function loginUser(
   const token = jwt.sign(payload, env.JWT_SECRET);
 
   // Log del login exitoso
-  stmts.insertLog.run({
-    user_id:    user.id,
-    action:     "login",
-    ip_address: ipAddress ?? null,
-    meta:       JSON.stringify({ expiresAt }),
-  });
+  stmts.insertLog.run([user.id, "login", ipAddress ?? null, JSON.stringify({ expiresAt })]);
 
   console.log(
     `[auth-manager] Login exitoso → username=${username} exp=${new Date(expiresAt * 1000).toISOString()}`
@@ -151,10 +141,5 @@ export function logChatActivity(
   channel: string,
   ipAddress?: string
 ): void {
-  stmts.insertLog.run({
-    user_id:    userId,
-    action:     "chat_send",
-    ip_address: ipAddress ?? null,
-    meta:       JSON.stringify({ channel }),
-  });
+  stmts.insertLog.run([userId, "chat_send", ipAddress ?? null, JSON.stringify({ channel })]);
 }

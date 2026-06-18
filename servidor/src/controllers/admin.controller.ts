@@ -25,13 +25,16 @@ export function adminCreateBot(req: Request, res: Response): void {
   }
 
   const encrypted = encryptToHex(bearer);
-  const result = stmts.insertBot.run({ bot_name, encrypted_bearer: encrypted });
+  const result = stmts.insertBot.run([bot_name, encrypted]);
 
   res.status(201).json({ success: true, botId: result.lastInsertRowid, bot_name });
 }
 
 export function adminListBots(_req: Request, res: Response): void {
-  const bots = stmts.listAllBots.all();
+  const bots = stmts.listAllBots.all().map((b) => ({
+    id: b.id, bot_name: b.bot_name, is_active: b.is_active, created_at: b.created_at,
+    has_oauth: !!b.oauth_refresh_token, has_bearer: !!b.encrypted_bearer,
+  }));
   res.json({ success: true, bots });
 }
 
@@ -59,13 +62,7 @@ export function adminCreateUser(req: Request, res: Response): void {
   const link = typeof link_url === "string" ? link_url : null;
   const expires = typeof expires_at === "number" ? expires_at : null;
 
-  const result = stmts.insertUserFull.run({
-    username,
-    password_hash: passwordHash,
-    role: "client",
-    link_url: link,
-    expires_at: expires,
-  });
+  const result = stmts.insertUserFull.run([username, passwordHash, "client", link, expires]);
 
   res.status(201).json({ success: true, userId: result.lastInsertRowid, username, role: "client" });
 }
@@ -101,7 +98,7 @@ export function adminAssignBot(req: Request, res: Response): void {
     return;
   }
 
-  stmts.assignBotToUser.run({ bot_id, user_id: user.id });
+  stmts.assignBotToUser.run([bot_id, user.id]);
 
   res.json({ success: true, bot_name: bot.bot_name, username });
 }
@@ -132,7 +129,7 @@ export function adminUnassignBot(req: Request, res: Response): void {
     res.status(404).json({ error: "Usuario no encontrado" });
     return;
   }
-  stmts.unassignBotFromUser.run({ q_bot_id: bot_id, q_user_id: user.id });
+  stmts.unassignBotFromUser.run([bot_id, user.id]);
   res.json({ success: true, bot_id, username });
 }
 
@@ -173,7 +170,7 @@ export function adminUpdateUser(req: Request, res: Response): void {
   const expires = typeof expires_at === "number" ? expires_at : user.expires_at;
   const active = typeof is_active === "number" ? is_active : user.is_active;
 
-  stmts.updateUser.run({ q_link: link, q_expires: expires, q_active: active, q_id: userId });
+  stmts.updateUser.run([link, expires, active, userId]);
   res.json({ success: true, userId });
 }
 
@@ -194,7 +191,7 @@ export function adminDeleteUser(req: Request, res: Response): void {
     return;
   }
 
-  stmts.deleteUser.run({ q_id: userId });
+  stmts.deleteUser.run([userId]);
   res.json({ success: true, userId });
 }
 

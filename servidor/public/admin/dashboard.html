@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SCB – Dashboard</title>
+  <link rel="stylesheet" href="../css/main.css" />
+</head>
+<body class="chat-page">
+  <header class="app-header">
+    <span class="app-title">StreamChat Bridge · Dashboard</span>
+    <div class="connection-status">
+      <span id="status-badge" class="status-dot status-disconnected"></span>
+      <span id="status-label">Desconectado</span>
+      <button id="logout-btn" class="btn btn-ghost" style="margin-left:12px">Cerrar sesión</button>
+    </div>
+  </header>
+
+  <nav class="tab-nav">
+    <a href="/admin/dashboard" class="tab-btn active">Dashboard</a>
+    <a href="/admin/bots" class="tab-btn">Bots</a>
+    <a href="/admin/clientes" class="tab-btn">Clientes</a>
+  </nav>
+
+  <section id="panel-dashboard" class="tab-panel active">
+    <p id="dash-msg" class="settings-msg" hidden></p>
+
+    <div class="dash-stats">
+      <div class="dash-card dash-card-bots"><span class="dash-num" id="dash-total-bots">—</span><span class="dash-label">Bots</span></div>
+      <div class="dash-card dash-card-oauth"><span class="dash-num" id="dash-oauth-bots">—</span><span class="dash-label">OAuth Conectados</span></div>
+      <div class="dash-card dash-card-clients"><span class="dash-num" id="dash-total-clients">—</span><span class="dash-label">Clientes</span></div>
+      <div class="dash-card dash-card-msgs"><span class="dash-num" id="dash-msgs-sent">—</span><span class="dash-label">Mensajes Enviados</span></div>
+      <div class="dash-card dash-card-uptime"><span class="dash-num" id="dash-uptime">—</span><span class="dash-label">Tiempo encendido</span></div>
+      <div class="dash-card dash-card-expired"><span class="dash-num" id="dash-expired">—</span><span class="dash-label">Clientes vencidos</span></div>
+    </div>
+
+    <div class="dash-grid">
+      <div class="admin-card dash-section">
+        <h3 class="admin-card-title">Actividad reciente</h3>
+        <div id="dash-recent-log">
+          <p style="opacity:0.6;font-style:italic">Cargando...</p>
+        </div>
+      </div>
+      <div class="admin-card dash-section">
+        <h3 class="admin-card-title">Acciones rápidas</h3>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button id="dash-oauth-btn" class="btn btn-primary">＋ Conectar cuenta de Kick</button>
+          <button id="dash-create-client-btn" class="btn btn-secondary">＋ Crear Cliente</button>
+          <button id="dash-agregar-bot-btn" class="btn btn-secondary">＋ Agregar Bot manual</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script type="module" src="../js/admin-dashboard.js"></script>
+</body>
+</html>
