@@ -17,14 +17,24 @@ export function getStatus() {
   return _status;
 }
 
+function ss(key) { return sessionStorage.getItem(key) || localStorage.getItem(key) || ''; }
+function ssSet(key, val) {
+  if (val) { sessionStorage.setItem(key, val); localStorage.setItem(key, val); }
+  else { sessionStorage.removeItem(key); localStorage.removeItem(key); }
+}
+
 export function setServerUrl(url) {
-  if (url) sessionStorage.setItem('scb_server_url', url.replace(/\/+$/, ''));
+  ssSet('scb_server_url', url ? url.replace(/\/+$/, '') : '');
+}
+
+function getServerUrl() {
+  return ss('scb_server_url') || null;
 }
 
 export async function ping() {
   setStatus('checking');
   try {
-    const url = sessionStorage.getItem('scb_server_url');
+    const url = getServerUrl();
     if (!url) { setStatus('disconnected'); return false; }
     const res = await fetch(`${url}/health`);
     const ok = res.ok;
@@ -38,8 +48,8 @@ export async function ping() {
 
 export async function fetchMyBots() {
   try {
-    const url = sessionStorage.getItem('scb_server_url');
-    const token = sessionStorage.getItem('scb_jwt');
+    const url = getServerUrl();
+    const token = ss('scb_jwt');
     if (!url || !token) return [];
     const res = await fetch(`${url}/me/bots`, { headers: { 'Authorization': `Bearer ${token}` } });
     const data = await res.json();
@@ -49,8 +59,8 @@ export async function fetchMyBots() {
 
 export async function sendMessage(payload) {
   try {
-    const url = sessionStorage.getItem('scb_server_url');
-    const token = sessionStorage.getItem('scb_jwt');
+    const url = getServerUrl();
+    const token = ss('scb_jwt');
     if (!url || !token) return { ok: false, error: 'Not authenticated', status: 401 };
     const body = { sessionId: crypto.randomUUID?.() || Date.now().toString(), message: payload.message, channel: payload.channel };
     if (payload.bot_name) body.bot_name = payload.bot_name;
@@ -62,8 +72,8 @@ export async function sendMessage(payload) {
     });
     const data = await res.json().catch(() => ({}));
     if (res.status === 401) {
-      sessionStorage.removeItem('scb_jwt');
-      sessionStorage.removeItem('scb_role');
+      ssSet('scb_jwt', '');
+      ssSet('scb_role', '');
       window.location.href = '/';
       return { ok: false, error: 'Session expired', status: 401 };
     }

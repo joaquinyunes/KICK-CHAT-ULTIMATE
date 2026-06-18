@@ -1,7 +1,7 @@
-// config/env.ts - Loader y validacion de variables de entorno
-
 import dotenv from "dotenv";
-dotenv.config();
+import path from "path";
+const envPath = path.resolve(__dirname, "../../.env");
+dotenv.config({ path: envPath });
 
 interface EnvConfig {
   PORT: number;
@@ -14,17 +14,33 @@ interface EnvConfig {
   KICK_CLIENT_SECRET: string;
   KICK_REDIRECT_URI: string;
   GEMINI_API_KEY: string;
+  OPENROUTER_API_KEY: string;
+}
+
+function requireVar(label: string, value: string | undefined, minLen: number): string {
+  if (!value || value.length < minLen) {
+    throw new Error(`[env] ${label} requerida (mín ${minLen} caracteres)`);
+  }
+  return value;
+}
+
+function optionalVar(label: string, value: string | undefined): string {
+  if (!value) {
+    console.warn(`[env] ⚠ ${label} no definida`);
+  }
+  return value || "";
 }
 
 export const env: EnvConfig = {
   PORT: parseInt(process.env.PORT || "3000", 10),
-  MASTER_KEY: process.env.MASTER_KEY || "",
-  JWT_SECRET: process.env.JWT_SECRET || "",
-  KICK_API_URL: process.env.KICK_API_URL || "",
+  MASTER_KEY: requireVar("MASTER_KEY", process.env.MASTER_KEY, 32),
+  JWT_SECRET: requireVar("JWT_SECRET", process.env.JWT_SECRET, 16),
+  KICK_API_URL: optionalVar("KICK_API_URL", process.env.KICK_API_URL),
   NODE_ENV: process.env.NODE_ENV || "development",
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "24h",
-  KICK_CLIENT_ID: process.env.KICK_CLIENT_ID || "",
-  KICK_CLIENT_SECRET: process.env.KICK_CLIENT_SECRET || "",
-  KICK_REDIRECT_URI: process.env.KICK_REDIRECT_URI || "",
-  GEMINI_API_KEY: process.env.GEMINI_API_KEY || "",
+  KICK_CLIENT_ID: requireVar("KICK_CLIENT_ID", process.env.KICK_CLIENT_ID, 1),
+  KICK_CLIENT_SECRET: requireVar("KICK_CLIENT_SECRET", process.env.KICK_CLIENT_SECRET, 1),
+  KICK_REDIRECT_URI: requireVar("KICK_REDIRECT_URI", process.env.KICK_REDIRECT_URI, 1),
+  GEMINI_API_KEY: optionalVar("GEMINI_API_KEY", process.env.GEMINI_API_KEY),
+  OPENROUTER_API_KEY: optionalVar("OPENROUTER_API_KEY", process.env.OPENROUTER_API_KEY),
 };

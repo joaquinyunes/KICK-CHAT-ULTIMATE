@@ -147,6 +147,42 @@ async function initDb(): Promise<SqlJsDatabase> {
 
   db.run(`CREATE INDEX IF NOT EXISTS idx_sim_mensajes_session ON sim_mensajes(session_id, bloque_numero)`);
 
+  // ─── Triggers / Actions tables ──────────────────────────────────
+  db.run(`
+    CREATE TABLE IF NOT EXISTS triggers (
+      id          TEXT PRIMARY KEY,
+      name        TEXT NOT NULL,
+      enabled     INTEGER NOT NULL DEFAULT 1,
+      source      TEXT NOT NULL,
+      event       TEXT NOT NULL,
+      filters     TEXT,
+      action_ids  TEXT NOT NULL DEFAULT '[]',
+      created_at  INTEGER NOT NULL DEFAULT (unixepoch())
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS actions (
+      id          TEXT PRIMARY KEY,
+      name        TEXT NOT NULL,
+      enabled     INTEGER NOT NULL DEFAULT 1,
+      created_at  INTEGER NOT NULL DEFAULT (unixepoch())
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS action_steps (
+      id          TEXT PRIMARY KEY,
+      action_id   TEXT NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
+      type        TEXT NOT NULL,
+      order_num   INTEGER NOT NULL DEFAULT 0,
+      params      TEXT NOT NULL DEFAULT '{}',
+      enabled     INTEGER NOT NULL DEFAULT 1
+    )
+  `);
+
+  db.run(`CREATE INDEX IF NOT EXISTS idx_action_steps_action_id ON action_steps(action_id)`);
+
   db.run(`
     CREATE TABLE IF NOT EXISTS sim_noticias_cache (
       id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -191,18 +227,18 @@ function saveDb(): void {
 // ─── Wrapper para prepared statements tipo better-sqlite3 ────────────────────
 
 interface StmtWrapper<TBind, TRow> {
-  run: (params: TBind) => { changes: number; lastInsertRowid: number };
+  run: (params: TBind | any[]) => { changes: number; lastInsertRowid: number };
   get: (params?: any | any[]) => TRow | undefined;
   all: (params?: any | any[]) => TRow[];
 }
 
-function prepareStmt<TBind extends Record<string, any>, TRow = any>(
+function prepareStmt<TBind, TRow = any>(
   sql: string
 ): StmtWrapper<TBind, TRow> {
   return {
-    run(params: TBind): { changes: number; lastInsertRowid: number } {
+    run(params: TBind | any[]): { changes: number; lastInsertRowid: number } {
       const stmt = db.prepare(sql);
-      const values = Object.values(params);
+      const values = Array.isArray(params) ? params : Object.values(params);
       stmt.run(values);
       stmt.free();
       saveDb();
@@ -381,6 +417,52 @@ export const stmts = {
 
   unassignBotFromUser: prepareStmt<{ q_bot_id: number; q_user_id: number }, any>(
     `DELETE FROM bot_assignments WHERE bot_id = ? AND user_id = ?`
+  ),
+
+  // ─── Triggers / Actions ────────────────────────────────────────────────────
+
+  insertTrigger: prepareStmt<{ id: string; name: string; enabled: number; source: string; event: string; filters: string | null; action_ids: string; created_at: number }, any>(
+    `INSERT INTO triggers (id, name, enabled, source, event, filters, action_ids, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ),
+
+  listTriggers: prepareStmt<never, any>(
+    `SELECT * FROM triggers ORDER BY name ASC`
+  ),
+
+  updateTrigger: prepareStmt<{ name: string; enabled: number; source: string; event: string; filters: string | null; action_ids: string; id: string }, any>(
+    `UPDATE triggers SET name=COALESCE(?, name), enabled=COALESCE(?, enabled), source=COALESCE(?, source), event=COALESCE(?, event), filters=COALESCE(?, filters), action_ids=COALESCE(?, action_ids) WHERE id=?`
+  ),
+
+  deleteTrigger: prepareStmt<{ id: string }, any>(
+    `DELETE FROM triggers WHERE id = ?`
+  ),
+
+  insertAction: prepareStmt<{ id: string; name: string; enabled: number; created_at: number }, any>(
+    `INSERT INTO actions (id, name, enabled, created_at) VALUES (?, ?, ?, ?)`
+  ),
+
+  listActions: prepareStmt<never, any>(
+    `SELECT * FROM actions ORDER BY name ASC`
+  ),
+
+  findAction: prepareStmt<[string], any>(
+    `SELECT * FROM actions WHERE id = ? LIMIT 1`
+  ),
+
+  deleteAction: prepareStmt<{ id: string }, any>(
+    `DELETE FROM actions WHERE id = ?`
+  ),
+
+  insertStep: prepareStmt<{ id: string; action_id: string; type: string; order: number; params: string; enabled: number }, any>(
+    `INSERT INTO action_steps (id, action_id, type, order_num, params, enabled) VALUES (?, ?, ?, ?, ?, ?)`
+  ),
+
+  listStepsForAction: prepareStmt<[string], any>(
+    `SELECT * FROM action_steps WHERE action_id = ? ORDER BY order_num ASC`
+  ),
+
+  deleteStepsForAction: prepareStmt<{ action_id: string }, any>(
+    `DELETE FROM action_steps WHERE action_id = ?`
   ),
 };
 

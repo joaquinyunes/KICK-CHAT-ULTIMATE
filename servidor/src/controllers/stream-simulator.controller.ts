@@ -4,8 +4,8 @@ import { getDb } from "../models/database";
 import path from "path";
 import fs from "fs";
 
-const GEMINI_MODEL = "gemini-2.0-flash";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+const OR_MODEL = "openai/gpt-oss-20b:free";
+const OR_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 const ENERGY_CONFIGS: Record<string, { temp: number; desc: string; capsBoost: string }> = {
   tranquilo:  { temp: 0.55, desc: "tranquilo, más conversación, menos spam, más preguntas", capsBoost: "bajo" },
@@ -229,32 +229,39 @@ function dbAll(sql: string, params: any[] = []): any[] {
   return rows;
 }
 
-async function callGemini(
+async function callOpenRouter(
   prompt: string,
-  geminiKey: string,
+  apiKey: string,
   temperature: number,
-  agentCount: number = 1
+  agentCount: number = 1,
+  inputData?: Record<string, any>
 ): Promise<string> {
   const promises: Promise<string>[] = [];
+  const dataStr = inputData ? JSON.stringify(inputData, null, 2) : "{}";
   for (let a = 0; a < agentCount; a++) {
     const p = (async () => {
-      const res = await fetch(`${GEMINI_URL}?key=${geminiKey}`, {
+      const res = await fetch(OR_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
         body: JSON.stringify({
-          system_instruction: { parts: [{ text: prompt }] },
-          contents: [{ role: "user", parts: [{ text: `Generá el array de mensajes (agente ${a + 1}/${agentCount}). Seguí todas las reglas exactamente. La cantidad de mensajes de esta tanda está en la entrada.` }] }],
-          tools: [{ googleSearch: {} }],
-          generationConfig: { temperature, topP: 0.9, maxOutputTokens: 8192 },
+          model: OR_MODEL,
+          messages: [
+            { role: "system", content: prompt },
+            { role: "user", content: `Esta es la entrada para generar los mensajes:\n\`\`\`json\n${dataStr}\n\`\`\`\n\nGenerá el array de mensajes (agente ${a + 1}/${agentCount}). Seguí TODAS las reglas exactamente. Respondé ÚNICAMENTE con el JSON array de mensajes, sin markdown ni explicaciones.` },
+          ],
+          temperature,
+          max_tokens: 8192,
         }),
       });
       if (!res.ok) {
         const errText = await res.text();
-        throw new Error(`Gemini ${res.status}: ${errText.substring(0, 200)}`);
+        throw new Error(`OpenRouter ${res.status}: ${errText.substring(0, 200)}`);
       }
       const data = await res.json();
-      return data?.candidates?.[0]?.content?.parts
-        ?.filter((p: any) => p.text).map((p: any) => p.text).join("") || "";
+      return data?.choices?.[0]?.message?.content || "";
     })();
     promises.push(p);
   }
@@ -266,25 +273,43 @@ function parseMessages(rawText: string): any[] {
   const all: any[] = [];
   const parts = rawText.split("---SPLIT---");
   for (const part of parts) {
+    const clean = part.replace(/```json|```/g, "").trim();
+    // Try 1: full JSON object with "mensajes" key
+    const objMatch = clean.match(/\{(?:[^{}]|(?:\{[^{}]*\}))*"mensajes"\s*:\s*\[([\s\S]*?)\]\s*\}/);
+    if (objMatch) {
+      try {
+        const arr = JSON.parse("[" + objMatch[1] + "]");
+        if (Array.isArray(arr)) { all.push(...arr); continue; }
+      } catch {}
+    }
+    // Try 2: bare JSON array
     try {
-      const clean = part.replace(/```json|```/g, "").trim();
-      const match = clean.match(/\[[\s\S]*?\]/);
-      if (match) {
-        const parsed = JSON.parse(match[0]);
-        if (Array.isArray(parsed)) all.push(...parsed);
-      }
-    } catch {
-      // try to extract partial JSON
-      const lines = part.split("\n");
-      for (const line of lines) {
+      const parsed = JSON.parse(clean);
+      if (Array.isArray(parsed)) { all.push(...parsed); continue; }
+    } catch {}
+    // Try 3: find any array in the text (including truncated)
+    const arrMatch = clean.match(/\[([\s\S]*)$/);
+    if (arrMatch) {
+      // Try to extract individual objects from the partial array
+      const objPattern = /\{(?:[^{}]|(?:\{[^{}]*\}))*\}/g;
+      let m;
+      while ((m = objPattern.exec(arrMatch[1])) !== null) {
         try {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('{"user"') || trimmed.startsWith('{"id"')) {
-            const obj = JSON.parse(trimmed);
-            if (obj.user && obj.message) all.push(obj);
-          }
+          const obj = JSON.parse(m[0]);
+          if (obj && obj.user && obj.message) all.push(obj);
         } catch {}
       }
+    }
+    // Try 4: extract line by line
+    const lines = part.split("\n");
+    for (const line of lines) {
+      try {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('{"user"') || trimmed.startsWith('{"id"')) {
+          const obj = JSON.parse(trimmed);
+          if (obj.user && obj.message) all.push(obj);
+        }
+      } catch {}
     }
   }
   return all;
@@ -345,12 +370,14 @@ export async function generateChat(req: Request, res: Response): Promise<void> {
 
     const cantidadMsgs = Math.min(cantidad || 20, 600);
     const sessionId = session_id || `stream_${Date.now()}`;
-    const geminiKey = req.headers["x-gemini-key"] as string || env.GEMINI_API_KEY;
-    if (!geminiKey) { res.status(500).json({ error: "Gemini API key requerida" }); return; }
+    const orKey = req.headers["x-openrouter-key"] as string || env.OPENROUTER_API_KEY;
+    if (!orKey) { res.status(500).json({ error: "OpenRouter API key requerida" }); return; }
 
-    const energia = (energia_chat || "normal") as string;
-    const energyCfg = ENERGY_CONFIGS[energia] || ENERGY_CONFIGS.normal;
+    const energiaRaw = (typeof energia_chat === "string") ? energia_chat : (temperature !== undefined ? "custom" : "normal");
+    const energyKey = ENERGY_CONFIGS[energiaRaw] ? energiaRaw : "normal";
+    const energyCfg = ENERGY_CONFIGS[energyKey];
     const temp = temperature ?? energyCfg.temp;
+    const energiaLabel = energyKey.charAt(0).toUpperCase() + energyKey.slice(1);
 
     // Auto context: if stream_context is empty or "auto", let the AI invent it
     const ctxFinal = (stream_context && stream_context.trim() && stream_context !== "auto")
@@ -358,7 +385,7 @@ export async function generateChat(req: Request, res: Response): Promise<void> {
       : "auto";
 
     // Build energy description for prompt injection
-    const energiaDesc = `ENERGÍA: ${energia.toUpperCase()} — ${energyCfg.desc} | CAPS boost: ${energyCfg.capsBoost}`;
+    const energiaDesc = `ENERGÍA: ${energiaLabel} — ${energyCfg.desc} | CAPS boost: ${energyCfg.capsBoost}`;
     const prompt = SYSTEM_PROMPT.replace("{energia_desc}", energiaDesc);
 
     // Get cached news
@@ -394,7 +421,7 @@ export async function generateChat(req: Request, res: Response): Promise<void> {
       stream_context: ctxFinal,
       categoria_stream: categoria_stream || "justchatting",
       cantidad: msgsPerCall,
-      energia_chat: energia,
+      energia_chat: energyKey,
       temperatura: temp,
       noticias: cachedNews || [],
       historial_db: historial.slice(-10),
@@ -402,8 +429,8 @@ export async function generateChat(req: Request, res: Response): Promise<void> {
       evento: { tipo: "normal", impacto: "medio", tema: ctxFinal !== "auto" ? ctxFinal.substring(0, 50) : "transmisión en vivo" },
     };
 
-    // Call Gemini (potentially multiple parallel agents)
-    const rawText = await callGemini(prompt, geminiKey, temp, agentCount);
+    // Call OpenRouter (potentially multiple parallel agents)
+    const rawText = await callOpenRouter(prompt, orKey, temp, agentCount, inputData);
 
     // Parse all messages
     let allMessages = parseMessages(rawText);
@@ -452,7 +479,7 @@ export async function generateChat(req: Request, res: Response): Promise<void> {
       session_id: sessionId,
       bloque_numero: bloqueNum,
       total_en_sesion: (countRows[0]?.cnt || 0) + allMessages.length,
-      energia_usada: energia,
+      energia_usada: energyKey,
       temperatura_usada: temp,
     });
 
@@ -481,12 +508,12 @@ export async function getHistory(req: Request, res: Response): Promise<void> {
 }
 
 // ============================================================
-// POST /api/chat/news  — busca noticias con Gemini + Google Search
+// POST /api/chat/news  — busca noticias con OpenRouter
 // ============================================================
 export async function fetchNews(req: Request, res: Response): Promise<void> {
   try {
-    const geminiKey = req.headers["x-gemini-key"] as string || env.GEMINI_API_KEY;
-    if (!geminiKey) { res.status(500).json({ error: "Gemini API key requerida" }); return; }
+    const orKey = req.headers["x-openrouter-key"] as string || env.OPENROUTER_API_KEY;
+    if (!orKey) { res.status(500).json({ error: "OpenRouter API key requerida" }); return; }
 
     // Check cache: if we fetched news in the last 5 minutes, return cached
     const cached = getCachedNews();
@@ -498,7 +525,7 @@ export async function fetchNews(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const newsPrompt = `Buscá en la web las noticias más importantes de las ÚLTIMAS HORAS en estas 3 categorías. Respondé ÚNICAMENTE con un JSON array sin markdown:
+    const newsPrompt = `Generá las noticias más importantes de las ÚLTIMAS HORAS en estas 3 categorías. Respondé ÚNICAMENTE con un JSON array sin markdown:
 [
   {"tipo":"sport","texto":"descripción breve del resultado o noticia deportiva"},
   {"tipo":"trend","texto":"tendencia viral en redes sociales"},
@@ -506,26 +533,31 @@ export async function fetchNews(req: Request, res: Response): Promise<void> {
 ]
 Máximo 8 items en total, mezcla los 3 tipos. Priorizá Argentina y Latinoamérica. Incluí resultados de fútbol, MMA, boxeo, gaming, esports.`;
 
-    const resGemini = await fetch(`${GEMINI_URL}?key=${geminiKey}`, {
+    const resOR = await fetch(OR_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${orKey}`,
+      },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: "Sos un buscador de noticias. Respondé solo JSON." }] },
-        contents: [{ role: "user", parts: [{ text: newsPrompt }] }],
-        tools: [{ googleSearch: {} }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 1024 },
+        model: OR_MODEL,
+        messages: [
+          { role: "system", content: "Sos un generador de noticias. Respondé solo JSON." },
+          { role: "user", content: newsPrompt },
+        ],
+        temperature: 0.3,
+        max_tokens: 1024,
       }),
     });
 
-    if (!resGemini.ok) {
-      const errText = await resGemini.text();
-      res.status(502).json({ error: "Error Gemini", status: resGemini.status, detail: errText.substring(0, 200) });
+    if (!resOR.ok) {
+      const errText = await resOR.text();
+      res.status(502).json({ error: "Error OpenRouter", status: resOR.status, detail: errText.substring(0, 200) });
       return;
     }
 
-    const data = await resGemini.json();
-    const fullText = data?.candidates?.[0]?.content?.parts
-      ?.filter((p: any) => p.text).map((p: any) => p.text).join("") || "";
+    const data = await resOR.json();
+    const fullText = data?.choices?.[0]?.message?.content || "";
 
     let parsed: any[] = [];
     try {

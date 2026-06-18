@@ -362,12 +362,13 @@
 
   // NEWS
   async function buscarNews() {
-    const key = localStorage.getItem('gemini_api_key');
-    if(!key){alert("Configurá la API Key en Ajustes");return}
+    const key = localStorage.getItem('gemini_api_key') || '';
     const b=document.getElementById("simNewsBtn"); b.disabled=true;
     document.getElementById("simNewsBox").innerHTML='<span style="color:var(--text-muted)">Buscando...</span>';
     try {
-      const r=await fetch('/api/chat/news',{method:'POST',headers:{'Content-Type':'application/json','x-gemini-key':key}});
+      const headers={'Content-Type':'application/json'};
+      if(key) headers['x-openrouter-key']=key;
+      const r=await fetch('/api/chat/news',{method:'POST',headers});
       const d=await r.json();
       if(d.noticias&&d.noticias.length>0){simNews=d.noticias;document.getElementById("simNewsBox").innerHTML=d.noticias.map(n=>`<div class="n-item"><span class="n-badge ${n.tipo}">${n.tipo}</span>${n.texto}</div>`).join("")}
       else document.getElementById("simNewsBox").innerHTML='<span style="color:var(--text-muted)">Sin noticias</span>';
@@ -378,8 +379,7 @@
   // GENERATE
   async function genSim() {
     if(simGenerando) return;
-    const key = localStorage.getItem('gemini_api_key');
-    if(!key){alert("Configurá la API Key en Ajustes");return}
+    const key = localStorage.getItem('gemini_api_key') || '';
     const ctx=document.getElementById("simCtx").value.trim();
     if(!ctx&&!simAuto){alert("Escribí un contexto o activá Auto");return}
     const cant=parseInt(document.getElementById("simCant").value);
@@ -388,7 +388,9 @@
     const btn=document.getElementById("simGenBtn");btn.disabled=true;btn.innerHTML='<div class="spinner"></div> Generando...';
     mostrarTyping(cant>100);
     try {
-      const r=await fetch('/api/chat/generate',{method:'POST',headers:{'Content-Type':'application/json','x-gemini-key':key},body:JSON.stringify({stream_context:simAuto?'auto':ctx,categoria_stream:simCat,cantidad:cant,energia_chat:simEnergy,temperature:temp})});
+      const headers={'Content-Type':'application/json'};
+      if(key) headers['x-openrouter-key']=key;
+      const r=await fetch('/api/chat/generate',{method:'POST',headers,body:JSON.stringify({stream_context:simAuto?'auto':ctx,categoria_stream:simCat,cantidad:cant,energia_chat:simEnergy,temperature:temp})});
       const d=await r.json();
       ocultarTyping();
       if(!r.ok){btn.disabled=false;btn.innerHTML='✨ Generar';document.getElementById("simApiStatus").textContent='● Error';document.getElementById("simApiStatus").className='sim-api err';simGenerando=false;return}
@@ -442,8 +444,8 @@
   // ─── SEND SIMULATED MESSAGES TO KICK ───
   async function enviarSimAKick() {
     if(simMsgs.length===0){alert("No hay mensajes generados para enviar");return}
-    const token=sessionStorage.getItem('scb_jwt');
-    const url=sessionStorage.getItem('scb_server_url');
+    const token=sessionStorage.getItem('scb_jwt')||localStorage.getItem('scb_jwt');
+    const url=sessionStorage.getItem('scb_server_url')||localStorage.getItem('scb_server_url');
     if(!token||!url){alert("No estás autenticado. Iniciá sesión primero.");return}
     const settings=JSON.parse(localStorage.getItem('scb_settings')||'{}');
     const channel=settings.channelName;
