@@ -1,7 +1,4 @@
-import { setServerUrl } from './bridge-client.js';
-
 const form = document.getElementById('login-form');
-const serverInput = document.getElementById('server-url');
 const userInput = document.getElementById('username');
 const passInput = document.getElementById('password');
 const errorEl = document.getElementById('error-msg');
@@ -25,20 +22,17 @@ async function handleSubmit(e) {
   e.preventDefault();
   clearError();
 
-  const serverUrl = serverInput?.value.trim() || '';
   const username = userInput?.value.trim() || '';
   const password = passInput?.value || '';
+  const serverUrl = window.location.origin;
 
-  if (!serverUrl) { showError('Ingresa la URL del servidor.'); return; }
   if (!username) { showError('El usuario no puede estar vacío.'); return; }
   if (!password) { showError('La contraseña no puede estar vacía.'); return; }
 
-  setServerUrl(serverUrl);
-  localStorage.setItem('scb_server_url', serverUrl.replace(/\/+$/, ''));
   setLoading(true);
 
   try {
-    const res = await fetch(`${serverUrl.replace(/\/+$/, '')}/auth/login`, {
+    const res = await fetch(serverUrl + '/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
@@ -46,7 +40,7 @@ async function handleSubmit(e) {
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      const msg = res.status === 401 ? 'Credenciales incorrectas.' : res.status === 429 ? 'Demasiados intentos.' : data?.message || `Error ${res.status}`;
+      const msg = res.status === 401 ? 'Credenciales incorrectas.' : res.status === 429 ? 'Demasiados intentos.' : data?.message || 'Error ' + res.status;
       showError(msg);
       return;
     }
@@ -69,14 +63,10 @@ async function handleSubmit(e) {
 
     window.location.href = role === 'admin' ? '/admin/dashboard' : '/chat.html';
   } catch (err) {
-    showError(err?.name === 'TypeError' ? 'No se puede conectar al servidor.' : `Error: ${err?.message || 'desconocido'}`);
+    showError(err?.name === 'TypeError' ? 'No se puede conectar al servidor.' : 'Error: ' + (err?.message || 'desconocido'));
   } finally {
     setLoading(false);
   }
 }
-
-// Restore saved server URL
-const savedUrl = localStorage.getItem('scb_server_url');
-if (savedUrl && serverInput) serverInput.value = savedUrl;
 
 form?.addEventListener('submit', handleSubmit);
