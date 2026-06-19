@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Proxies — Admin</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .proxy-grid { display:grid; gap:12px; grid-template-columns:1fr; }
+    .proxy-card { background:var(--card-bg,#1a1d25); border:1px solid var(--border,#2a2d35); border-radius:8px; padding:12px 16px; display:grid; grid-template-columns:auto 1fr auto; gap:8px 16px; align-items:center; }
+    .proxy-card .proxy-addr { font-family:monospace; font-size:14px; }
+    .proxy-card .proxy-creds { font-size:12px; opacity:.7; }
+    .proxy-card .proxy-status { font-size:12px; padding:2px 8px; border-radius:4px; }
+    .proxy-status.active { background:var(--success,#27ae60); color:#fff; }
+    .proxy-status.inactive { background:var(--danger,#e74c3c); color:#fff; }
+    .proxy-card .proxy-actions { display:flex; gap:6px; }
+    .import-area { width:100%; min-height:120px; font-family:monospace; font-size:13px; padding:8px; background:#0d0f14; color:#ccc; border:1px solid var(--border,#2a2d35); border-radius:6px; resize:vertical; }
+    .inline-form { display:flex; gap:8px; flex-wrap:wrap; align-items:end; background:var(--card-bg,#1a1d25); padding:16px; border-radius:8px; margin-bottom:16px; border:1px solid var(--border,#2a2d35); }
+    .inline-form .field { display:flex; flex-direction:column; gap:4px; }
+    .inline-form .field label { font-size:11px; opacity:.7; }
+    .inline-form .field input { padding:6px 10px; border-radius:4px; border:1px solid var(--border,#2a2d35); background:#0d0f14; color:#ccc; width:140px; }
+    .inline-form .field input.small { width:70px; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header style="display:flex;justify-content:space-between;align-items:center;padding:12px 24px;background:#1a1d25;border-bottom:1px solid #2a2d35">
+      <div>
+        <a href="/admin/dashboard" style="color:#6d5afc;text-decoration:none;margin-right:16px">&larr; Dashboard</a>
+        <strong style="color:#fff">Gestión de Proxies</strong>
+      </div>
+      <div style="display:flex;gap:12px;align-items:center">
+        <span id="status-badge" style="font-size:12px;padding:2px 8px;border-radius:4px;background:#555">Desconectado</span>
+        <button id="logout-btn" style="background:none;border:1px solid #e74c3c;color:#e74c3c;padding:4px 12px;border-radius:4px;cursor:pointer">Salir</button>
+      </div>
+    </header>
+    <main style="padding:24px;max-width:1000px;margin:0 auto">
+      <div id="msg" style="margin-bottom:12px"></div>
+
+      <h2 style="color:#fff;margin-bottom:12px">Agregar Proxy</h2>
+      <div class="inline-form" id="add-form">
+        <div class="field"><label>Host</label><input id="f-host" type="text" placeholder="192.168.1.1" /></div>
+        <div class="field"><label>Puerto</label><input id="f-port" type="number" class="small" placeholder="8080" /></div>
+        <div class="field"><label>Usuario</label><input id="f-user" type="text" placeholder="user" /></div>
+        <div class="field"><label>Password</label><input id="f-pass" type="text" placeholder="pass" /></div>
+        <div class="field"><label>Protocolo</label><input id="f-proto" type="text" class="small" value="http" /></div>
+        <button id="btn-add" class="btn btn-primary">Agregar</button>
+      </div>
+
+      <h2 style="color:#fff;margin:20px 0 12px">Importar desde texto</h2>
+      <div style="margin-bottom:16px">
+        <textarea id="import-text" class="import-area" placeholder="user:pass@host:port (uno por línea)&#10;ej: usuario1:pass123@192.168.1.1:8080"></textarea>
+        <button id="btn-import" class="btn btn-primary" style="margin-top:8px">Importar</button>
+      </div>
+
+      <h2 style="color:#fff;margin:20px 0 12px">Proxies (<span id="proxy-count">0</span>)</h2>
+      <div id="proxy-list" class="proxy-grid"></div>
+    </main>
+  </div>
+  <script type="module" src="/js/admin-proxies.js"></script>
+</body>
+</html>

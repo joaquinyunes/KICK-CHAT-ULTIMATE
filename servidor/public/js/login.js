@@ -51,9 +51,13 @@ async function handleSubmit(e) {
     sessionStorage.setItem('scb_jwt', token);
     localStorage.setItem('scb_jwt', token);
     let role = 'client';
+    let permissions = ['chat', 'simulator', 'vods'];
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
       role = payload.role || 'client';
+      if (payload.permissions) {
+        try { permissions = JSON.parse(payload.permissions); } catch { permissions = ['chat', 'simulator', 'vods']; }
+      }
       sessionStorage.setItem('scb_role', role);
       localStorage.setItem('scb_role', role);
     } catch {
@@ -61,7 +65,13 @@ async function handleSubmit(e) {
       localStorage.setItem('scb_role', 'client');
     }
 
-    window.location.href = role === 'admin' ? '/admin/dashboard' : '/chat.html';
+    if (role === 'admin') {
+      window.location.href = '/admin/dashboard';
+    } else if (permissions.includes('vods') && !permissions.includes('chat')) {
+      window.location.href = '/vods.html';
+    } else {
+      window.location.href = '/chat.html';
+    }
   } catch (err) {
     showError(err?.name === 'TypeError' ? 'No se puede conectar al servidor.' : 'Error: ' + (err?.message || 'desconocido'));
   } finally {

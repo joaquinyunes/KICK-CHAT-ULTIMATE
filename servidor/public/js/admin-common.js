@@ -2,7 +2,10 @@ import { onStatusChange, ping } from './bridge-client.js';
 
 export function ss(key) { return sessionStorage.getItem(key) || localStorage.getItem(key) || ''; }
 
-export function isAdmin() { return (sessionStorage.getItem('scb_role') || localStorage.getItem('scb_role')) === 'admin'; }
+export function esc(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 
 export function getServerUrl() { return (ss('scb_server_url') || window.location.origin).replace(/\/+$/, ''); }
 
@@ -26,7 +29,10 @@ export function showMsg(elId, msg, type) {
   setTimeout(() => { el.hidden = true; }, 4000);
 }
 
-export function handleLogout() {
+export async function handleLogout() {
+  try {
+    await fetch('/auth/logout', { method: 'POST' });
+  } catch {}
   sessionStorage.clear();
   localStorage.removeItem('scb_jwt');
   localStorage.removeItem('scb_role');
@@ -49,12 +55,30 @@ export function checkOAuthResult(msgElId) {
   return false;
 }
 
-export function initCommon() {
-  ['scb_jwt','scb_role','scb_server_url'].forEach(k => {
-    const s = sessionStorage.getItem(k);
-    if (s && !localStorage.getItem(k)) localStorage.setItem(k, s);
-  });
-  if (!isAdmin()) { window.location.href = '/chat.html'; return false; }
+export async function initCommon() {
+  const token = ss('scb_jwt');
+  const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+
+  try {
+    const res = await fetch('/auth/me', { headers });
+    if (!res.ok) {
+      window.location.href = '/';
+      return false;
+    }
+    const data = await res.json();
+    if (data.user.role !== 'admin') {
+      window.location.href = '/';
+      return false;
+    }
+    // Sincronizar token existente a cookie httpOnly para futuras navegaciones
+    if (token) {
+      fetch('/auth/sync-cookie', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } }).catch(() => {});
+    }
+  } catch {
+    window.location.href = '/';
+    return false;
+  }
+
   onStatusChange(updateStatusUI);
   ping();
   setInterval(() => ping(), 15000);

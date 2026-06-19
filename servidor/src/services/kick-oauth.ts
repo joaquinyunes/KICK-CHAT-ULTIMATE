@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { env } from "../config/env";
 import { stmts } from "../models/database";
 import { logger } from "../utils/logger";
+import { encryptToHex, decryptFromHex } from "./security";
 import { KickApiError, type TokenResult } from "../types/kick";
 
 const TAG = "kick-oauth";
@@ -106,6 +107,11 @@ export async function refreshAccessToken(refreshToken: string): Promise<TokenRes
   }
 }
 
+function tryDecrypt(hex: string): string {
+  if (!hex) return hex;
+  try { return decryptFromHex(hex); } catch { return hex; }
+}
+
 export async function getBotAccessToken(botId: number): Promise<string | null> {
   const bot = stmts.findBotById?.get([botId]) as any;
   if (!bot?.oauth_refresh_token) {
@@ -113,17 +119,22 @@ export async function getBotAccessToken(botId: number): Promise<string | null> {
     return null;
   }
 
+  const decryptedRefresh = tryDecrypt(bot.oauth_refresh_token);
+  const decryptedAccess = tryDecrypt(bot.oauth_access_token);
+
   const SAFETY_MARGIN = 60;
-  if (bot.oauth_access_token && bot.oauth_token_expires_at > Math.floor(Date.now() / 1000) + SAFETY_MARGIN) {
-    return bot.oauth_access_token;
+  if (decryptedAccess && bot.oauth_token_expires_at > Math.floor(Date.now() / 1000) + SAFETY_MARGIN) {
+    return decryptedAccess;
   }
 
-  const result = await refreshAccessToken(bot.oauth_refresh_token);
+  const result = await refreshAccessToken(decryptedRefresh);
   if (!result) return null;
 
+  const encRefresh = encryptToHex(result.refresh_token || decryptedRefresh);
+  const encAccess = encryptToHex(result.access_token);
   stmts.updateBotOAuthTokens.run([
-    result.refresh_token || bot.oauth_refresh_token,
-    result.access_token,
+    encRefresh,
+    encAccess,
     Math.floor(Date.now() / 1000) + result.expires_in,
     botId,
   ]);

@@ -1,5 +1,7 @@
 import express, { type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
+import helmet from "helmet";
+import cookieParser from "cookie-parser";
 import { rateLimit } from "express-rate-limit";
 import path from "path";
 import { env } from "./config/env";
@@ -16,19 +18,41 @@ import oauthRoutes from "./routes/oauth.routes";
 import adminDashboardRoutes from "./routes/admin-dashboard.routes";
 import adminBotsRoutes from "./routes/admin-bots.routes";
 import adminClientesRoutes from "./routes/admin-clientes.routes";
+import adminProxiesRoutes from "./routes/admin-proxies.routes";
+import clientVodsRoutes from "./routes/client-vods.routes";
 import simulatorRoutes from "./routes/simulator.routes";
 import actionsRoutes from "./routes/actions.routes";
+import { requirePageAuth } from "./middleware/auth-page.middleware";
 
 const app = express();
 
-app.use(cors({ origin: process.env.NODE_ENV === "production" ? [env.KICK_API_URL].filter(Boolean) : "*" }));
+app.use(cors({
+  origin: process.env.NODE_ENV === "production" ? [env.KICK_API_URL].filter(Boolean) : "*",
+  credentials: true,
+}));
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],  // modules require 'unsafe-inline' or nonce
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+    },
+  },
+}));
+app.use(cookieParser());
 app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: false }));
 app.disable("x-powered-by");
 
 app.use(express.static(path.join(__dirname, "..", "public")));
 
-// ─── Admin page routes ──────────────────────────────────────────
+// ─── Admin page routes — protegidas con cookie JWT ──────────────
+app.use("/admin", requirePageAuth);
 app.get("/admin", (req: Request, res: Response) => {
   const query = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
   res.redirect(`/admin/dashboard${query}`);
@@ -39,8 +63,15 @@ app.get("/admin/dashboard", (_req: Request, res: Response) => {
 app.get("/admin/bots", (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "..", "public", "admin", "bots.html"));
 });
+app.get("/vods.html", requirePageAuth, (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, "..", "public", "vods.html"));
+});
+
 app.get("/admin/clientes", (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "..", "public", "admin", "clientes.html"));
+});
+app.get("/admin/proxies", (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, "..", "public", "admin", "proxies.html"));
 });
 
 // ─── Telemetry ───────────────────────────────────────────────────
@@ -57,6 +88,8 @@ app.use(oauthRoutes);
 app.use(adminDashboardRoutes);
 app.use(adminBotsRoutes);
 app.use(adminClientesRoutes);
+app.use(adminProxiesRoutes);
+app.use(clientVodsRoutes);
 app.use(simulatorRoutes);
 app.use(actionsRoutes);
 
@@ -71,7 +104,7 @@ app.get("/health", (_req: Request, res: Response) => {
 // ─── Error Handlers ──────────────────────────────────────────────
 app.use((_req: Request, res: Response) => res.status(404).json({ error: "Ruta no encontrada" }));
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  logger.error(TAG, "Error no manejado", err.message);
+  logger.error(TAG, "Error no manejado", err.message, err.stack);
   res.status(500).json({ error: "Error interno del servidor" });
 });
 

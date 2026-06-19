@@ -8,6 +8,12 @@ import type { Request, Response } from "express";
 const router = Router();
 
 router.get("/me/bots", requireAuth, handleListMyBots);
+router.get("/api/client/permissions", requireAuth, (req: Request, res: Response) => {
+  const user = req.user!;
+  let permissions: string[] = [];
+  try { permissions = JSON.parse(user.permissions || '["chat","simulator","vods"]'); } catch { permissions = ["chat", "simulator", "vods"]; }
+  res.json({ success: true, permissions, hourly_view_limit: user.hourly_view_limit ?? 50 });
+});
 
 router.post("/chat/send", requireAuth, async (req: Request, res: Response) => {
   const userId = req.user?.sub;

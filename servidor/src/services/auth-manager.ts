@@ -28,6 +28,8 @@ export interface TokenPayload extends JwtPayload {
   sub: string;       // user ID (string por convención JWT)
   username: string;
   role: string;
+  permissions?: string;
+  hourly_view_limit?: number;
 }
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
@@ -97,8 +99,10 @@ export async function loginUser(
     sub:      String(user.id),
     username: user.username,
     role:     user.role,
+    permissions: user.permissions ?? '["chat","simulator","vods"]',
+    hourly_view_limit: user.hourly_view_limit ?? 50,
     iat:      now,
-    exp:      expiresAt,       // Expiración FIJA de 24 horas
+    exp:      expiresAt,
   };
 
   const token = jwt.sign(payload, env.JWT_SECRET);

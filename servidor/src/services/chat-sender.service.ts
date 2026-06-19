@@ -20,21 +20,19 @@ export interface SendResult {
 }
 
 function pickBot(userId: number, botName?: string): { botId: number } | null {
+  const userBots = stmts.listBotsForUser.all(userId);
+
   if (botName) {
-    const bot = stmts.findBotByName.get(botName);
-    if (!bot || !bot.oauth_refresh_token) return null;
-    return { botId: bot.id };
+    const assigned = userBots.find((b: any) => b.bot_name === botName);
+    if (!assigned || !assigned.oauth_refresh_token) return null;
+    return { botId: assigned.id };
   }
 
-  const userBots = stmts.listBotsForUser.all(userId);
   if (userBots.length > 0) {
     const bot = userBots[Math.floor(Math.random() * userBots.length)];
     if (!bot.oauth_refresh_token) return null;
     return { botId: bot.id };
   }
-
-  const anyBot = (stmts.listAllBots?.all?.() || []).find((b: any) => b.oauth_refresh_token);
-  if (anyBot) return { botId: anyBot.id };
 
   return null;
 }

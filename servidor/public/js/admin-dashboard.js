@@ -1,4 +1,4 @@
-import { getServerUrl, getAuthHeaders, showMsg, checkOAuthResult, initCommon } from './admin-common.js';
+import { getServerUrl, getAuthHeaders, showMsg, checkOAuthResult, initCommon, esc } from './admin-common.js';
 
 async function loadDashboard() {
   try {
@@ -12,6 +12,7 @@ async function loadDashboard() {
     setText('dash-msgs-sent', s.messages_sent);
     setText('dash-uptime', fmtUptime(s.uptime_seconds));
     setText('dash-expired', s.expired_clients);
+    setText('dash-total-proxies', `${s.total_proxies} (${s.active_proxies} act)`);
 
     const log = document.getElementById('dash-recent-log');
     if (!log) return;
@@ -23,8 +24,8 @@ async function loadDashboard() {
     log.innerHTML = `<div class="table-header" style="grid-template-columns:1fr 1fr 1fr 1fr"><span>Hora</span><span>Bot</span><span>Canal</span><span>Estado</span></div>` +
       msgs.map(m => {
         const time = new Date(m.sent_at * 1000).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-        const status = m.success ? 'OK' : `FAIL ${m.error_reason || ''}`;
-        return `<div class="table-row" style="grid-template-columns:1fr 1fr 1fr 1fr"><span>${time}</span><span>${m.bot_name || '—'}</span><span>${m.channel || '—'}</span><span>${status}</span></div>`;
+        const status = m.success ? 'OK' : `FAIL ${esc(m.error_reason) || ''}`;
+        return `<div class="table-row" style="grid-template-columns:1fr 1fr 1fr 1fr"><span>${time}</span><span>${esc(m.bot_name) || '—'}</span><span>${esc(m.channel) || '—'}</span><span>${esc(status)}</span></div>`;
       }).join('');
   } catch {}
 }
@@ -42,11 +43,12 @@ function fmtUptime(sec) {
   return `${d}d ${h}h ${m}m ${s}s`;
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-  if (!initCommon()) return;
+window.addEventListener('DOMContentLoaded', async () => {
+  if (!(await initCommon())) return;
   checkOAuthResult('dash-msg');
   loadDashboard();
   document.getElementById('dash-oauth-btn')?.addEventListener('click', () => { window.location.href = '/admin/bots'; });
   document.getElementById('dash-create-client-btn')?.addEventListener('click', () => { window.location.href = '/admin/clientes'; });
   document.getElementById('dash-agregar-bot-btn')?.addEventListener('click', () => { window.location.href = '/admin/bots'; });
+  document.getElementById('dash-proxies-btn')?.addEventListener('click', () => { window.location.href = '/admin/proxies'; });
 });

@@ -364,9 +364,18 @@ function getCachedNews(): string[] | null {
 // ============================================================
 // POST /api/chat/generate
 // ============================================================
+function sanitizeContext(input: string): string {
+  if (!input || typeof input !== "string") return "";
+  return input
+    .replace(/[\x00-\x1f\x7f-\x9f]/g, "")
+    .replace(/["""'']/g, "")
+    .slice(0, 500);
+}
+
 export async function generateChat(req: Request, res: Response): Promise<void> {
   try {
-    const { session_id, stream_context, cantidad, energia_chat, temperature, categoria_stream, historial_db } = req.body;
+    let { session_id, stream_context, cantidad, energia_chat, temperature, categoria_stream, historial_db } = req.body;
+    stream_context = sanitizeContext(stream_context);
 
     const cantidadMsgs = Math.min(cantidad || 20, 600);
     const sessionId = session_id || `stream_${Date.now()}`;
@@ -485,7 +494,7 @@ export async function generateChat(req: Request, res: Response): Promise<void> {
 
   } catch (err: any) {
     console.error("[simulator] Error:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Error interno del simulador" });
   }
 }
 
@@ -503,7 +512,7 @@ export async function getHistory(req: Request, res: Response): Promise<void> {
     );
     res.json({ mensajes: rows, session_id: sessionId });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Error interno del simulador" });
   }
 }
 
@@ -579,6 +588,6 @@ Máximo 8 items en total, mezcla los 3 tipos. Priorizá Argentina y Latinoaméri
 
   } catch (err: any) {
     console.error("[simulator] News error:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Error interno del simulador" });
   }
 }
