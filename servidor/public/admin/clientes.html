@@ -20,6 +20,7 @@
     <a href="/admin/dashboard" class="tab-btn">Dashboard</a>
     <a href="/admin/bots" class="tab-btn">Bots</a>
     <a href="/admin/clientes" class="tab-btn active">Clientes</a>
+    <a href="/admin/proxies" class="tab-btn">Proxies</a>
   </nav>
 
   <section class="tab-panel active">
@@ -41,6 +42,18 @@
         <div class="field">
           <label for="adm-client-expires">Vencimiento (días desde hoy, opcional)</label>
           <input id="adm-client-expires" type="number" min="1" placeholder="ej: 30" />
+        </div>
+        <div class="field">
+          <label>Permisos</label>
+          <div class="perm-checkboxes" style="display:flex;gap:12px;flex-wrap:wrap">
+            <label><input type="checkbox" class="create-perm" value="chat" checked /> Chat</label>
+            <label><input type="checkbox" class="create-perm" value="simulator" checked /> Simulador</label>
+            <label><input type="checkbox" class="create-perm" value="vods" checked /> VODs</label>
+          </div>
+        </div>
+        <div class="field">
+          <label for="adm-client-hourly-limit">Límite vistas/hora</label>
+          <input id="adm-client-hourly-limit" type="number" min="0" value="50" style="width:100px" />
         </div>
         <button id="adm-create-client-btn" class="btn btn-primary">Crear Cliente</button>
         <p id="adm-client-msg" class="settings-msg" hidden></p>

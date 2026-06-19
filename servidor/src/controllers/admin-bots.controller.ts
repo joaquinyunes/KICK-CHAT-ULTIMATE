@@ -2,6 +2,10 @@ import type { Request, Response } from "express";
 import { stmts } from "../models/database";
 import { encryptToHex } from "../services/security";
 
+function audit(adminId: number, action: string, targetType: string | null, targetId: string | null, details: string | null, ip: string | null): void {
+  try { stmts.insertAuditLog.run([adminId, action, targetType, targetId, details, ip]); } catch {}
+}
+
 export function adminCreateBot(req: Request, res: Response): void {
   const { bot_name, bearer } = req.body;
   if (!bot_name || typeof bot_name !== "string") {
@@ -16,6 +20,7 @@ export function adminCreateBot(req: Request, res: Response): void {
   }
   const encrypted = encryptToHex(bearer);
   const result = stmts.insertBot.run([bot_name, encrypted]);
+  audit(Number(req.user!.sub), "create_bot", "bot", String(result.lastInsertRowid), bot_name, req.ip ?? null);
   res.status(201).json({ success: true, botId: result.lastInsertRowid, bot_name });
 }
 
@@ -40,6 +45,7 @@ export function adminAssignBot(req: Request, res: Response): void {
   const user = stmts.findUserByUsernameExact.get(username);
   if (!user) { res.status(404).json({ error: "Usuario no encontrado" }); return; }
   stmts.assignBotToUser.run([bot_id, user.id]);
+  audit(Number(req.user!.sub), "assign_bot", "bot", String(bot_id), `bot=${bot.bot_name} user=${username}`, req.ip ?? null);
   res.json({ success: true, bot_name: bot.bot_name, username });
 }
 
@@ -61,5 +67,6 @@ export function adminUnassignBot(req: Request, res: Response): void {
   const user = stmts.findUserByUsernameExact.get(username);
   if (!user) { res.status(404).json({ error: "Usuario no encontrado" }); return; }
   stmts.unassignBotFromUser.run([bot_id, user.id]);
+  audit(Number(req.user!.sub), "unassign_bot", "bot", String(bot_id), `user=${username}`, req.ip ?? null);
   res.json({ success: true, bot_id, username });
 }

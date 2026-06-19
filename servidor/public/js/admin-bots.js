@@ -1,4 +1,4 @@
-import { getServerUrl, getAuthHeaders, showMsg, checkOAuthResult, initCommon } from './admin-common.js';
+import { getServerUrl, getAuthHeaders, showMsg, checkOAuthResult, initCommon, esc } from './admin-common.js';
 
 async function handleAddBot() {
   const botName = document.getElementById('adm-bot-name')?.value?.trim();
@@ -53,7 +53,7 @@ async function loadBots() {
       html += bots.map(b => {
         const oauth = b.has_oauth ? 'Conectado' : 'No conectado';
         const bearer = b.has_bearer ? 'Tiene token' : 'Sin token';
-        return `<div class="table-row"><span><strong>${b.bot_name}</strong></span><span>${oauth}</span><span>${bearer}</span></div>`;
+        return `<div class="table-row"><span><strong>${esc(b.bot_name)}</strong></span><span>${oauth}</span><span>${bearer}</span></div>`;
       }).join('');
     }
     container.innerHTML = html;
@@ -85,8 +85,8 @@ function copyOAuthUrl() {
   if (btn) { btn.textContent = 'Copiado'; setTimeout(() => { btn.textContent = 'Copiar'; }, 2000); }
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-  if (!initCommon()) return;
+window.addEventListener('DOMContentLoaded', async () => {
+  if (!(await initCommon())) return;
   checkOAuthResult('adm-bot-msg');
   loadBots();
   document.getElementById('adm-add-bot-btn')?.addEventListener('click', handleAddBot);

@@ -46,6 +46,8 @@ async function initDb(): Promise<SqlJsDatabase> {
   try { db.run("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'client'"); } catch {}
   try { db.run("ALTER TABLE users ADD COLUMN link_url TEXT"); } catch {}
   try { db.run("ALTER TABLE users ADD COLUMN expires_at INTEGER"); } catch {}
+  try { db.run("ALTER TABLE users ADD COLUMN permissions TEXT NOT NULL DEFAULT '[\"chat\",\"simulator\",\"vods\"]'"); } catch {}
+  try { db.run("ALTER TABLE users ADD COLUMN hourly_view_limit INTEGER NOT NULL DEFAULT 50"); } catch {}
 
   // Sembrar admin por defecto si no existe
   const adminExists = db.exec("SELECT id FROM users WHERE username = 'admin' LIMIT 1");
@@ -204,6 +206,62 @@ async function initDb(): Promise<SqlJsDatabase> {
     )
   `);
 
+  db.run(`
+    CREATE TABLE IF NOT EXISTS admin_audit_log (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      admin_id    INTEGER NOT NULL REFERENCES users(id),
+      action      TEXT    NOT NULL,
+      target_type TEXT,
+      target_id   TEXT,
+      details     TEXT,
+      ip_address  TEXT,
+      created_at  INTEGER NOT NULL DEFAULT (unixepoch())
+    )
+  `);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_admin_audit_created ON admin_audit_log(created_at DESC)`);
+
+  // ─── Proxies table ────────────────────────────────────────────
+  db.run(`
+    CREATE TABLE IF NOT EXISTS proxies (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      host        TEXT    NOT NULL,
+      port        INTEGER NOT NULL,
+      username    TEXT    NOT NULL,
+      password    TEXT    NOT NULL,
+      protocol    TEXT    NOT NULL DEFAULT 'http',
+      is_active   INTEGER NOT NULL DEFAULT 1,
+      last_used_at INTEGER,
+      created_at  INTEGER NOT NULL DEFAULT (unixepoch())
+    )
+  `);
+
+  // ─── Client VODs table ───────────────────────────────────────
+  db.run(`
+    CREATE TABLE IF NOT EXISTS client_vods (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL REFERENCES users(id),
+      url         TEXT    NOT NULL,
+      type        TEXT    NOT NULL DEFAULT 'vod',
+      channel     TEXT,
+      is_active   INTEGER NOT NULL DEFAULT 1,
+      views_count INTEGER NOT NULL DEFAULT 0,
+      added_at    INTEGER NOT NULL DEFAULT (unixepoch())
+    )
+  `);
+
+  // ─── View log table ──────────────────────────────────────────
+  db.run(`
+    CREATE TABLE IF NOT EXISTS view_log (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL REFERENCES users(id),
+      vod_id      INTEGER REFERENCES client_vods(id),
+      proxy_id    INTEGER REFERENCES proxies(id),
+      success     INTEGER NOT NULL DEFAULT 0,
+      error       TEXT,
+      created_at  INTEGER NOT NULL DEFAULT (unixepoch())
+    )
+  `);
+
   saveDb();
   return db;
 }
@@ -282,6 +340,8 @@ export interface UserRow {
   is_active: number;
   link_url: string | null;
   expires_at: number | null;
+  permissions?: string;
+  hourly_view_limit?: number;
 }
 
 export interface MessageLogRow {
@@ -320,6 +380,39 @@ export interface BotAssignmentRow {
   bot_id: number;
   user_id: number;
   assigned_at: number;
+}
+
+export interface ProxyRow {
+  id: number;
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+  protocol: string;
+  is_active: number;
+  last_used_at: number | null;
+  created_at: number;
+}
+
+export interface ClientVodRow {
+  id: number;
+  user_id: number;
+  url: string;
+  type: string;
+  channel: string | null;
+  is_active: number;
+  views_count: number;
+  added_at: number;
+}
+
+export interface ViewLogRow {
+  id: number;
+  user_id: number;
+  vod_id: number | null;
+  proxy_id: number | null;
+  success: number;
+  error: string | null;
+  created_at: number;
 }
 
 // ─── Statements preparados ────────────────────────────────────────────────────
@@ -463,6 +556,86 @@ export const stmts = {
 
   deleteStepsForAction: prepareStmt<{ action_id: string }, any>(
     `DELETE FROM action_steps WHERE action_id = ?`
+  ),
+
+  insertAuditLog: prepareStmt<{ admin_id: number; action: string; target_type: string | null; target_id: string | null; details: string | null; ip: string | null }, any>(
+    `INSERT INTO admin_audit_log (admin_id, action, target_type, target_id, details, ip_address) VALUES (?, ?, ?, ?, ?, ?)`
+  ),
+
+  // ─── Proxies ──────────────────────────────────────────────────────────────────
+  insertProxy: prepareStmt<{ host: string; port: number; username: string; password: string; protocol: string; is_active: number }, ProxyRow>(
+    `INSERT INTO proxies (host, port, username, password, protocol, is_active) VALUES (?, ?, ?, ?, ?, ?)`
+  ),
+
+  listProxies: prepareStmt<never, ProxyRow>(
+    `SELECT * FROM proxies ORDER BY is_active DESC, created_at ASC`
+  ),
+
+  findProxyById: prepareStmt<[number], ProxyRow>(
+    `SELECT * FROM proxies WHERE id = ? LIMIT 1`
+  ),
+
+  updateProxy: prepareStmt<{ host: string; port: number; username: string; password: string; protocol: string; is_active: number; id: number }, any>(
+    `UPDATE proxies SET host=COALESCE(?,host), port=COALESCE(?,port), username=COALESCE(?,username), password=COALESCE(?,password), protocol=COALESCE(?,protocol), is_active=COALESCE(?,is_active) WHERE id=?`
+  ),
+
+  deleteProxy: prepareStmt<{ id: number }, any>(
+    `DELETE FROM proxies WHERE id = ?`
+  ),
+
+  getRandomActiveProxy: prepareStmt<never, ProxyRow>(
+    `SELECT * FROM proxies WHERE is_active = 1 ORDER BY RANDOM() LIMIT 1`
+  ),
+
+  // ─── Client VODs ────────────────────────────────────────────────────────────
+  insertClientVod: prepareStmt<{ user_id: number; url: string; type: string; channel: string | null }, ClientVodRow>(
+    `INSERT INTO client_vods (user_id, url, type, channel) VALUES (?, ?, ?, ?)`
+  ),
+
+  listClientVods: prepareStmt<[number], ClientVodRow>(
+    `SELECT * FROM client_vods WHERE user_id = ? ORDER BY added_at DESC`
+  ),
+
+  listActiveClientVods: prepareStmt<[number], ClientVodRow>(
+    `SELECT * FROM client_vods WHERE user_id = ? AND is_active = 1 ORDER BY added_at DESC`
+  ),
+
+  findClientVodById: prepareStmt<[number], ClientVodRow>(
+    `SELECT * FROM client_vods WHERE id = ? LIMIT 1`
+  ),
+
+  deleteClientVod: prepareStmt<{ id: number; user_id: number }, any>(
+    `DELETE FROM client_vods WHERE id = ? AND user_id = ?`
+  ),
+
+  incrementVodViews: prepareStmt<{ id: number }, any>(
+    `UPDATE client_vods SET views_count = views_count + 1 WHERE id = ?`
+  ),
+
+  // ─── View log ──────────────────────────────────────────────────────────────
+  insertViewLog: prepareStmt<{ user_id: number; vod_id: number | null; proxy_id: number | null; success: number; error: string | null }, ViewLogRow>(
+    `INSERT INTO view_log (user_id, vod_id, proxy_id, success, error) VALUES (?, ?, ?, ?, ?)`
+  ),
+
+  countViewsInLastHour: prepareStmt<[number], { cnt: number }>(
+    `SELECT COUNT(*) as cnt FROM view_log WHERE user_id = ? AND created_at > (unixepoch() - 3600)`
+  ),
+
+  getViewStats: prepareStmt<[number], any>(
+    `SELECT
+       COUNT(*) as total_views,
+       SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful,
+       SUM(CASE WHEN created_at > (unixepoch() - 3600) THEN 1 ELSE 0 END) as last_hour
+     FROM view_log WHERE user_id = ?`
+  ),
+
+  // ─── Permissions ───────────────────────────────────────────────────────────
+  updateUserPermissions: prepareStmt<{ permissions: string; id: number }, any>(
+    `UPDATE users SET permissions = ? WHERE id = ?`
+  ),
+
+  updateUserHourlyViewLimit: prepareStmt<{ hourly_view_limit: number; id: number }, any>(
+    `UPDATE users SET hourly_view_limit = ? WHERE id = ?`
   ),
 };
 

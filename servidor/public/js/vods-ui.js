@@ -1,0 +1,150 @@
+import { getServerUrl, getAuthHeaders, showMsg, initCommon, esc } from './admin-common.js';
+
+let viewerInterval = null;
+
+async function loadVods() {
+  const container = document.getElementById('vod-list');
+  try {
+    const res = await fetch(getServerUrl() + '/api/client/vods', { headers: getAuthHeaders() });
+    const data = await res.json();
+    if (!data.success) { container.innerHTML = '<p style="opacity:0.6;font-style:italic">Error al cargar.</p>'; return; }
+    const vods = data.vods || [];
+    if (vods.length === 0) {
+      container.innerHTML = '<p style="opacity:0.6;font-style:italic">No tienes VODs o clips agregados. Pegá URLs arriba.</p>';
+      return;
+    }
+    container.innerHTML = vods.map(v => `
+      <div class="vod-item" data-id="${v.id}">
+        <div class="vod-url">${esc(v.url)}</div>
+        <div class="vod-meta">
+          <span class="vod-badge ${v.type}">${esc(v.type)}</span>
+          ${v.channel ? `<span style="font-size:11px;color:var(--text-muted)">${esc(v.channel)}</span>` : ''}
+          <span style="font-size:11px;color:var(--text-muted)">${v.views_count} views</span>
+          <button class="btn btn-small btn-danger vod-del" data-id="${v.id}">X</button>
+        </div>
+      </div>
+    `).join('');
+
+    container.querySelectorAll('.vod-del').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Quitar este VOD?')) return;
+        const id = btn.dataset.id;
+        const res = await fetch(getServerUrl() + '/api/client/vods/' + id, { method: 'DELETE', headers: getAuthHeaders() });
+        const data = await res.json();
+        if (data.success) {
+          showMsg('vod-msg', 'VOD eliminado', 'success');
+          loadVods();
+        } else {
+          showMsg('vod-msg', data.error || 'Error', 'error');
+        }
+      });
+    });
+  } catch {
+    container.innerHTML = '<p style="opacity:0.6;font-style:italic">Error de conexión.</p>';
+  }
+}
+
+async function loadViewerStats() {
+  try {
+    const res = await fetch(getServerUrl() + '/api/client/vods/stats', { headers: getAuthHeaders() });
+    const data = await res.json();
+    if (!data.success) return;
+    const v = data.viewer;
+    const s = data.stats;
+    const limit = data.hourly_limit || 50;
+
+    document.getElementById('stat-status').textContent = v.running ? 'Corriendo' : 'Detenido';
+    document.getElementById('stat-status').style.color = v.running ? 'var(--success,#27ae60)' : 'var(--text-muted)';
+    document.getElementById('stat-views-gen').textContent = v.viewsGenerated || 0;
+    document.getElementById('stat-views-fail').textContent = v.viewsFailed || 0;
+    document.getElementById('stat-hourly').textContent = (s.last_hour || 0) + ' / ' + limit;
+    document.getElementById('stat-total').textContent = s.total_views || 0;
+
+    const pct = limit > 0 ? Math.min(100, ((s.last_hour || 0) / limit) * 100) : 0;
+    const bar = document.getElementById('hourly-progress');
+    const fill = document.getElementById('hourly-fill');
+    if (bar && fill) {
+      bar.style.display = 'block';
+      fill.style.width = pct + '%';
+    }
+
+    document.getElementById('btn-start-viewer').style.display = v.running ? 'none' : '';
+    document.getElementById('btn-stop-viewer').style.display = v.running ? '' : 'none';
+  } catch {}
+}
+
+async function refreshPermissions() {
+  try {
+    const res = await fetch(getServerUrl() + '/api/client/permissions', { headers: getAuthHeaders() });
+    const data = await res.json();
+    if (!data.success) return;
+    renderNav(data.permissions || []);
+  } catch {}
+}
+
+function renderNav(permissions) {
+  const container = document.getElementById('nav-links');
+  const links = [];
+  if (permissions.includes('chat')) links.push({ href: '/chat.html', label: '💬 Chat' });
+  if (permissions.includes('simulator')) links.push({ href: '/stream-simulator.html', label: '🤖 Simulador' });
+  if (permissions.includes('vods')) links.push({ href: '/vods.html', label: '🎬 VODs', active: true });
+  container.innerHTML = links.map(l =>
+    `<a href="${l.href}" class="${l.active ? 'active' : ''}">${l.label}</a>`
+  ).join('');
+}
+
+async function init() {
+  const ok = await initCommon();
+  if (!ok) return;
+
+  await refreshPermissions();
+
+  document.getElementById('btn-add-vod').addEventListener('click', async () => {
+    const url = document.getElementById('vod-url-input').value.trim();
+    if (!url) { showMsg('vod-msg', 'Pegá una URL de VOD o clip de Kick', 'error'); return; }
+    const res = await fetch(getServerUrl() + '/api/client/vods', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ url }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      showMsg('vod-msg', 'VOD agregado', 'success');
+      document.getElementById('vod-url-input').value = '';
+      loadVods();
+    } else {
+      showMsg('vod-msg', data.error || 'Error', 'error');
+    }
+  });
+
+  document.getElementById('btn-start-viewer').addEventListener('click', async () => {
+    const res = await fetch(getServerUrl() + '/api/client/vods/start', { method: 'POST', headers: getAuthHeaders() });
+    const data = await res.json();
+    if (data.success) {
+      showMsg('vod-msg', 'Visor iniciado', 'success');
+      loadViewerStats();
+      if (!viewerInterval) {
+        viewerInterval = setInterval(loadViewerStats, 3000);
+      }
+    } else {
+      showMsg('vod-msg', data.error || 'Error', 'error');
+    }
+  });
+
+  document.getElementById('btn-stop-viewer').addEventListener('click', async () => {
+    const res = await fetch(getServerUrl() + '/api/client/vods/stop', { method: 'POST', headers: getAuthHeaders() });
+    const data = await res.json();
+    if (data.success) {
+      showMsg('vod-msg', 'Visor detenido', 'success');
+      loadViewerStats();
+    } else {
+      showMsg('vod-msg', data.error || 'Error', 'error');
+    }
+  });
+
+  await loadVods();
+  await loadViewerStats();
+  viewerInterval = setInterval(loadViewerStats, 5000);
+}
+
+init();

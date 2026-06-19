@@ -1,4 +1,7 @@
 import { onStatusChange, ping, sendMessage, fetchMyBots } from './bridge-client.js';
+import { getServerUrl, getAuthHeaders } from './admin-common.js';
+
+function esc(str) { if (str == null) return ''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 let files = [];
 let currentFileIndex = -1;
@@ -28,6 +31,20 @@ function updateStatusUI(status) {
   label.textContent = status === 'connected' ? 'Conectado' : status === 'checking' ? 'Verificando…' : 'Desconectado';
 }
 
+async function renderNavLinks() {
+  const container = document.getElementById('nav-links');
+  if (!container) return;
+  try {
+    const res = await fetch(getServerUrl() + '/api/client/permissions', { headers: getAuthHeaders() });
+    const data = await res.json();
+    if (!data.success) return;
+    const perms = data.permissions || [];
+    const links = [];
+    if (perms.includes('vods')) links.push('<a href="/vods.html" style="color:var(--text-muted);text-decoration:none;padding:2px 6px;border-radius:3px">🎬 VODs</a>');
+    container.innerHTML = links.join('');
+  } catch {}
+}
+
 function startPingLoop() { ping(); setInterval(() => ping(), 15000); }
 
 async function loadBotsInfo() {
@@ -50,7 +67,7 @@ function renderFileList() {
   }
   list.innerHTML = files.map((f, i) => `
     <li class="file-item${i === currentFileIndex ? ' file-active' : ''}" data-index="${i}">
-      <span class="file-name">${f.name}</span>
+      <span class="file-name">${esc(f.name)}</span>
       <span class="file-count">${f.messages.length} msgs</span>
     </li>
   `).join('');
@@ -85,7 +102,7 @@ function renderMessageList() {
   list.innerHTML = file.messages.map((msg, i) => `
     <li class="msg-item${i === (file.currentIndex || 0) ? ' msg-current' : ''}">
       <span class="msg-num">${i + 1}</span>
-      <span class="msg-text">${msg}</span>
+      <span class="msg-text">${esc(msg)}</span>
     </li>
   `).join('');
   updateProgress();
@@ -234,17 +251,36 @@ function switchTab(name) {
   document.querySelector(`[data-tab="${name}"]`)?.click();
 }
 
-export function initChatUI() {
+export async function initChatUI() {
   initTabs();
 
-  if ((sessionStorage.getItem('scb_role') || localStorage.getItem('scb_role')) === 'admin') {
-    window.location.href = '/admin/dashboard';
+  const token = sessionStorage.getItem('scb_jwt') || localStorage.getItem('scb_jwt');
+  const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+
+  try {
+    const res = await fetch('/auth/me', { headers });
+    if (!res.ok) {
+      window.location.href = '/';
+      return;
+    }
+    const data = await res.json();
+    if (data.user.role === 'admin') {
+      window.location.href = '/admin/dashboard';
+      return;
+    }
+    // Sincronizar token existente a cookie httpOnly
+    if (token) {
+      fetch('/auth/sync-cookie', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } }).catch(() => {});
+    }
+  } catch {
+    window.location.href = '/';
     return;
   }
 
   onStatusChange(updateStatusUI);
   startPingLoop();
   loadBotsInfo();
+  renderNavLinks();
 
   document.getElementById('load-file-btn')?.addEventListener('click', handleLoadFile);
   document.getElementById('start-btn')?.addEventListener('click', startAutoSend);
@@ -272,5 +308,5 @@ window.addGeneratedMessages = function (msgs, name) {
 };
 
 if (typeof window !== 'undefined') {
-  window.addEventListener('DOMContentLoaded', initChatUI);
+  window.addEventListener('DOMContentLoaded', () => { initChatUI(); });
 }
