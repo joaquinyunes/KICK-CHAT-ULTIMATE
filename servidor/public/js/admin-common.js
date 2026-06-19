@@ -4,18 +4,18 @@ export function ss(key) { return sessionStorage.getItem(key) || localStorage.get
 
 export function isAdmin() { return (sessionStorage.getItem('scb_role') || localStorage.getItem('scb_role')) === 'admin'; }
 
-export function getServerUrl() { return ss('scb_server_url').replace(/\/+$/, ''); }
+export function getServerUrl() { return (ss('scb_server_url') || window.location.origin).replace(/\/+$/, ''); }
 
 export function getAuthHeaders() {
   const token = ss('scb_jwt');
-  return { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' };
+  return { 'Content-Type': 'application/json', 'Authorization': token ? 'Bearer ' + token : '' };
 }
 
 export function updateStatusUI(status) {
   const badge = document.getElementById('status-badge');
   const label = document.getElementById('status-label');
   if (!badge || !label) return;
-  badge.className = `status-dot status-${status}`;
+  badge.className = 'status-dot status-' + status;
   label.textContent = status === 'connected' ? 'Conectado' : status === 'checking' ? 'Verificando…' : 'Desconectado';
 }
 
@@ -42,7 +42,7 @@ export function checkOAuthResult(msgElId) {
     window.history.replaceState({}, '', window.location.pathname);
     return true;
   } else if (oauth === 'error') {
-    showMsg(msgElId, `Error OAuth: ${params.get('reason') || 'desconocido'}`, 'error');
+    showMsg(msgElId, 'Error OAuth: ' + (params.get('reason') || 'desconocido'), 'error');
     window.history.replaceState({}, '', window.location.pathname);
     return true;
   }

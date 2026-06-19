@@ -23,20 +23,15 @@ function ssSet(key, val) {
   else { sessionStorage.removeItem(key); localStorage.removeItem(key); }
 }
 
-export function setServerUrl(url) {
-  ssSet('scb_server_url', url ? url.replace(/\/+$/, '') : '');
-}
-
 function getServerUrl() {
-  return ss('scb_server_url') || null;
+  return ss('scb_server_url') || window.location.origin;
 }
 
 export async function ping() {
   setStatus('checking');
   try {
     const url = getServerUrl();
-    if (!url) { setStatus('disconnected'); return false; }
-    const res = await fetch(`${url}/health`);
+    const res = await fetch(url + '/health');
     const ok = res.ok;
     setStatus(ok ? 'connected' : 'disconnected');
     return ok;
@@ -51,7 +46,7 @@ export async function fetchMyBots() {
     const url = getServerUrl();
     const token = ss('scb_jwt');
     if (!url || !token) return [];
-    const res = await fetch(`${url}/me/bots`, { headers: { 'Authorization': `Bearer ${token}` } });
+    const res = await fetch(url + '/me/bots', { headers: { 'Authorization': 'Bearer ' + token } });
     const data = await res.json();
     return data.bots || [];
   } catch { return []; }
@@ -65,9 +60,9 @@ export async function sendMessage(payload) {
     const body = { sessionId: crypto.randomUUID?.() || Date.now().toString(), message: payload.message, channel: payload.channel };
     if (payload.bot_name) body.bot_name = payload.bot_name;
     if (payload.chatroom_id) body.chatroom_id = payload.chatroom_id;
-    const res = await fetch(`${url}/chat/send`, {
+    const res = await fetch(url + '/chat/send', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => ({}));
