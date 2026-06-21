@@ -7,28 +7,93 @@
   <link rel="stylesheet" href="css/main.css" />
 </head>
 <body class="login-page">
+
+  <div class="scene" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <div class="feed-backdrop" aria-hidden="true">
+    <div class="feed-col" style="left:4%;animation-duration:38s">
+      <span><b>twitch/canal_x</b> &gt; gg ese combo fue increible</span>
+      <span><b>discord/comunidad</b> &gt; alguien tiene el link del vod?</span>
+      <span><b>youtube/live</b> &gt; primer stream del año vamos</span>
+      <span><b>twitch/canal_x</b> &gt; jaja se le cayo la conexion</span>
+      <span><b>kick/canal_y</b> &gt; subiendo el hype 🔥</span>
+      <span><b>discord/comunidad</b> &gt; bienvenido nuevo mod</span>
+      <span><b>twitch/canal_x</b> &gt; gg ese combo fue increible</span>
+      <span><b>discord/comunidad</b> &gt; alguien tiene el link del vod?</span>
+      <span><b>youtube/live</b> &gt; primer stream del año vamos</span>
+      <span><b>twitch/canal_x</b> &gt; jaja se le cayo la conexion</span>
+      <span><b>kick/canal_y</b> &gt; subiendo el hype 🔥</span>
+      <span><b>discord/comunidad</b> &gt; bienvenido nuevo mod</span>
+    </div>
+    <div class="feed-col" style="left:30%;animation-duration:46s;animation-direction:reverse">
+      <span><b>youtube/live</b> &gt; el audio se desincronizo un poco</span>
+      <span><b>twitch/canal_x</b> &gt; raid entrante de 200 viewers</span>
+      <span><b>kick/canal_y</b> &gt; nuevo record de subs</span>
+      <span><b>discord/comunidad</b> &gt; evento este finde confirmado</span>
+      <span><b>twitch/canal_x</b> &gt; clip guardado al highlight</span>
+      <span><b>youtube/live</b> &gt; el audio se desincronizo un poco</span>
+      <span><b>twitch/canal_x</b> &gt; raid entrante de 200 viewers</span>
+      <span><b>kick/canal_y</b> &gt; nuevo record de subs</span>
+      <span><b>discord/comunidad</b> &gt; evento este finde confirmado</span>
+      <span><b>twitch/canal_x</b> &gt; clip guardado al highlight</span>
+    </div>
+    <div class="feed-col" style="left:62%;animation-duration:41s">
+      <span><b>kick/canal_y</b> &gt; mensaje sincronizado correctamente</span>
+      <span><b>twitch/canal_x</b> &gt; bot conectado sin errores</span>
+      <span><b>discord/comunidad</b> &gt; webhook funcionando ok</span>
+      <span><b>youtube/live</b> &gt; latencia baja, todo fluido</span>
+      <span><b>kick/canal_y</b> &gt; puente activo entre 3 canales</span>
+      <span><b>kick/canal_y</b> &gt; mensaje sincronizado correctamente</span>
+      <span><b>twitch/canal_x</b> &gt; bot conectado sin errores</span>
+      <span><b>discord/comunidad</b> &gt; webhook funcionando ok</span>
+      <span><b>youtube/live</b> &gt; latencia baja, todo fluido</span>
+      <span><b>kick/canal_y</b> &gt; puente activo entre 3 canales</span>
+    </div>
+    <div class="feed-col" style="left:86%;animation-duration:50s;animation-direction:reverse">
+      <span><b>discord/comunidad</b> &gt; gracias por el directo de hoy</span>
+      <span><b>twitch/canal_x</b> &gt; mañana mismo horario?</span>
+      <span><b>youtube/live</b> &gt; suscrito desde el celu</span>
+      <span><b>kick/canal_y</b> &gt; el bridge anda perfecto</span>
+      <span><b>discord/comunidad</b> &gt; gracias por el directo de hoy</span>
+      <span><b>twitch/canal_x</b> &gt; mañana mismo horario?</span>
+      <span><b>youtube/live</b> &gt; suscrito desde el celu</span>
+      <span><b>kick/canal_y</b> &gt; el bridge anda perfecto</span>
+    </div>
+  </div>
+
   <div class="login-card">
     <header class="login-header">
-      <div class="logo-mark">SCB</div>
+      <div class="logo-mark">
+        <svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="26" cy="26" r="25" stroke="#2A9D6F" stroke-width="1.2" opacity="0.4"/>
+          <circle cx="14" cy="26" r="5.5" fill="#11151B" stroke="#3DDC97" stroke-width="2"/>
+          <circle cx="38" cy="26" r="5.5" fill="#11151B" stroke="#3DDC97" stroke-width="2"/>
+          <path class="logo-pulse" d="M19.5 26H32.5" stroke="#3DDC97" stroke-width="2" stroke-linecap="round"/>
+          <circle class="logo-pulse" cx="26" cy="26" r="2" fill="#6FF0B8"/>
+        </svg>
+      </div>
       <h1>StreamChat Bridge</h1>
       <p class="subtitle">Panel de Administración</p>
+      <span class="status-pill"><span class="status-dot" aria-hidden="true"></span>Puente activo</span>
     </header>
     <form id="login-form" novalidate autocomplete="off">
       <div class="field">
         <label for="username">Usuario</label>
-        <input id="username" type="text" placeholder="usuario" autocomplete="off" spellcheck="false" />
+        <div class="field-wrap"><input id="username" type="text" placeholder="usuario" autocomplete="off" spellcheck="false" /></div>
       </div>
       <div class="field">
         <label for="password">Contraseña</label>
-        <input id="password" type="password" placeholder="••••••••" autocomplete="new-password" />
+        <div class="field-wrap"><input id="password" type="password" placeholder="••••••••" autocomplete="new-password" /></div>
       </div>
       <p id="error-msg" class="error-msg" hidden aria-live="polite"></p>
       <button id="submit-btn" type="submit" class="btn btn-primary">
         <span id="spinner" class="spinner" hidden></span>
-        Iniciar sesión
+        <span>Iniciar sesión</span>
       </button>
     </form>
   </div>
+
   <script type="module" src="js/login.js"></script>
 </body>
 </html>

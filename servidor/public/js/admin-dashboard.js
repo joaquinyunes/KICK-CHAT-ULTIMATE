@@ -18,15 +18,19 @@ async function loadDashboard() {
     if (!log) return;
     const msgs = data.recent_messages || [];
     if (msgs.length === 0) {
-      log.innerHTML = '<p style="opacity:0.6;font-style:italic">Sin actividad todavía.</p>';
+      log.innerHTML = '<div style="color:var(--text-muted);font-style:italic;text-align:center;padding:32px 0">Sin actividad todavía.</div>';
       return;
     }
-    log.innerHTML = `<div class="table-header" style="grid-template-columns:1fr 1fr 1fr 1fr"><span>Hora</span><span>Bot</span><span>Canal</span><span>Estado</span></div>` +
-      msgs.map(m => {
+    log.innerHTML = `<table class="data-table">
+      <thead><tr><th>Hora</th><th>Bot</th><th>Canal</th><th>Estado</th></tr></thead>
+      <tbody>${msgs.map(m => {
         const time = new Date(m.sent_at * 1000).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-        const status = m.success ? 'OK' : `FAIL ${esc(m.error_reason) || ''}`;
-        return `<div class="table-row" style="grid-template-columns:1fr 1fr 1fr 1fr"><span>${time}</span><span>${esc(m.bot_name) || '—'}</span><span>${esc(m.channel) || '—'}</span><span>${esc(status)}</span></div>`;
-      }).join('');
+        const ok = m.success;
+        const status = ok
+          ? '<span class="tag">✓ OK</span>'
+          : `<span class="tag" style="background:var(--alert-glow);color:var(--alert);border-color:rgba(255,92,92,0.3)">✗ ${esc(m.error_reason) || 'FAIL'}</span>`;
+        return `<tr><td>${time}</td><td>${esc(m.bot_name) || '—'}</td><td>${esc(m.channel) || '—'}</td><td>${status}</td></tr>`;
+      }).join('')}</tbody></table>`;
   } catch {}
 }
 

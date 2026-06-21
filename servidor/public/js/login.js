@@ -16,6 +16,7 @@ function clearError() {
 function setLoading(loading) {
   if (submitBtn) submitBtn.disabled = loading;
   if (spinnerEl) spinnerEl.hidden = !loading;
+  if (submitBtn) submitBtn.dataset.loading = loading ? 'true' : 'false';
 }
 
 async function handleSubmit(e) {
