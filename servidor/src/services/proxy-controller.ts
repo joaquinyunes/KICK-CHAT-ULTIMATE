@@ -3,7 +3,7 @@ import { getRandomBearer, decryptFromHex } from "./security";
 import { stmts } from "../models/database";
 import path from "path";
 import { logger } from "../utils/logger";
-import { sendMessage, type SendMessageConfig, type SendResult } from "./chat-sender.service";
+import { sendViaPlaywright } from "./playwright-sender.service";
 
 const TAG = "proxy-controller";
 
@@ -44,10 +44,11 @@ function findPython(): string {
 const PYTHON = findPython();
 
 function pyExec(...args: string[]): { status: number; body: string } {
-  const escaped = args.map(a => '"' + (a || " ").replace(/"/g, '\\"') + '"').join(" ");
-  const cmd = '"' + PYTHON + '" "' + SCRIPT + '" ' + escaped;
-  const out = execSync(cmd, { timeout: 15000, encoding: "utf-8" }).trim();
-  return JSON.parse(out);
+  const cmd = '"' + PYTHON + '" "' + SCRIPT + '"';
+  const input = JSON.stringify(args);
+  const out = execSync(cmd, { timeout: 15000, encoding: "utf-8", input }).trim();
+  if (!out) return { status: 0, body: "Python no devolvio salida" };
+  try { return JSON.parse(out); } catch { logger.error(TAG, "JSON invalido de Python", out?.substring(0, 500)); return { status: 0, body: out?.substring(0, 200) || "error" }; }
 }
 
 function logMessage(botId: number | null, userId: number, channel: string, message: string, success: boolean, errorReason?: string): void {
@@ -59,88 +60,86 @@ function logMessage(botId: number | null, userId: number, channel: string, messa
 export async function sendToKick(req: ProxyRequest): Promise<ProxyResult> {
   const sentAt = Date.now();
 
-  // Try OAuth first via chat-sender
-  const oauthResult = await sendMessage({
-    channel: req.channel,
-    message: req.message,
-    userId: req.userId,
-    botName: req.botName,
-  });
+  // Pick bots randomly, try each one, up to 3 attempts
+  let lastError = "No hay tokens disponibles para enviar mensajes";
+  let triedBots: string[] = [];
 
-  if (oauthResult.success) {
-    return { success: true, sentAt };
+  let candidateBots: any[] = stmts.listBotsForUser.all(req.userId);
+  if (candidateBots.length === 0) {
+    candidateBots = stmts.listAllBots.all();
+  }
+  if (req.botName) {
+    candidateBots = candidateBots.filter((b: any) => b.bot_name === req.botName);
+    if (candidateBots.length === 0) {
+      const named = stmts.findBotByName.get(req.botName);
+      if (named) candidateBots.push(named);
+    }
   }
 
-  logger.warn(TAG, "OAuth fallo, intentando Python fallback...", oauthResult.reason);
+  // Shuffle & try up to 3 random bots
+  const shuffled = candidateBots.sort(() => Math.random() - 0.5);
+  const maxAttempts = Math.min(shuffled.length, 3);
+  for (let i = 0; i < maxAttempts; i++) {
+    const bot = shuffled[i];
+    triedBots.push(bot.bot_name);
+    try {
+      let bearer: string | undefined;
+      try { bearer = decryptFromHex(bot.encrypted_bearer); } catch {}
+      if (!bearer) { lastError = "Bearer invalido para " + bot.bot_name; continue; }
 
-  // Python fallback
-  try {
-    let bearer: string | undefined;
-    let botId: number | undefined;
-
-    const userBots = stmts.listBotsForUser.all(req.userId);
-    if (userBots.length > 0) {
-      const bot = userBots[Math.floor(Math.random() * userBots.length)];
-      bearer = bot.encrypted_bearer ? decryptFromHex(bot.encrypted_bearer) : undefined;
-      botId = bot.id;
-    }
-
-    if (!bearer && req.botName) {
-      const bot = stmts.findBotByName.get(req.botName);
-      if (bot) {
-        bearer = bot.encrypted_bearer ? decryptFromHex(bot.encrypted_bearer) : undefined;
-        botId = bot.id;
+      const result = pyExec("send_to_channel", bearer, req.channel, req.message);
+      if (result.status === 200) {
+        logger.info(TAG, "Python OK", "channel=" + req.channel, "bot=" + bot.bot_name);
+        logMessage(bot.id, req.userId, req.channel, req.message, true);
+        return { success: true, sentAt };
       }
+      logger.warn(TAG, "Fallo bot " + bot.bot_name, "status=" + result.status, "body=" + (result.body || "").substring(0, 200));
+      lastError = mapKickError(result.status, result.body);
+      logMessage(bot.id, req.userId, req.channel, req.message, false, lastError);
+    } catch (err: any) {
+      logger.error(TAG, "Error con bot " + bot.bot_name, err.message);
+      lastError = "Error ejecutando Python: " + (err.message || "desconocido");
     }
+  }
 
-    if (!bearer) {
-      bearer = getRandomBearer();
-    }
-
-    if (!bearer) {
-      logMessage(null, req.userId, req.channel, req.message, false, "No token available");
-      return { success: false, reason: "No hay tokens disponibles para enviar mensajes", sentAt };
-    }
-
-    let chatroomId = req.chatroomId;
-    if (!chatroomId) {
-      try {
-        const result = pyExec("chatroom", " ", req.channel);
-        if (result.status === 200) {
-          const inner = JSON.parse(result.body);
-          chatroomId = inner?.chatroom?.id;
+  // Fallback: cookies + bearer (try ALL bots with cookies, not just user's)
+  let cookiesBot: any;
+  if (req.botName) {
+    cookiesBot = stmts.listAllBots.all().find((b: any) => b.bot_name === req.botName && b.cookies);
+  }
+  if (!cookiesBot) {
+    cookiesBot = stmts.listAllBots.all().find((b: any) => b.cookies);
+  }
+  if (cookiesBot && cookiesBot.cookies) {
+    triedBots.push(cookiesBot.bot_name + "(cookies)");
+    try {
+      const parsed = JSON.parse(cookiesBot.cookies);
+      let botBearer: string | undefined;
+      try { botBearer = decryptFromHex(cookiesBot.encrypted_bearer); } catch {}
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const pwResult = sendViaPlaywright(req.channel, req.message, parsed, botBearer);
+        if (pwResult.success) {
+          logMessage(cookiesBot.id, req.userId, req.channel, req.message, true);
+          return { success: true, sentAt };
         }
-      } catch (e: any) {
-        logger.error(TAG, "getChannelInfo exception", e?.message);
+        lastError = pwResult.reason || "Error enviando por cookies";
+        logMessage(cookiesBot.id, req.userId, req.channel, req.message, false, "Cookies: " + lastError);
       }
-    }
-
-    if (!chatroomId) {
-      logMessage(null, req.userId, req.channel, req.message, false, "No chatroomId");
-      return { success: false, reason: "El canal no existe o no se pudo verificar", sentAt };
-    }
-
-    const result = pyExec("send", bearer, String(chatroomId), req.message);
-    if (result.status === 200) {
-      logger.info(TAG, "Python OK", "channel=" + req.channel);
-      logMessage(botId ?? null, req.userId, req.channel, req.message, true);
-      return { success: true, sentAt };
-    }
-
-    logger.warn(TAG, "Kick rechazo", "status=" + result.status, "body=" + (result.body || "").substring(0, 200));
-    logMessage(botId ?? null, req.userId, req.channel, req.message, false, mapKickError(result.status));
-    return { success: false, reason: mapKickError(result.status), sentAt };
-  } catch (err: any) {
-    logger.error(TAG, "Python error", err.message);
-    logMessage(null, req.userId, req.channel, req.message, false, "Python error");
-    return { success: false, reason: "Error al enviar el mensaje", sentAt };
+    } catch {}
   }
+
+  return { success: false, reason: "Intenté con: " + triedBots.join(", ") + " — " + lastError, sentAt };
 }
 
-function mapKickError(status: number): string {
-  if (status === 429) return "Demasiadas peticiones. Espera un momento.";
-  if (status >= 500) return "El servicio de chat no esta disponible.";
-  if (status === 403) return "No tienes permiso para enviar mensajes en este canal.";
-  if (status === 404) return "El canal especificado no existe.";
-  return "No se pudo enviar el mensaje. Intentalo de nuevo.";
+function mapKickError(status: number, body?: string): string {
+  let msg = "";
+  if (body) {
+    try { const j = JSON.parse(body); msg = j.message || j.error || j.status?.message || ""; } catch { msg = body.substring(0, 100); }
+  }
+  if (status === 429) return msg || "Demasiadas peticiones. Espera un momento.";
+  if (status === 422) return msg || "El mensaje fue rechazado por Kick.";
+  if (status >= 500) return msg || "El servicio de chat no esta disponible.";
+  if (status === 403) return msg || "No tienes permiso para enviar mensajes en este canal.";
+  if (status === 404) return msg || "El canal especificado no existe.";
+  return msg || "No se pudo enviar el mensaje.";
 }

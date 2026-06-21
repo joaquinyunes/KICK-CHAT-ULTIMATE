@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SCB – Bots</title>
+  <title>SCB – Pools de Mensajes</title>
   <link rel="stylesheet" href="../css/main.css" />
 </head>
 <body class="chat-page">
   <header class="app-header">
-    <span class="app-title">StreamChat Bridge · Bots</span>
+    <span class="app-title">StreamChat Bridge · Pools</span>
     <div class="connection-status">
       <span id="status-badge" class="status-dot status-disconnected"></span>
       <span id="status-label">Desconectado</span>
@@ -18,35 +18,37 @@
 
   <nav class="tab-nav">
     <a href="/admin/dashboard" class="tab-btn">Dashboard</a>
-    <a href="/admin/bots" class="tab-btn active">Bots</a>
+    <a href="/admin/bots" class="tab-btn">Bots</a>
     <a href="/admin/clientes" class="tab-btn">Clientes</a>
     <a href="/admin/proxies" class="tab-btn">Proxies</a>
-    <a href="/admin/pools" class="tab-btn">Pools</a>
+    <a href="/admin/pools" class="tab-btn active">Pools</a>
   </nav>
 
   <section class="tab-panel active">
     <div class="admin-grid">
       <div class="admin-card">
-        <h3 class="admin-card-title">Agregar Bot</h3>
+        <h3 class="admin-card-title">Nuevo Pool</h3>
         <div class="field">
-          <label for="adm-bot-bearer">Bearer Token de Kick</label>
-          <input id="adm-bot-bearer" type="password" placeholder="Pegá el bearer token aquí" />
+          <label for="pool-name">Nombre del Pool</label>
+          <input id="pool-name" type="text" placeholder="ej: Casino, Saludos, Deportivas" />
         </div>
-        <button id="adm-add-bot-btn" class="btn btn-primary">Agregar Bot</button>
-        <p id="adm-bot-msg" class="settings-msg" hidden></p>
+        <div class="field">
+          <label for="pool-messages">Mensajes (uno por línea)</label>
+          <textarea id="pool-messages" class="bulk-textarea" rows="10" placeholder="mensaje 1&#10;mensaje 2&#10;mensaje 3"></textarea>
+        </div>
+        <button id="add-pool-btn" class="btn btn-primary">Guardar Pool</button>
+        <p id="pool-msg" class="settings-msg" hidden></p>
       </div>
 
       <div class="admin-card admin-card-wide">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-          <h3 class="admin-card-title" style="margin-bottom:0">Todos los Bots</h3>
-        </div>
-        <div id="adm-bot-list">
+        <h3 class="admin-card-title">Todos los Pools</h3>
+        <div id="pool-list">
           <p style="opacity:0.6;font-style:italic">Cargando...</p>
         </div>
       </div>
     </div>
   </section>
 
-  <script type="module" src="../js/admin-bots.js"></script>
+  <script type="module" src="../js/admin-pools.js"></script>
 </body>
 </html>
