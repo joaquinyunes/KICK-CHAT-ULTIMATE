@@ -5,12 +5,23 @@ function esc(str) { if (str == null) return ''; return String(str).replace(/&/g,
 
 let files = [];
 let currentFileIndex = -1;
-let intervalId = null;
 let channelName = '';
 let intervalMin = 3;
 let intervalMax = 8;
 let chatroomId = '';
+let autoMode = false;
+let autoTimeoutId = null;
+let isSendingBlock = false;
 
+function parseToBlocks(text) {
+  const raw = text.split(/\n\s*\n/);
+  const blocks = [];
+  for (const chunk of raw) {
+    const lines = chunk.split('\n').filter(l => l.trim());
+    if (lines.length > 0) blocks.push({ messages: lines, sent: false });
+  }
+  return blocks;
+}
 
 function initTabs() {
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -56,6 +67,19 @@ async function loadBotsInfo() {
     : `${bots.length} bot(es) asignado(s) — se usan automáticamente`;
 }
 
+function getBlockCount(file) {
+  return file.blocks ? file.blocks.length : 0;
+}
+
+function getTotalSentBlocks(file) {
+  if (!file.blocks) return 0;
+  return file.blocks.filter(b => b.sent).length;
+}
+
+function allBlocksSent(file) {
+  return file.blocks && file.blocks.length > 0 && file.blocks.every(b => b.sent);
+}
+
 function renderFileList() {
   const list = document.getElementById('file-list');
   if (!list) return;
@@ -65,12 +89,14 @@ function renderFileList() {
     document.getElementById('msg-count').textContent = '';
     return;
   }
-  list.innerHTML = files.map((f, i) => `
-    <li class="file-item${i === currentFileIndex ? ' file-active' : ''}" data-index="${i}">
+  list.innerHTML = files.map((f, i) => {
+    const total = getBlockCount(f);
+    const done = getTotalSentBlocks(f);
+    return `<li class="file-item${i === currentFileIndex ? ' file-active' : ''}" data-index="${i}">
       <span class="file-name">${esc(f.name)}</span>
-      <span class="file-count">${f.messages.length} msgs</span>
-    </li>
-  `).join('');
+      <span class="file-count">${done}/${total} bloques</span>
+    </li>`;
+  }).join('');
   list.querySelectorAll('.file-item').forEach(el => {
     el.addEventListener('click', () => {
       currentFileIndex = parseInt(el.dataset.index, 10);
@@ -94,17 +120,33 @@ function renderMessageList() {
   }
   const file = files[currentFileIndex];
   if (nameEl) nameEl.textContent = file.name;
-  if (countEl) countEl.textContent = `${file.currentIndex + 1 || 0}/${file.messages.length}`;
-  if (file.messages.length === 0) {
+  const blocks = file.blocks || [];
+  if (blocks.length === 0) {
     list.innerHTML = '<li class="empty-state">Archivo vacío.</li>';
+    if (countEl) countEl.textContent = '0/0 bloques';
     return;
   }
-  list.innerHTML = file.messages.map((msg, i) => `
-    <li class="msg-item${i === (file.currentIndex || 0) ? ' msg-current' : ''}">
-      <span class="msg-num">${i + 1}</span>
-      <span class="msg-text">${esc(msg)}</span>
-    </li>
-  `).join('');
+  const total = blocks.length;
+  const done = getTotalSentBlocks(file);
+  if (countEl) countEl.textContent = `${done}/${total} bloques`;
+  let html = '';
+  for (let bi = 0; bi < blocks.length; bi++) {
+    const block = blocks[bi];
+    const isCurrent = bi === file.currentBlock && !block.sent && !allBlocksSent(file);
+    const isDone = block.sent;
+    html += `<li class="block-divider ${isDone ? 'block-done' : ''} ${isCurrent ? 'block-current' : ''}" data-block="${bi}">
+      <span class="block-label">Bloque ${bi + 1}${isDone ? ' ✓' : ''}${isCurrent ? ' ◄ enviando' : ''}</span>
+    </li>`;
+    for (let mi = 0; mi < block.messages.length; mi++) {
+      const msg = block.messages[mi];
+      const isCurrentMsg = isCurrent && mi === 0;
+      html += `<li class="msg-item${isCurrentMsg ? ' msg-current' : ''} ${isDone ? 'msg-done' : ''}">
+        <span class="msg-num">${mi + 1}</span>
+        <span class="msg-text">${esc(msg)}</span>
+      </li>`;
+    }
+  }
+  list.innerHTML = html;
   updateProgress();
 }
 
@@ -115,7 +157,17 @@ function saveFiles() {
 function loadSavedFiles() {
   try {
     const saved = localStorage.getItem('scb_files');
-    if (saved) files = JSON.parse(saved);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // migrate old format (flat messages) to blocks
+      for (const f of parsed) {
+        if (!f.blocks && f.messages) {
+          f.blocks = [{ messages: f.messages, sent: false }];
+          delete f.messages;
+        }
+      }
+      files = parsed;
+    }
   } catch {}
 }
 
@@ -127,10 +179,10 @@ function handleLoadFile() {
   input.addEventListener('change', async () => {
     const fileList = input.files;
     if (!fileList || fileList.length === 0) return;
-    for (const file of fileList) {
-      const text = await file.text();
-      const messages = text.split('\n').filter(l => l.trim());
-      files.push({ name: file.name, messages, currentIndex: 0 });
+    for (const f of fileList) {
+      const text = await f.text();
+      const blocks = parseToBlocks(text);
+      files.push({ name: f.name, blocks, currentBlock: 0 });
     }
     if (currentFileIndex < 0) currentFileIndex = 0;
     saveFiles();
@@ -147,60 +199,112 @@ function getRandomInterval() {
   return (Math.random() * (max - min) + min) * 1000;
 }
 
+function getIntraBlockDelay() {
+  return 2000 + Math.random() * 2000;
+}
+
 async function sendCurrentMessage() {
   if (currentFileIndex < 0 || currentFileIndex >= files.length) return;
   const file = files[currentFileIndex];
-  if (!file.messages || file.messages.length === 0) return;
-  if ((file.currentIndex || 0) >= file.messages.length) return;
-  const idx = file.currentIndex || 0;
-  const message = file.messages[idx];
+  if (!file.blocks || file.blocks.length === 0) return;
+  if (allBlocksSent(file)) return;
+  if (isSendingBlock) return;
+
+  isSendingBlock = true;
   const statusEl = document.getElementById('send-status');
-  if (statusEl) statusEl.textContent = `Enviando (${idx + 1}/${file.messages.length})…`;
-  const res = await sendMessage({ channel: channelName, message, chatroom_id: chatroomId || undefined });
-  if (res.ok) {
-    if (statusEl) statusEl.textContent = `Enviado: "${message.substring(0, 40)}…"`;
-    file.currentIndex = idx + 1;
-    saveFiles();
-    renderMessageList();
-    if ((file.currentIndex) >= file.messages.length) {
-      stopAutoSend();
-      if (statusEl) statusEl.textContent = 'Todos los mensajes enviados.';
-    }
-  } else {
-    if (statusEl) statusEl.textContent = `Error: ${res.message || res.error}`;
-    if (res.status !== 401) stopAutoSend();
+
+  // advance past already-sent blocks
+  while (file.currentBlock < file.blocks.length && file.blocks[file.currentBlock].sent) {
+    file.currentBlock++;
   }
+  if (file.currentBlock >= file.blocks.length) {
+    isSendingBlock = false;
+    return;
+  }
+
+  const block = file.blocks[file.currentBlock];
+
+  for (let i = 0; i < block.messages.length; i++) {
+    const msg = block.messages[i];
+    if (statusEl) statusEl.textContent = `Enviando bloque ${file.currentBlock + 1}/${file.blocks.length} (msg ${i + 1}/${block.messages.length})…`;
+    renderMessageList();
+
+    const res = await sendMessage({ channel: channelName, message: msg, chatroom_id: chatroomId || undefined });
+
+    if (res.ok) {
+      if (statusEl) statusEl.textContent = `✓ Bloque ${file.currentBlock + 1}: "${msg.substring(0, 30)}…"`;
+      renderMessageList();
+    } else {
+      if (statusEl) statusEl.textContent = `Error: ${res.message || res.error}`;
+      if (res.status !== 401) {
+        isSendingBlock = false;
+        stopAutoSend();
+        return;
+      }
+    }
+
+    if (i < block.messages.length - 1) {
+      await new Promise(r => setTimeout(r, getIntraBlockDelay()));
+    }
+  }
+
+  block.sent = true;
+  file.currentBlock++;
+  saveFiles();
+  renderMessageList();
+
+  if (allBlocksSent(file)) {
+    if (statusEl) statusEl.textContent = '✓ Todos los bloques enviados.';
+    isSendingBlock = false;
+    stopAutoSend();
+    return;
+  }
+
+  isSendingBlock = false;
+}
+
+function scheduleNextBlock() {
+  if (!autoMode) return;
+  const file = files[currentFileIndex];
+  if (!file || allBlocksSent(file)) { autoMode = false; updateButtonStates(); return; }
+  autoTimeoutId = setTimeout(async () => {
+    await sendCurrentMessage();
+    if (autoMode) scheduleNextBlock();
+  }, getRandomInterval());
 }
 
 function startAutoSend() {
-  if (intervalId !== null) return;
+  if (autoMode) return;
   if (currentFileIndex < 0 || files.length === 0) { alert('Cargá archivos .txt primero.'); return; }
+  const file = files[currentFileIndex];
+  if (!file || !file.blocks || file.blocks.length === 0) { alert('El archivo no tiene bloques.'); return; }
+  if (allBlocksSent(file)) { alert('Todos los bloques ya fueron enviados.'); return; }
   if (!channelName) { alert('Configurá el canal en Ajustes.'); switchTab('settings'); return; }
-  const send = async () => {
-    await sendCurrentMessage();
-    if (intervalId !== null) {
-      clearInterval(intervalId);
-      intervalId = setInterval(send, getRandomInterval());
-      updateButtonStates();
-    }
-  };
-  send();
-  intervalId = setInterval(send, getRandomInterval());
+  autoMode = true;
   updateButtonStates();
+  sendCurrentMessage().then(() => {
+    if (autoMode && !allBlocksSent(files[currentFileIndex])) {
+      scheduleNextBlock();
+    }
+  });
 }
 
 function stopAutoSend() {
-  if (intervalId !== null) { clearInterval(intervalId); intervalId = null; }
+  autoMode = false;
+  if (autoTimeoutId !== null) { clearTimeout(autoTimeoutId); autoTimeoutId = null; }
   updateButtonStates();
-  document.getElementById('send-status')?.removeAttribute('data-running');
+  const statusEl = document.getElementById('send-status');
+  if (statusEl) statusEl.removeAttribute('data-running');
 }
 
 function updateProgress() {
   if (currentFileIndex < 0 || currentFileIndex >= files.length) return;
   const file = files[currentFileIndex];
   const bar = document.getElementById('progress-bar');
-  if (!bar || !file.messages || file.messages.length === 0) return;
-  const pct = Math.round(((file.currentIndex || 0) / file.messages.length) * 100);
+  if (!bar || !file.blocks || file.blocks.length === 0) return;
+  const done = getTotalSentBlocks(file);
+  const total = file.blocks.length;
+  const pct = Math.round((done / total) * 100);
   bar.style.width = `${pct}%`;
 }
 
@@ -208,12 +312,12 @@ function updateButtonStates() {
   const start = document.getElementById('start-btn');
   const stop = document.getElementById('stop-btn');
   const sendOnce = document.getElementById('send-once-btn');
-  const hasQueue = currentFileIndex >= 0 && files[currentFileIndex]?.messages?.length > 0 &&
-    (files[currentFileIndex].currentIndex || 0) < files[currentFileIndex].messages.length;
-  const running = intervalId !== null;
-  if (start) start.disabled = running || !hasQueue;
+  const file = currentFileIndex >= 0 && currentFileIndex < files.length ? files[currentFileIndex] : null;
+  const hasPendingBlocks = file && file.blocks && !allBlocksSent(file);
+  const running = autoMode;
+  if (start) start.disabled = running || !hasPendingBlocks;
   if (stop) stop.disabled = !running;
-  if (sendOnce) sendOnce.disabled = running || !hasQueue;
+  if (sendOnce) sendOnce.disabled = running || !hasPendingBlocks;
 }
 
 function loadSettings() {
@@ -268,7 +372,6 @@ export async function initChatUI() {
       window.location.href = '/admin/dashboard';
       return;
     }
-    // Sincronizar token existente a cookie httpOnly
     if (token) {
       fetch('/auth/sync-cookie', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } }).catch(() => {});
     }
@@ -281,6 +384,7 @@ export async function initChatUI() {
   startPingLoop();
   loadBotsInfo();
   renderNavLinks();
+  loadPools();
 
   document.getElementById('load-file-btn')?.addEventListener('click', handleLoadFile);
   document.getElementById('start-btn')?.addEventListener('click', startAutoSend);
@@ -296,10 +400,50 @@ export async function initChatUI() {
   updateButtonStates();
 }
 
-// ─── Simulator integration ─────────────────────────────────────
+async function loadPools() {
+  const section = document.getElementById('pools-section');
+  const container = document.getElementById('pool-buttons');
+  if (!section || !container) return;
+  try {
+    const res = await fetch(getServerUrl() + '/api/chat/pools', { headers: getAuthHeaders() });
+    const data = await res.json();
+    if (!data.success || !data.pools || data.pools.length === 0) { section.style.display = 'none'; return; }
+    section.style.display = 'block';
+    container.innerHTML = data.pools.map(p =>
+      `<button class="pool-btn" data-pool-id="${p.id}" data-pool-name="${esc(p.name)}">${esc(p.name)} (${p.message_count})</button>`
+    ).join('');
+    container.querySelectorAll('.pool-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const channel = channelName || document.getElementById('cfg-channel')?.value?.trim();
+        if (!channel) { alert('Configurá el canal en Ajustes primero.'); return; }
+        const poolId = parseInt(btn.dataset.poolId, 10);
+        btn.classList.add('send');
+        btn.textContent = 'Enviando...';
+        try {
+          const res = await fetch(getServerUrl() + '/api/chat/send-random', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ channel, pool_id: poolId })
+          });
+          const data = await res.json();
+          btn.textContent = data.success ? '✓ Enviado' : '✗ ' + (data.message || 'Error');
+          setTimeout(() => {
+            btn.classList.remove('send');
+            const p = data.pools?.find(x => x.id === poolId);
+            btn.textContent = `${btn.dataset.poolName} (${p?.message_count || '?'})`;
+          }, 2000);
+        } catch {
+          btn.textContent = 'Error';
+          setTimeout(() => { btn.classList.remove('send'); btn.textContent = btn.dataset.poolName; }, 2000);
+        }
+      });
+    });
+  } catch { section.style.display = 'none'; }
+}
+
 window.addGeneratedMessages = function (msgs, name) {
   const msgLines = msgs.map(m => `${m.user}: ${m.message}`);
-  files.push({ name: name || `IA - ${new Date().toLocaleTimeString()}`, messages: msgLines, currentIndex: 0 });
+  files.push({ name: name || `IA - ${new Date().toLocaleTimeString()}`, blocks: [{ messages: msgLines, sent: false }], currentBlock: 0 });
   if (currentFileIndex < 0) currentFileIndex = files.length - 1;
   saveFiles();
   renderFileList();

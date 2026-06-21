@@ -34,7 +34,7 @@ let _bearersCache: string[] | null = null;
  * @returns Buffer con formato [IV][Tag][Ciphertext]
  */
 export function encrypt(plaintext: string): Buffer {
-  const key = Buffer.from(env.MASTER_KEY, "utf8"); // 32 bytes exactos
+  const key = Buffer.from(env.MASTER_KEY.substring(0, 64), "hex");
   const iv  = crypto.randomBytes(IV_LENGTH);
 
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv, {
@@ -59,7 +59,7 @@ export function encrypt(plaintext: string): Buffer {
  * Lanza un error si la autenticación falla (datos manipulados).
  */
 export function decrypt(data: Buffer): string {
-  const key        = Buffer.from(env.MASTER_KEY, "utf8");
+  const key        = Buffer.from(env.MASTER_KEY.substring(0, 64), "hex");
   const iv         = data.subarray(0, IV_LENGTH);
   const authTag    = data.subarray(IV_LENGTH, IV_LENGTH + TAG_LENGTH);
   const ciphertext = data.subarray(IV_LENGTH + TAG_LENGTH);
@@ -134,9 +134,16 @@ export function invalidateBearersCache(): void {
 /**
  * Retorna un Bearer aleatorio de la lista en cache.
  * Llama a loadBearers() si el cache está vacío.
+ * Retorna undefined si bearers.enc no existe o está vacío.
  */
-export function getRandomBearer(): string {
-  const bearers = loadBearers();
+export function getRandomBearer(): string | undefined {
+  let bearers: string[];
+  try {
+    bearers = loadBearers();
+  } catch {
+    return undefined;
+  }
+  if (bearers.length === 0) return undefined;
   const idx = crypto.randomInt(0, bearers.length);
   return bearers[idx];
 }
@@ -150,10 +157,33 @@ export function encryptToHex(plaintext: string): string {
   return encrypt(plaintext).toString("hex");
 }
 
+function tryDecryptWithKey(hex: string, keyHex?: string): string {
+  const key = keyHex
+    ? Buffer.from(keyHex.substring(0, 64), "hex")
+    : Buffer.from(env.MASTER_KEY, "utf8");
+  const data = Buffer.from(hex, "hex");
+  const iv = data.subarray(0, IV_LENGTH);
+  const authTag = data.subarray(IV_LENGTH, IV_LENGTH + TAG_LENGTH);
+  const ciphertext = data.subarray(IV_LENGTH + TAG_LENGTH);
+  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv, { authTagLength: TAG_LENGTH });
+  decipher.setAuthTag(authTag);
+  return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8");
+}
+
 /**
  * Descifra una cadena hex (previamente cifrada con encryptToHex).
+ * Compatibilidad hacia atras: si falla con la clave nueva (hex),
+ * reintenta con la clave vieja (UTF-8) para tokens pre-fix.
  */
 export function decryptFromHex(hex: string): string {
   if (!hex) return "";
-  return decrypt(Buffer.from(hex, "hex"));
+  try {
+    return tryDecryptWithKey(hex, env.MASTER_KEY);
+  } catch {
+    try {
+      return tryDecryptWithKey(hex);
+    } catch {
+      throw new Error("Descifrado fallido: integridad comprometida o clave incorrecta");
+    }
+  }
 }

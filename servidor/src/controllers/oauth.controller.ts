@@ -39,23 +39,23 @@ export function handleOAuthStart(req: Request, res: Response) {
 export async function handleOAuthCallback(req: Request, res: Response) {
   const { code, state, error } = req.query as Record<string, string>;
   if (error || !code || !state) {
-    return res.redirect("/admin/dashboard?oauth=error&reason=" + encodeURIComponent(error || "missing_params"));
+    return res.redirect("/admin/bots?oauth=error&reason=" + encodeURIComponent(error || "missing_params"));
   }
   const stored = oauthStates.get(state);
   if (!stored) {
-    return res.redirect("/admin/dashboard?oauth=error&reason=state_expired");
+    return res.redirect("/admin/bots?oauth=error&reason=state_expired");
   }
   oauthStates.delete(state);
 
   const result = await exchangeCode(code, stored.verifier);
   if (!result) {
     logger.error(TAG, "token_exchange_failed para state=" + state);
-    return res.redirect("/admin/dashboard?oauth=error&reason=token_exchange_failed");
+    return res.redirect("/admin/bots?oauth=error&reason=token_exchange_failed");
   }
 
   const kickUser = await getKickUsername(result.access_token);
   if (!kickUser) {
-    return res.redirect("/admin/dashboard?oauth=error&reason=no_bot_name");
+    return res.redirect("/admin/bots?oauth=error&reason=no_bot_name");
   }
   const botName = "bot." + kickUser;
 
@@ -72,18 +72,18 @@ export async function handleOAuthCallback(req: Request, res: Response) {
   if (stored.botId) {
     stmts.updateBotOAuthTokens.run([encRefresh, encAccess, expiresAt, stored.botId]);
     assignToUser(stored.botId);
-    return res.redirect("/admin/dashboard?oauth=success&botId=" + stored.botId);
+    return res.redirect("/admin/bots?oauth=success&botId=" + stored.botId);
   }
 
   const existing = stmts.findBotByName.get(botName);
   if (existing) {
     stmts.updateBotOAuthTokens.run([encRefresh, encAccess, expiresAt, existing.id]);
     assignToUser(existing.id);
-    return res.redirect("/admin/dashboard?oauth=success&botId=" + existing.id);
+    return res.redirect("/admin/bots?oauth=success&botId=" + existing.id);
   }
 
   const newBot = stmts.insertBot.run([botName, ""]);
   stmts.updateBotOAuthTokens.run([encRefresh, encAccess, expiresAt, newBot.lastInsertRowid as number]);
   assignToUser(newBot.lastInsertRowid as number);
-  res.redirect("/admin/dashboard?oauth=success&botId=" + newBot.lastInsertRowid);
+  res.redirect("/admin/bots?oauth=success&botId=" + newBot.lastInsertRowid);
 }

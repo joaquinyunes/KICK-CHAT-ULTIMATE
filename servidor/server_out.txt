@@ -1,0 +1,8 @@
+[09:58:18.463] [INFO] [server] Inicializando base de datos...
+[09:58:18.520] [INFO] [server] Verificando bearers...
+[09:58:18.530] [INFO] [server] StreamChat Bridge en puerto 3000
+[36mINFO [0m 2026-06-21T09:58:21.386Z  200  16.43ms  GET    /health  anonymous
+[36mINFO [0m 2026-06-21T09:58:36.365Z  200   0.96ms  GET    /health  anonymous
+[36mINFO [0m 2026-06-21T09:58:51.367Z  200   1.16ms  GET    /health  anonymous
+[36mINFO [0m 2026-06-21T09:59:06.365Z  200    0.8ms  GET    /health  anonymous
+[36mINFO [0m 2026-06-21T09:59:21.366Z  200   0.91ms  GET    /health  anonymous

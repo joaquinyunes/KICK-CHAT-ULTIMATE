@@ -93,6 +93,7 @@ async function initDb(): Promise<SqlJsDatabase> {
   try { db.run("ALTER TABLE bots ADD COLUMN oauth_refresh_token TEXT"); } catch {}
   try { db.run("ALTER TABLE bots ADD COLUMN oauth_access_token TEXT"); } catch {}
   try { db.run("ALTER TABLE bots ADD COLUMN oauth_token_expires_at INTEGER"); } catch {}
+  try { db.run("ALTER TABLE bots ADD COLUMN cookies TEXT DEFAULT ''"); } catch {}
 
   db.run(`
     CREATE TABLE IF NOT EXISTS bot_assignments (
@@ -262,6 +263,16 @@ async function initDb(): Promise<SqlJsDatabase> {
     )
   `);
 
+  // ─── Message Pools table ──────────────────────────────────────
+  db.run(`
+    CREATE TABLE IF NOT EXISTS message_pools (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      name        TEXT    NOT NULL UNIQUE,
+      messages    TEXT    NOT NULL,
+      created_at  INTEGER NOT NULL DEFAULT (unixepoch())
+    )
+  `);
+
   saveDb();
   return db;
 }
@@ -371,6 +382,7 @@ export interface BotRow {
   oauth_refresh_token: string | null;
   oauth_access_token: string | null;
   oauth_token_expires_at: number | null;
+  cookies: string | null;
   is_active: number;
   created_at: number;
 }
@@ -512,6 +524,10 @@ export const stmts = {
     `DELETE FROM bot_assignments WHERE bot_id = ? AND user_id = ?`
   ),
 
+  updateBotCookies: prepareStmt<{ q_cookies: string | null; q_id: number }, any>(
+    `UPDATE bots SET cookies = ? WHERE id = ?`
+  ),
+
   // ─── Triggers / Actions ────────────────────────────────────────────────────
 
   insertTrigger: prepareStmt<{ id: string; name: string; enabled: number; source: string; event: string; filters: string | null; action_ids: string; created_at: number }, any>(
@@ -627,6 +643,20 @@ export const stmts = {
        SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful,
        SUM(CASE WHEN created_at > (unixepoch() - 3600) THEN 1 ELSE 0 END) as last_hour
      FROM view_log WHERE user_id = ?`
+  ),
+
+  // ─── Message Pools ─────────────────────────────────────────────────────────
+  insertPool: prepareStmt<{ name: string; messages: string }, any>(
+    `INSERT INTO message_pools (name, messages) VALUES (?, ?)`
+  ),
+  listPools: prepareStmt<never, { id: number; name: string; messages: string; created_at: number }>(
+    `SELECT * FROM message_pools ORDER BY name ASC`
+  ),
+  findPoolById: prepareStmt<[number], { id: number; name: string; messages: string; created_at: number }>(
+    `SELECT * FROM message_pools WHERE id = ? LIMIT 1`
+  ),
+  deletePool: prepareStmt<[number], any>(
+    `DELETE FROM message_pools WHERE id = ?`
   ),
 
   // ─── Permissions ───────────────────────────────────────────────────────────

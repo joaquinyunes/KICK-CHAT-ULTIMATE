@@ -9,7 +9,7 @@
 
 import type { Request, Response, NextFunction } from "express";
 
-const INTERVAL_MS = 30_000; // 30 segundos entre mensajes
+const INTERVAL_MS = 0; // Sin restricción entre mensajes
 
 interface RateLimitEntry {
   lastSentAt: number; // timestamp del último mensaje permitido
@@ -79,7 +79,7 @@ export function chatRateLimiter(
     res.setHeader("Retry-After", String(retryAfterSec));
     res.status(429).json({
       error: "Demasiadas solicitudes",
-      message: `Puedes enviar 1 mensaje cada 30 segundos. Reintenta en ${retryAfterSec}s.`,
+      message: `Reintenta en ${retryAfterSec}s.`,
       retryAfterSeconds: retryAfterSec,
     });
   }

@@ -22,6 +22,7 @@ import adminProxiesRoutes from "./routes/admin-proxies.routes";
 import clientVodsRoutes from "./routes/client-vods.routes";
 import simulatorRoutes from "./routes/simulator.routes";
 import actionsRoutes from "./routes/actions.routes";
+import adminPoolsRoutes from "./routes/admin-pools.routes";
 import { requirePageAuth } from "./middleware/auth-page.middleware";
 
 const app = express();
@@ -73,6 +74,9 @@ app.get("/admin/clientes", (_req: Request, res: Response) => {
 app.get("/admin/proxies", (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "..", "public", "admin", "proxies.html"));
 });
+app.get("/admin/pools", (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, "..", "public", "admin", "pools.html"));
+});
 
 // ─── Telemetry ───────────────────────────────────────────────────
 app.use(requestLogger);
@@ -92,6 +96,7 @@ app.use(adminProxiesRoutes);
 app.use(clientVodsRoutes);
 app.use(simulatorRoutes);
 app.use(actionsRoutes);
+app.use(adminPoolsRoutes);
 
 // ─── Metrics ─────────────────────────────────────────────────────
 app.use(metricsRouter);

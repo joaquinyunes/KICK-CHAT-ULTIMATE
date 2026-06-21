@@ -1,0 +1,14 @@
+[env] ⚠ KICK_API_URL no definida
+[env] ⚠ GEMINI_API_KEY no definida
+[09:58:18.524] [WARN] [server] Sin bearers.enc — solo bots OAuth disponibles
+[09:58:20.436] [ERROR] [server] Error no manejado Expected property name or '}' in JSON at position 1 (line 1 column 2) SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+    at JSON.parse (<anonymous>)
+    at parse (C:\Users\joaqii\Desktop\KICK-CHAT-ULTIMATE\servidor\node_modules\body-parser\lib\types\json.js:92:19)
+    at C:\Users\joaqii\Desktop\KICK-CHAT-ULTIMATE\servidor\node_modules\body-parser\lib\read.js:128:18
+    at AsyncResource.runInAsyncScope (node:async_hooks:226:14)
+    at invokeCallback (C:\Users\joaqii\Desktop\KICK-CHAT-ULTIMATE\servidor\node_modules\raw-body\index.js:238:16)
+    at done (C:\Users\joaqii\Desktop\KICK-CHAT-ULTIMATE\servidor\node_modules\raw-body\index.js:227:7)
+    at IncomingMessage.onEnd (C:\Users\joaqii\Desktop\KICK-CHAT-ULTIMATE\servidor\node_modules\raw-body\index.js:287:7)
+    at IncomingMessage.emit (node:events:509:20)
+    at endReadableNT (node:internal/streams/readable:1744:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
