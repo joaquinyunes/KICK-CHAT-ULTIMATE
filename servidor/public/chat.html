@@ -104,6 +104,10 @@
 </style>
 </head>
 <body class="chat-page">
+  <div class="pl-scene" aria-hidden="true"></div>
+  <div class="pl-grid" aria-hidden="true"></div>
+  <div class="pl-orbs" aria-hidden="true"><div class="pl-orb"></div><div class="pl-orb"></div><div class="pl-orb"></div></div>
+  <div class="pl-grain" aria-hidden="true"></div>
   <header class="app-header">
     <span class="app-title">StreamChat Bridge</span>
     <div class="connection-status">
@@ -137,6 +141,12 @@
     <div class="files-section" id="pools-section" style="display:none">
       <div class="files-header">
         <span class="files-title">Pools (mensajes aleatorios)</span>
+        <button id="pool-toggle-form" class="btn btn-secondary btn-sm">+ Nuevo</button>
+      </div>
+      <div id="pool-create-form" style="display:none;background:var(--surface2,#13161c);border:1px solid var(--border,#2a2d35);border-radius:6px;padding:10px;margin-bottom:8px">
+        <input id="pool-create-name" type="text" placeholder="Nombre del pool" style="width:100%;margin-bottom:6px;font-size:12px" />
+        <textarea id="pool-create-msgs" rows="4" placeholder="Un mensaje por línea" style="width:100%;font-size:12px;resize:vertical;background:var(--surface2,#1a1d25);border:1px solid var(--border,#2a2d35);border-radius:4px;color:var(--text);padding:6px 8px;font-family:inherit"></textarea>
+        <button id="pool-create-btn" class="btn btn-primary" style="margin-top:6px;font-size:11px;padding:6px 12px">Guardar Pool</button>
       </div>
       <div id="pool-buttons" class="pool-buttons"></div>
     </div>
@@ -306,6 +316,7 @@
     </div>
   </section>
 
+  <script src="js/pl-mascot.js"></script>
   <script type="module" src="js/chat-ui.js"></script>
   <script>
   // ─── SIMULATOR STATE ───

@@ -391,6 +391,11 @@ export async function initChatUI() {
   document.getElementById('stop-btn')?.addEventListener('click', stopAutoSend);
   document.getElementById('send-once-btn')?.addEventListener('click', sendCurrentMessage);
   document.getElementById('save-settings-btn')?.addEventListener('click', handleSaveSettings);
+  document.getElementById('pool-toggle-form')?.addEventListener('click', () => {
+    const f = document.getElementById('pool-create-form');
+    if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
+  });
+  document.getElementById('pool-create-btn')?.addEventListener('click', createPool);
 
   loadSettings();
   loadSavedFiles();
@@ -407,12 +412,17 @@ async function loadPools() {
   try {
     const res = await fetch(getServerUrl() + '/api/chat/pools', { headers: getAuthHeaders() });
     const data = await res.json();
-    if (!data.success || !data.pools || data.pools.length === 0) { section.style.display = 'none'; return; }
+    if (!data.success) { section.style.display = 'none'; return; }
+    const pools = data.pools || [];
+    if (pools.length === 0) { section.style.display = 'none'; return; }
     section.style.display = 'block';
-    container.innerHTML = data.pools.map(p =>
-      `<button class="pool-btn" data-pool-id="${p.id}" data-pool-name="${esc(p.name)}">${esc(p.name)} (${p.message_count})</button>`
+    container.innerHTML = pools.map(p =>
+      `<div style="display:flex;gap:4px;align-items:stretch">
+        <button class="pool-btn" data-pool-id="${p.id}" data-pool-name="${esc(p.name)}">${esc(p.name)} (${p.messages.length})</button>
+        <button class="pool-btn pool-del" data-pool-id="${p.id}" title="Eliminar pool" style="color:var(--alert);font-size:11px;padding:4px 6px">✕</button>
+      </div>`
     ).join('');
-    container.querySelectorAll('.pool-btn').forEach(btn => {
+    container.querySelectorAll('.pool-btn:not(.pool-del)').forEach(btn => {
       btn.addEventListener('click', async () => {
         const channel = channelName || document.getElementById('cfg-channel')?.value?.trim();
         if (!channel) { alert('Configurá el canal en Ajustes primero.'); return; }
@@ -420,25 +430,56 @@ async function loadPools() {
         btn.classList.add('send');
         btn.textContent = 'Enviando...';
         try {
-          const res = await fetch(getServerUrl() + '/api/chat/send-random', {
+          const r = await fetch(getServerUrl() + '/api/chat/send-random', {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify({ channel, pool_id: poolId })
           });
-          const data = await res.json();
-          btn.textContent = data.success ? '✓ Enviado' : '✗ ' + (data.message || 'Error');
-          setTimeout(() => {
-            btn.classList.remove('send');
-            const p = data.pools?.find(x => x.id === poolId);
-            btn.textContent = `${btn.dataset.poolName} (${p?.message_count || '?'})`;
-          }, 2000);
+          const d = await r.json();
+          btn.textContent = d.success ? '✓ Enviado' : '✗ ' + (d.message || 'Error');
+          setTimeout(() => { btn.classList.remove('send'); loadPools(); }, 2000);
         } catch {
           btn.textContent = 'Error';
-          setTimeout(() => { btn.classList.remove('send'); btn.textContent = btn.dataset.poolName; }, 2000);
+          setTimeout(() => { btn.classList.remove('send'); loadPools(); }, 2000);
         }
       });
     });
+    container.querySelectorAll('.pool-del').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Eliminar este pool?')) return;
+        const poolId = parseInt(btn.dataset.poolId, 10);
+        try {
+          await fetch(getServerUrl() + '/api/chat/pools/' + poolId, { method: 'DELETE', headers: getAuthHeaders() });
+          loadPools();
+        } catch {}
+      });
+    });
   } catch { section.style.display = 'none'; }
+}
+
+async function createPool() {
+  const nameInput = document.getElementById('pool-create-name');
+  const msgsInput = document.getElementById('pool-create-msgs');
+  if (!nameInput || !msgsInput) return;
+  const name = nameInput.value.trim();
+  if (!name) { alert('Escribí un nombre para el pool.'); return; }
+  const lines = msgsInput.value.split('\n').filter(l => l.trim());
+  if (lines.length === 0) { alert('Agregá al menos un mensaje.'); return; }
+  try {
+    const res = await fetch(getServerUrl() + '/api/chat/pools', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ name, messages: lines })
+    });
+    const data = await res.json();
+    if (data.success) {
+      nameInput.value = '';
+      msgsInput.value = '';
+      loadPools();
+    } else {
+      alert(data.error || 'Error al crear pool');
+    }
+  } catch { alert('Error de conexión'); }
 }
 
 window.addGeneratedMessages = function (msgs, name) {

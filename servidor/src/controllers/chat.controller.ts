@@ -17,9 +17,32 @@ export function handleListMyBots(req: Request, res: Response): void {
 
 export function handleListPools(_req: Request, res: Response): void {
   const pools = stmts.listPools.all().map((p) => ({
-    id: p.id, name: p.name, message_count: JSON.parse(p.messages || "[]").length,
+    id: p.id, name: p.name, messages: JSON.parse(p.messages || "[]"),
   }));
   res.json({ success: true, pools });
+}
+
+export function handleCreatePool(req: Request, res: Response): void {
+  const { name, messages } = req.body;
+  if (!name || typeof name !== "string") {
+    res.status(400).json({ error: "name es requerido" }); return;
+  }
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    res.status(400).json({ error: "messages debe ser un array con al menos un mensaje" }); return;
+  }
+  try {
+    const result = stmts.insertPool.run([name, JSON.stringify(messages)]);
+    res.status(201).json({ success: true, id: result.lastInsertRowid, name });
+  } catch {
+    res.status(409).json({ error: "Ya existe un pool con ese nombre" });
+  }
+}
+
+export function handleDeletePool(req: Request, res: Response): void {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "id invalido" }); return; }
+  stmts.deletePool.run([id]);
+  res.json({ success: true });
 }
 
 export async function handleChatSend(

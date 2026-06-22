@@ -3,60 +3,100 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Proxies — Admin</title>
+  <title>SCB – Proxies</title>
   <link rel="stylesheet" href="/css/main.css">
   <style>
     .proxy-grid { display:grid; gap:12px; grid-template-columns:1fr; }
-    .proxy-card { background:var(--card-bg,#1a1d25); border:1px solid var(--border,#2a2d35); border-radius:8px; padding:12px 16px; display:grid; grid-template-columns:auto 1fr auto; gap:8px 16px; align-items:center; }
-    .proxy-card .proxy-addr { font-family:monospace; font-size:14px; }
-    .proxy-card .proxy-creds { font-size:12px; opacity:.7; }
+    .proxy-card { background:var(--bg-panel); border:1px solid var(--line); border-radius:10px; padding:12px 16px; display:grid; grid-template-columns:auto 1fr auto; gap:8px 16px; align-items:center; }
+    .proxy-card .proxy-addr { font-family:var(--font-mono); font-size:14px; color:var(--text-primary); }
+    .proxy-card .proxy-creds { font-size:12px; opacity:.7; color:var(--text-secondary); }
     .proxy-card .proxy-status { font-size:12px; padding:2px 8px; border-radius:4px; }
-    .proxy-status.active { background:var(--success,#27ae60); color:#fff; }
-    .proxy-status.inactive { background:var(--danger,#e74c3c); color:#fff; }
+    .proxy-status.active { background:var(--signal); color:#06231A; }
+    .proxy-status.inactive { background:var(--alert); color:#fff; }
     .proxy-card .proxy-actions { display:flex; gap:6px; }
-    .import-area { width:100%; min-height:120px; font-family:monospace; font-size:13px; padding:8px; background:#0d0f14; color:#ccc; border:1px solid var(--border,#2a2d35); border-radius:6px; resize:vertical; }
-    .inline-form { display:flex; gap:8px; flex-wrap:wrap; align-items:end; background:var(--card-bg,#1a1d25); padding:16px; border-radius:8px; margin-bottom:16px; border:1px solid var(--border,#2a2d35); }
+    .import-area { width:100%; min-height:120px; font-family:var(--font-mono); font-size:13px; padding:8px; background:var(--bg-base); color:var(--text-primary); border:1px solid var(--line); border-radius:8px; resize:vertical; }
+    .inline-form { display:flex; gap:8px; flex-wrap:wrap; align-items:end; background:var(--bg-panel); padding:16px; border-radius:10px; margin-bottom:16px; border:1px solid var(--line); }
     .inline-form .field { display:flex; flex-direction:column; gap:4px; }
-    .inline-form .field label { font-size:11px; opacity:.7; }
-    .inline-form .field input { padding:6px 10px; border-radius:4px; border:1px solid var(--border,#2a2d35); background:#0d0f14; color:#ccc; width:140px; }
+    .inline-form .field label { font-size:11px; color:var(--text-secondary); }
+    .inline-form .field input { padding:6px 10px; border-radius:6px; border:1px solid var(--line); background:var(--bg-base); color:var(--text-primary); width:140px; font-family:var(--font-mono); font-size:13px; }
     .inline-form .field input.small { width:70px; }
   </style>
 </head>
 <body>
-  <div id="app">
-    <header style="display:flex;justify-content:space-between;align-items:center;padding:12px 24px;background:#1a1d25;border-bottom:1px solid #2a2d35">
-      <div>
-        <a href="/admin/dashboard" style="color:#6d5afc;text-decoration:none;margin-right:16px">&larr; Dashboard</a>
-        <strong style="color:#fff">Gestión de Proxies</strong>
-      </div>
-      <div style="display:flex;gap:12px;align-items:center">
-        <span id="status-badge" style="font-size:12px;padding:2px 8px;border-radius:4px;background:#555">Desconectado</span>
-        <button id="logout-btn" style="background:none;border:1px solid #e74c3c;color:#e74c3c;padding:4px 12px;border-radius:4px;cursor:pointer">Salir</button>
-      </div>
-    </header>
-    <main style="padding:24px;max-width:1000px;margin:0 auto">
-      <div id="msg" style="margin-bottom:12px"></div>
+  <div class="pl-scene" aria-hidden="true"></div>
+  <div class="pl-grid" aria-hidden="true"></div>
+  <div class="pl-orbs" aria-hidden="true"><div class="pl-orb"></div><div class="pl-orb"></div><div class="pl-orb"></div></div>
+  <div class="pl-grain" aria-hidden="true"></div>
 
-      <h2 style="color:#fff;margin-bottom:12px">Agregar Proxy</h2>
-      <div class="inline-form" id="add-form">
-        <div class="field"><label>Host</label><input id="f-host" type="text" placeholder="192.168.1.1" /></div>
-        <div class="field"><label>Puerto</label><input id="f-port" type="number" class="small" placeholder="8080" /></div>
-        <div class="field"><label>Usuario</label><input id="f-user" type="text" placeholder="user" /></div>
-        <div class="field"><label>Password</label><input id="f-pass" type="text" placeholder="pass" /></div>
-        <div class="field"><label>Protocolo</label><input id="f-proto" type="text" class="small" value="http" /></div>
-        <button id="btn-add" class="btn btn-primary">Agregar</button>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="logo-mark">
+          <svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="26" cy="26" r="25" stroke="#2A9D6F" stroke-width="1.2" opacity="0.4"/>
+            <circle cx="14" cy="26" r="5.5" fill="#11151B" stroke="#3DDC97" stroke-width="2"/>
+            <circle cx="38" cy="26" r="5.5" fill="#11151B" stroke="#3DDC97" stroke-width="2"/>
+            <path d="M19.5 26H32.5" stroke="#3DDC97" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="26" cy="26" r="2" fill="#6FF0B8"/>
+          </svg>
+        </div>
+        <span>StreamChat</span>
       </div>
 
-      <h2 style="color:#fff;margin:20px 0 12px">Importar desde texto</h2>
-      <div style="margin-bottom:16px">
+      <nav class="nav-group">
+        <div class="nav-eyebrow">General</div>
+        <a href="/admin/dashboard" class="nav-link">📊 Dashboard</a>
+        <a href="/admin/bots" class="nav-link">🤖 Bots</a>
+        <a href="/admin/clientes" class="nav-link">👥 Clientes</a>
+        <a href="/admin/proxies" class="nav-link active">🌐 Proxies</a>
+        <a href="/admin/pools" class="nav-link">📦 Pools</a>
+      </nav>
+
+      <div style="margin-top:auto;padding-top:16px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px">
+        <span class="status-pill" style="align-self:flex-start">
+          <span id="status-badge" class="status-dot"></span>
+          <span id="status-label">Verificando…</span>
+        </span>
+        <button id="logout-btn" class="btn btn-primary" style="width:100%;font-size:11px;padding:9px 12px;background:transparent;color:var(--text-secondary);border:1px solid var(--line)">Cerrar sesión</button>
+      </div>
+    </aside>
+
+    <main class="main-panel">
+      <header class="page-header">
+        <h2>Proxies</h2>
+        <p>Gestión de proxies para envío de mensajes</p>
+      </header>
+
+      <p id="msg" style="margin-bottom:12px;font-size:12px;color:var(--text-secondary)" hidden></p>
+
+      <div class="card pl-bounce" style="padding:0;background:transparent;border:none;margin-bottom:16px">
+        <h3 style="font-family:var(--font-display);font-size:14px;font-weight:600;color:var(--text-primary);margin:0 0 8px">Agregar Proxy</h3>
+        <div class="inline-form" id="add-form">
+          <div class="field"><label>Host</label><input id="f-host" type="text" placeholder="192.168.1.1" /></div>
+          <div class="field"><label>Puerto</label><input id="f-port" type="number" class="small" placeholder="8080" /></div>
+          <div class="field"><label>Usuario</label><input id="f-user" type="text" placeholder="user" /></div>
+          <div class="field"><label>Password</label><input id="f-pass" type="text" placeholder="pass" /></div>
+          <div class="field"><label>Protocolo</label><input id="f-proto" type="text" class="small" value="http" /></div>
+          <button id="btn-add" class="btn btn-primary">Agregar</button>
+        </div>
+      </div>
+
+      <div class="card pl-bounce" style="animation-delay:0.06s;margin-bottom:16px">
+        <h3 style="font-family:var(--font-display);font-size:14px;font-weight:600;color:var(--text-primary);margin:0 0 8px">Importar desde texto</h3>
         <textarea id="import-text" class="import-area" placeholder="user:pass@host:port (uno por línea)&#10;ej: usuario1:pass123@192.168.1.1:8080"></textarea>
         <button id="btn-import" class="btn btn-primary" style="margin-top:8px">Importar</button>
       </div>
 
-      <h2 style="color:#fff;margin:20px 0 12px">Proxies (<span id="proxy-count">0</span>)</h2>
-      <div id="proxy-list" class="proxy-grid"></div>
+      <div class="card pl-bounce" style="animation-delay:0.1s">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <h3 style="font-family:var(--font-display);font-size:14px;font-weight:600;color:var(--text-primary);margin:0">Proxies <span id="proxy-count" style="color:var(--text-secondary)">(0)</span></h3>
+        </div>
+        <div id="proxy-list" class="proxy-grid"></div>
+      </div>
     </main>
   </div>
+
+  <script src="/js/pl-mascot.js"></script>
   <script type="module" src="/js/admin-proxies.js"></script>
 </body>
 </html>

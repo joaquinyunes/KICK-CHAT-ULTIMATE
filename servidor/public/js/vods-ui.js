@@ -1,6 +1,43 @@
-import { getServerUrl, getAuthHeaders, showMsg, initCommon, esc } from './admin-common.js';
+import { getServerUrl, getAuthHeaders, showMsg, esc } from './admin-common.js';
+import { onStatusChange, ping } from './bridge-client.js';
+
+function ss(key) { return sessionStorage.getItem(key) || localStorage.getItem(key) || ''; }
 
 let viewerInterval = null;
+
+async function initAuth() {
+  const token = ss('scb_jwt');
+  const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+  try {
+    const res = await fetch('/auth/me', { headers });
+    if (!res.ok) { window.location.href = '/'; return false; }
+    const data = await res.json();
+    if (data.user.role !== 'admin' && data.user.role !== 'client') { window.location.href = '/'; return false; }
+    if (token) { fetch('/auth/sync-cookie', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } }).catch(() => {}); }
+  } catch { window.location.href = '/'; return false; }
+  onStatusChange(updateStatusUI);
+  ping();
+  setInterval(() => ping(), 15000);
+  document.getElementById('logout-btn')?.addEventListener('click', handleLogout);
+  return true;
+}
+
+function updateStatusUI(status) {
+  const badge = document.getElementById('status-badge');
+  const label = document.getElementById('status-label');
+  if (!badge || !label) return;
+  badge.className = 'status-dot status-' + status;
+  label.textContent = status === 'connected' ? 'Conectado' : status === 'checking' ? 'Verificando…' : 'Desconectado';
+}
+
+async function handleLogout() {
+  try { await fetch('/auth/logout', { method: 'POST' }); } catch {}
+  sessionStorage.clear();
+  localStorage.removeItem('scb_jwt');
+  localStorage.removeItem('scb_role');
+  localStorage.removeItem('scb_server_url');
+  window.location.href = '/';
+}
 
 async function loadVods() {
   const container = document.getElementById('vod-list');
@@ -94,7 +131,7 @@ function renderNav(permissions) {
 }
 
 async function init() {
-  const ok = await initCommon();
+  const ok = await initAuth();
   if (!ok) return;
 
   await refreshPermissions();

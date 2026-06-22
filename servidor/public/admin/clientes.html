@@ -5,70 +5,101 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SCB – Clientes</title>
   <link rel="stylesheet" href="../css/main.css" />
+  <style>
+    .admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; width: 100%; }
+  </style>
 </head>
-<body class="chat-page">
-  <header class="app-header">
-    <span class="app-title">StreamChat Bridge · Clientes</span>
-    <div class="connection-status">
-      <span id="status-badge" class="status-dot status-disconnected"></span>
-      <span id="status-label">Desconectado</span>
-      <button id="logout-btn" class="btn btn-ghost" style="margin-left:12px">Cerrar sesión</button>
-    </div>
-  </header>
+<body>
+  <div class="pl-scene" aria-hidden="true"></div>
+  <div class="pl-grid" aria-hidden="true"></div>
+  <div class="pl-orbs" aria-hidden="true"><div class="pl-orb"></div><div class="pl-orb"></div><div class="pl-orb"></div></div>
+  <div class="pl-grain" aria-hidden="true"></div>
 
-  <nav class="tab-nav">
-    <a href="/admin/dashboard" class="tab-btn">Dashboard</a>
-    <a href="/admin/bots" class="tab-btn">Bots</a>
-    <a href="/admin/clientes" class="tab-btn active">Clientes</a>
-    <a href="/admin/proxies" class="tab-btn">Proxies</a>
-    <a href="/admin/pools" class="tab-btn">Pools</a>
-  </nav>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="logo-mark">
+          <svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="26" cy="26" r="25" stroke="#2A9D6F" stroke-width="1.2" opacity="0.4"/>
+            <circle cx="14" cy="26" r="5.5" fill="#11151B" stroke="#3DDC97" stroke-width="2"/>
+            <circle cx="38" cy="26" r="5.5" fill="#11151B" stroke="#3DDC97" stroke-width="2"/>
+            <path d="M19.5 26H32.5" stroke="#3DDC97" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="26" cy="26" r="2" fill="#6FF0B8"/>
+          </svg>
+        </div>
+        <span>StreamChat</span>
+      </div>
 
-  <section class="tab-panel active">
-    <div class="admin-grid">
-      <div class="admin-card">
-        <h3 class="admin-card-title">Crear Cliente</h3>
-        <div class="field">
-          <label for="adm-client-name">Nombre de usuario</label>
-          <input id="adm-client-name" type="text" placeholder="ej: cliente1" />
+      <nav class="nav-group">
+        <div class="nav-eyebrow">General</div>
+        <a href="/admin/dashboard" class="nav-link">📊 Dashboard</a>
+        <a href="/admin/bots" class="nav-link">🤖 Bots</a>
+        <a href="/admin/clientes" class="nav-link active">👥 Clientes</a>
+        <a href="/admin/proxies" class="nav-link">🌐 Proxies</a>
+        <a href="/admin/pools" class="nav-link">📦 Pools</a>
+      </nav>
+
+      <div style="margin-top:auto;padding-top:16px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px">
+        <span class="status-pill" style="align-self:flex-start">
+          <span id="status-badge" class="status-dot"></span>
+          <span id="status-label">Verificando…</span>
+        </span>
+        <button id="logout-btn" class="btn btn-primary" style="width:100%;font-size:11px;padding:9px 12px;background:transparent;color:var(--text-secondary);border:1px solid var(--line)">Cerrar sesión</button>
+      </div>
+    </aside>
+
+    <main class="main-panel">
+      <header class="page-header">
+        <h2>Clientes</h2>
+        <p>Gestión de cuentas y permisos</p>
+      </header>
+
+      <div class="admin-grid">
+        <div class="card pl-bounce">
+          <h3 class="admin-card-title">Crear Cliente</h3>
+          <div class="field">
+            <label for="adm-client-name">Nombre de usuario</label>
+            <input id="adm-client-name" type="text" placeholder="ej: cliente1" />
+          </div>
+          <div class="field">
+            <label for="adm-client-pass">Contraseña</label>
+            <input id="adm-client-pass" type="password" placeholder="••••••••" />
+          </div>
+          <div class="field">
+            <label for="adm-client-link">Link (opcional)</label>
+            <input id="adm-client-link" type="url" placeholder="https://..." />
+          </div>
+          <div class="field">
+            <label for="adm-client-expires">Vencimiento (días desde hoy, opcional)</label>
+            <input id="adm-client-expires" type="number" min="1" placeholder="ej: 30" />
+          </div>
+          <div class="field">
+            <label>Permisos</label>
+            <div class="perm-checkboxes" style="display:flex;gap:12px;flex-wrap:wrap">
+              <label><input type="checkbox" class="create-perm" value="chat" checked /> Chat</label>
+              <label><input type="checkbox" class="create-perm" value="simulator" checked /> Simulador</label>
+              <label><input type="checkbox" class="create-perm" value="vods" checked /> VODs</label>
+            </div>
+          </div>
+          <div class="field">
+            <label for="adm-client-hourly-limit">Límite vistas/hora</label>
+            <input id="adm-client-hourly-limit" type="number" min="0" value="50" style="width:100px" />
+          </div>
+          <button id="adm-create-client-btn" class="btn btn-primary">Crear Cliente</button>
+          <p id="adm-client-msg" class="settings-msg" hidden></p>
         </div>
-        <div class="field">
-          <label for="adm-client-pass">Contraseña</label>
-          <input id="adm-client-pass" type="password" placeholder="••••••••" />
-        </div>
-        <div class="field">
-          <label for="adm-client-link">Link (opcional)</label>
-          <input id="adm-client-link" type="url" placeholder="https://..." />
-        </div>
-        <div class="field">
-          <label for="adm-client-expires">Vencimiento (días desde hoy, opcional)</label>
-          <input id="adm-client-expires" type="number" min="1" placeholder="ej: 30" />
-        </div>
-        <div class="field">
-          <label>Permisos</label>
-          <div class="perm-checkboxes" style="display:flex;gap:12px;flex-wrap:wrap">
-            <label><input type="checkbox" class="create-perm" value="chat" checked /> Chat</label>
-            <label><input type="checkbox" class="create-perm" value="simulator" checked /> Simulador</label>
-            <label><input type="checkbox" class="create-perm" value="vods" checked /> VODs</label>
+
+        <div class="card admin-card-wide pl-bounce" style="animation-delay:0.08s">
+          <h3 class="admin-card-title">Todos los Clientes</h3>
+          <div id="adm-client-list">
+            <p style="opacity:0.6;font-style:italic">Cargando...</p>
           </div>
         </div>
-        <div class="field">
-          <label for="adm-client-hourly-limit">Límite vistas/hora</label>
-          <input id="adm-client-hourly-limit" type="number" min="0" value="50" style="width:100px" />
-        </div>
-        <button id="adm-create-client-btn" class="btn btn-primary">Crear Cliente</button>
-        <p id="adm-client-msg" class="settings-msg" hidden></p>
       </div>
+    </main>
+  </div>
 
-      <div class="admin-card admin-card-wide">
-        <h3 class="admin-card-title">Todos los Clientes</h3>
-        <div id="adm-client-list">
-          <p style="opacity:0.6;font-style:italic">Cargando...</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
+  <script src="../js/pl-mascot.js"></script>
   <script type="module" src="../js/admin-clientes.js"></script>
 </body>
 </html>

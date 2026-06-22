@@ -5,89 +5,306 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>StreamChat Bridge – Login</title>
   <link rel="stylesheet" href="css/main.css" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    * { box-sizing: border-box; }
+    body {
+      margin:0; padding:0;
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:#0B0E12;
+      font-family:'JetBrains Mono',monospace;
+      overflow:hidden;
+      position:relative;
+    }
+
+    /* ── Background layers ── */
+    .bg-scene {
+      position:fixed; inset:0; z-index:0;
+      background:
+        radial-gradient(ellipse 70% 40% at 50% 30%, rgba(61,220,151,0.06), transparent 70%),
+        radial-gradient(ellipse 120% 90% at 50% 50%, transparent 40%, rgba(0,0,0,0.6) 100%);
+      pointer-events:none;
+    }
+    .bg-grid {
+      position:fixed; inset:0; z-index:0;
+      background-image:
+        linear-gradient(rgba(61,220,151,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(61,220,151,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events:none;
+    }
+    .bg-grain {
+      position:fixed; inset:0; z-index:1;
+      opacity:0.025;
+      mix-blend-mode:overlay;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      pointer-events:none;
+    }
+
+    /* ── Floating orbs ── */
+    .orbs { position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden; }
+    .orb {
+      position:absolute;
+      border-radius:50%;
+      filter:blur(60px);
+      opacity:0.15;
+      animation: orb-drift linear infinite;
+    }
+    .orb:nth-child(1) { width:300px;height:300px;left:-80px;top:10%;background:#3DDC97;animation-duration:18s; }
+    .orb:nth-child(2) { width:200px;height:200px;right:-60px;bottom:20%;background:#2A9D6F;animation-duration:22s;animation-direction:reverse; }
+    .orb:nth-child(3) { width:150px;height:150px;left:40%;top:-60px;background:#6FF0B8;animation-duration:15s; }
+    @keyframes orb-drift {
+      0% { transform:translate(0,0) scale(1); }
+      33% { transform:translate(40px,-30px) scale(1.1); }
+      66% { transform:translate(-20px,40px) scale(0.9); }
+      100% { transform:translate(0,0) scale(1); }
+    }
+
+    /* ── Chat messages backdrop ── */
+    .chat-scroll {
+      position:fixed; inset:0; z-index:0; overflow:hidden; pointer-events:none;
+      -webkit-mask-image:linear-gradient(to bottom,transparent 5%,rgba(0,0,0,0.4) 20%,rgba(0,0,0,0.4) 80%,transparent 95%);
+    }
+    .chat-col {
+      position:absolute; top:0; white-space:nowrap;
+      color:#4B5560; font-size:11px; opacity:0.3;
+      animation: scroll-up linear infinite;
+    }
+    .chat-col span { display:block; padding:4px 0; }
+    .chat-col span b { color:#2A9D6F; font-weight:500; }
+    .chat-col:nth-child(1) { left:3%; animation-duration:35s; }
+    .chat-col:nth-child(2) { left:28%; animation-duration:42s; animation-direction:reverse; }
+    .chat-col:nth-child(3) { left:55%; animation-duration:38s; }
+    .chat-col:nth-child(4) { left:78%; animation-duration:45s; animation-direction:reverse; }
+    @keyframes scroll-up { from { transform:translateY(0); } to { transform:translateY(-50%); } }
+    @media (prefers-reduced-motion:reduce) { .chat-col,.orb,.face-blink,.status-pulse,.btn-shine { animation:none!important; } }
+
+    /* ── Card ── */
+    .login-card {
+      position:relative; z-index:2;
+      width:100%; max-width:400px;
+      background:#11151B;
+      border:1px solid #232932;
+      border-radius:16px;
+      padding:44px 38px 36px;
+      box-shadow:
+        0 40px 100px -40px rgba(0,0,0,0.7),
+        0 0 0 1px rgba(255,255,255,0.02) inset;
+      animation: card-bounce 0.7s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+    @keyframes card-bounce {
+      0% { opacity:0; transform:translateY(30px) scale(0.96); }
+      100% { opacity:1; transform:translateY(0) scale(1); }
+    }
+
+    /* ── Header ── */
+    .login-header { text-align:center; margin-bottom:30px; }
+
+    /* Face mascot */
+    .face {
+      position:relative;
+      width:64px; height:64px;
+      margin:0 auto 16px;
+      animation: face-float 3s ease-in-out infinite;
+    }
+    @keyframes face-float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-4px); } }
+    .face svg { width:100%; height:100%; display:block; }
+    .face-eyes { animation: face-blink 3.2s ease-in-out infinite; transform-origin:center; }
+    @keyframes face-blink { 0%,97%,100% { transform:scaleY(1); } 98.5% { transform:scaleY(0.1); } }
+
+    h1 {
+      font-family:'Space Grotesk',sans-serif;
+      font-weight:700; font-size:24px; letter-spacing:-0.02em;
+      margin:0 0 4px; color:#E8ECEF;
+    }
+    .subtitle {
+      font-size:11px; color:#7C8794;
+      text-transform:uppercase; letter-spacing:0.12em; margin:0 0 16px;
+    }
+
+    /* ── Status pill ── */
+    .status-pill {
+      display:inline-flex; align-items:center; gap:7px;
+      font-size:10px; letter-spacing:0.07em; text-transform:uppercase;
+      font-family:'Space Grotesk',sans-serif; font-weight:600;
+      color:#3DDC97; background:rgba(61,220,151,0.06);
+      border:1px solid rgba(61,220,151,0.18);
+      padding:4px 14px 4px 10px; border-radius:999px;
+    }
+    .status-pulse {
+      width:5px; height:5px; border-radius:50%;
+      background:#3DDC97;
+      animation: status-pulse 2s ease-out infinite;
+    }
+    @keyframes status-pulse {
+      0% { box-shadow:0 0 0 0 rgba(61,220,151,0.5); }
+      70% { box-shadow:0 0 0 8px rgba(61,220,151,0); }
+      100% { box-shadow:0 0 0 0 rgba(61,220,151,0); }
+    }
+
+    /* ── Form ── */
+    form { display:flex; flex-direction:column; gap:18px; }
+
+    .field-group {
+      display:flex; flex-direction:column; gap:6px;
+      animation: field-up 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+    .field-group:nth-child(1) { animation-delay:0.12s; }
+    .field-group:nth-child(2) { animation-delay:0.2s; }
+    @keyframes field-up { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+
+    label {
+      font-size:10px; text-transform:uppercase; letter-spacing:0.1em;
+      color:#7C8794; font-weight:500;
+    }
+
+    .input-wrap { position:relative; }
+
+    input {
+      width:100%;
+      font-family:'JetBrains Mono',monospace;
+      font-size:14px; color:#E8ECEF;
+      background:#0B0E12;
+      border:1.5px solid #232932;
+      border-radius:10px;
+      padding:11px 14px;
+      outline:none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    }
+    input::placeholder { color:#4B5560; font-size:13px; }
+    input:hover { border-color:#323B47; background:#11151B; }
+    input:focus {
+      border-color:#3DDC97;
+      background:#11151B;
+      box-shadow: 0 0 0 4px rgba(61,220,151,0.06);
+    }
+
+    /* ── Error ── */
+    .error-msg {
+      margin:0; font-size:12px; color:#FF5C5C;
+      background:rgba(255,92,92,0.06);
+      border:1px solid rgba(255,92,92,0.15);
+      border-radius:10px; padding:9px 13px;
+      display:flex; align-items:center; gap:7px;
+      font-family:'JetBrains Mono',monospace;
+    }
+    .error-msg[hidden] { display:none; }
+    .error-msg::before { content:'⚠'; flex-shrink:0; font-size:13px; }
+
+    /* ── Button ── */
+    .btn {
+      font-family:'Space Grotesk',sans-serif;
+      font-weight:600; font-size:13px; letter-spacing:0.04em;
+      text-transform:uppercase; border:none; border-radius:10px;
+      cursor:pointer;
+      animation: field-up 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.28s both;
+    }
+    .btn-primary {
+      display:flex; align-items:center; justify-content:center; gap:8px;
+      padding:13px 20px; margin-top:2px;
+      background:#3DDC97; color:#06231A;
+      position:relative; overflow:hidden;
+      transition: transform 0.15s ease, box-shadow 0.2s ease;
+      box-shadow: 0 4px 20px -8px rgba(61,220,151,0.3);
+    }
+    .btn-primary:hover:not(:disabled) {
+      transform:translateY(-1px);
+      box-shadow: 0 8px 30px -10px rgba(61,220,151,0.5);
+    }
+    .btn-primary:active:not(:disabled) { transform:translateY(0) scale(0.98); }
+    .btn-primary:disabled { opacity:0.5; cursor:not-allowed; box-shadow:none; }
+    .btn-shine {
+      position:absolute; inset:0;
+      background:linear-gradient(90deg,transparent,rgba(6,35,26,0.15),transparent);
+      transform:translateX(-100%);
+      pointer-events:none;
+    }
+    .btn-primary[data-loading="true"] .btn-shine { animation: shine 1.2s ease-in-out infinite; }
+    @keyframes shine { to { transform:translateX(100%); } }
+
+    .spinner {
+      width:15px; height:15px;
+      border:2px solid rgba(6,35,26,0.25);
+      border-top-color:#06231A;
+      border-radius:50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink:0;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+  </style>
 </head>
-<body class="login-page">
+<body>
+  <div class="bg-scene" aria-hidden="true"></div>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="orbs" aria-hidden="true"><div class="orb"></div><div class="orb"></div><div class="orb"></div></div>
+  <div class="bg-grain" aria-hidden="true"></div>
 
-  <div class="scene" aria-hidden="true"></div>
-  <div class="grain" aria-hidden="true"></div>
-
-  <div class="feed-backdrop" aria-hidden="true">
-    <div class="feed-col" style="left:4%;animation-duration:38s">
+  <div class="chat-scroll" aria-hidden="true">
+    <div class="chat-col">
       <span><b>twitch/canal_x</b> &gt; gg ese combo fue increible</span>
       <span><b>discord/comunidad</b> &gt; alguien tiene el link del vod?</span>
       <span><b>youtube/live</b> &gt; primer stream del año vamos</span>
-      <span><b>twitch/canal_x</b> &gt; jaja se le cayo la conexion</span>
-      <span><b>kick/canal_y</b> &gt; subiendo el hype 🔥</span>
-      <span><b>discord/comunidad</b> &gt; bienvenido nuevo mod</span>
-      <span><b>twitch/canal_x</b> &gt; gg ese combo fue increible</span>
-      <span><b>discord/comunidad</b> &gt; alguien tiene el link del vod?</span>
-      <span><b>youtube/live</b> &gt; primer stream del año vamos</span>
-      <span><b>twitch/canal_x</b> &gt; jaja se le cayo la conexion</span>
       <span><b>kick/canal_y</b> &gt; subiendo el hype 🔥</span>
       <span><b>discord/comunidad</b> &gt; bienvenido nuevo mod</span>
     </div>
-    <div class="feed-col" style="left:30%;animation-duration:46s;animation-direction:reverse">
-      <span><b>youtube/live</b> &gt; el audio se desincronizo un poco</span>
+    <div class="chat-col">
+      <span><b>youtube/live</b> &gt; el audio se desincronizo</span>
       <span><b>twitch/canal_x</b> &gt; raid entrante de 200 viewers</span>
       <span><b>kick/canal_y</b> &gt; nuevo record de subs</span>
-      <span><b>discord/comunidad</b> &gt; evento este finde confirmado</span>
-      <span><b>twitch/canal_x</b> &gt; clip guardado al highlight</span>
-      <span><b>youtube/live</b> &gt; el audio se desincronizo un poco</span>
-      <span><b>twitch/canal_x</b> &gt; raid entrante de 200 viewers</span>
-      <span><b>kick/canal_y</b> &gt; nuevo record de subs</span>
-      <span><b>discord/comunidad</b> &gt; evento este finde confirmado</span>
+      <span><b>discord/comunidad</b> &gt; evento este finde</span>
       <span><b>twitch/canal_x</b> &gt; clip guardado al highlight</span>
     </div>
-    <div class="feed-col" style="left:62%;animation-duration:41s">
-      <span><b>kick/canal_y</b> &gt; mensaje sincronizado correctamente</span>
+    <div class="chat-col">
+      <span><b>kick/canal_y</b> &gt; puente activo entre 3</span>
       <span><b>twitch/canal_x</b> &gt; bot conectado sin errores</span>
       <span><b>discord/comunidad</b> &gt; webhook funcionando ok</span>
       <span><b>youtube/live</b> &gt; latencia baja, todo fluido</span>
-      <span><b>kick/canal_y</b> &gt; puente activo entre 3 canales</span>
-      <span><b>kick/canal_y</b> &gt; mensaje sincronizado correctamente</span>
-      <span><b>twitch/canal_x</b> &gt; bot conectado sin errores</span>
-      <span><b>discord/comunidad</b> &gt; webhook funcionando ok</span>
-      <span><b>youtube/live</b> &gt; latencia baja, todo fluido</span>
-      <span><b>kick/canal_y</b> &gt; puente activo entre 3 canales</span>
+      <span><b>kick/canal_y</b> &gt; mensaje sincronizado ok</span>
     </div>
-    <div class="feed-col" style="left:86%;animation-duration:50s;animation-direction:reverse">
-      <span><b>discord/comunidad</b> &gt; gracias por el directo de hoy</span>
+    <div class="chat-col">
+      <span><b>discord/comunidad</b> &gt; gracias por el directo</span>
       <span><b>twitch/canal_x</b> &gt; mañana mismo horario?</span>
       <span><b>youtube/live</b> &gt; suscrito desde el celu</span>
       <span><b>kick/canal_y</b> &gt; el bridge anda perfecto</span>
-      <span><b>discord/comunidad</b> &gt; gracias por el directo de hoy</span>
-      <span><b>twitch/canal_x</b> &gt; mañana mismo horario?</span>
-      <span><b>youtube/live</b> &gt; suscrito desde el celu</span>
-      <span><b>kick/canal_y</b> &gt; el bridge anda perfecto</span>
+      <span><b>discord/comunidad</b> &gt; buena calidad de stream</span>
     </div>
   </div>
 
   <div class="login-card">
     <header class="login-header">
-      <div class="logo-mark">
-        <svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="26" cy="26" r="25" stroke="#2A9D6F" stroke-width="1.2" opacity="0.4"/>
-          <circle cx="14" cy="26" r="5.5" fill="#11151B" stroke="#3DDC97" stroke-width="2"/>
-          <circle cx="38" cy="26" r="5.5" fill="#11151B" stroke="#3DDC97" stroke-width="2"/>
-          <path class="logo-pulse" d="M19.5 26H32.5" stroke="#3DDC97" stroke-width="2" stroke-linecap="round"/>
-          <circle class="logo-pulse" cx="26" cy="26" r="2" fill="#6FF0B8"/>
+      <div class="face">
+        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="32" cy="36" r="22" stroke="#3DDC97" stroke-width="1.5" fill="#11151B"/>
+          <g class="face-eyes">
+            <circle cx="24" cy="32" r="3" fill="#3DDC97"/>
+            <circle cx="40" cy="32" r="3" fill="#3DDC97"/>
+          </g>
+          <path d="M26 43c0 0 3 4 6 4s6-4 6-4" stroke="#3DDC97" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="49" cy="22" r="6" fill="#3DDC97" opacity="0.08"/>
+          <circle cx="50" cy="21" r="1.5" fill="#3DDC97" opacity="0.2"/>
         </svg>
       </div>
       <h1>StreamChat Bridge</h1>
       <p class="subtitle">Panel de Administración</p>
-      <span class="status-pill"><span class="status-dot" aria-hidden="true"></span>Puente activo</span>
+      <span class="status-pill"><span class="status-pulse"></span>Puente activo</span>
     </header>
+
     <form id="login-form" novalidate autocomplete="off">
-      <div class="field">
+      <div class="field-group">
         <label for="username">Usuario</label>
-        <div class="field-wrap"><input id="username" type="text" placeholder="usuario" autocomplete="off" spellcheck="false" /></div>
+        <div class="input-wrap"><input id="username" type="text" placeholder="usuario" autocomplete="off" spellcheck="false" /></div>
       </div>
-      <div class="field">
+      <div class="field-group">
         <label for="password">Contraseña</label>
-        <div class="field-wrap"><input id="password" type="password" placeholder="••••••••" autocomplete="new-password" /></div>
+        <div class="input-wrap"><input id="password" type="password" placeholder="••••••••" autocomplete="new-password" /></div>
       </div>
       <p id="error-msg" class="error-msg" hidden aria-live="polite"></p>
       <button id="submit-btn" type="submit" class="btn btn-primary">
+        <span class="btn-shine"></span>
         <span id="spinner" class="spinner" hidden></span>
         <span>Iniciar sesión</span>
       </button>

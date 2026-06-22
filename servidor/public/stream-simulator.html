@@ -12,7 +12,7 @@
   --green:#00b37e; --red:#ef4444; --yellow:#f59e0b; --blue:#3b82f6;
   --text:#efeff1; --text2:#adadb8; --text3:#53535f;
 }
-body { background:var(--bg); color:var(--text); font-family:'Inter',system-ui,sans-serif; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+body { background:var(--bg); color:var(--text); font-family:'Inter',system-ui,sans-serif; height:100vh; display:flex; flex-direction:column; overflow:hidden; position:relative; }
 .header { background:var(--surface); border-bottom:1px solid var(--border); padding:8px 16px; display:flex; align-items:center; gap:12px; flex-shrink:0; }
 .header h1 { font-size:14px; font-weight:700; }
 .header-right { margin-left:auto; display:flex; align-items:center; gap:8px; }
@@ -159,6 +159,11 @@ textarea.ctx::placeholder { color:var(--text3); }
 </style>
 </head>
 <body>
+
+<div class="pl-scene" aria-hidden="true"></div>
+<div class="pl-grid" aria-hidden="true"></div>
+<div class="pl-orbs" aria-hidden="true"><div class="pl-orb"></div><div class="pl-orb"></div><div class="pl-orb"></div></div>
+<div class="pl-grain" aria-hidden="true"></div>
 
 <div class="header">
   <h1>Stream Chat Simulator</h1>
@@ -719,5 +724,6 @@ function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
 
 init();
 </script>
+<script src="js/pl-mascot.js"></script>
 </body>
 </html>

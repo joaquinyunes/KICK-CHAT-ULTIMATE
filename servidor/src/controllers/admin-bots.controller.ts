@@ -81,3 +81,30 @@ export function adminUpdateBotCookies(req: Request, res: Response): void {
   audit(Number(req.user!.sub), "update_bot_cookies", "bot", String(botId), `bot=${bot.bot_name}`, req.ip ?? null);
   res.json({ success: true });
 }
+
+export function adminUpdateBot(req: Request, res: Response): void {
+  const botId = parseInt(req.params.id, 10);
+  if (isNaN(botId)) { res.status(400).json({ error: "id invalido" }); return; }
+  const bot = stmts.findBotById.get([botId]);
+  if (!bot) { res.status(404).json({ error: "Bot no encontrado" }); return; }
+
+  let { bearer } = req.body;
+  if (!bearer || typeof bearer !== "string") {
+    res.status(400).json({ error: "bearer es requerido" }); return;
+  }
+  bearer = bearer.replace(/^Bearer\s+/i, "");
+  const encrypted = encryptToHex(bearer);
+  stmts.updateBotBearer.run([encrypted, botId]);
+  audit(Number(req.user!.sub), "update_bot", "bot", String(botId), `bot=${bot.bot_name}`, req.ip ?? null);
+  res.json({ success: true, bot_name: bot.bot_name });
+}
+
+export function adminDeleteBot(req: Request, res: Response): void {
+  const botId = parseInt(req.params.id, 10);
+  if (isNaN(botId)) { res.status(400).json({ error: "id invalido" }); return; }
+  const bot = stmts.findBotById.get([botId]);
+  if (!bot) { res.status(404).json({ error: "Bot no encontrado" }); return; }
+  stmts.deleteBot.run([botId]);
+  audit(Number(req.user!.sub), "delete_bot", "bot", String(botId), `bot=${bot.bot_name}`, req.ip ?? null);
+  res.json({ success: true });
+}
