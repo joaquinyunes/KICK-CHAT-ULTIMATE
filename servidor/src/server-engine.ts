@@ -64,7 +64,7 @@ app.get("/admin/dashboard", (_req: Request, res: Response) => {
 app.get("/admin/bots", (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "..", "public", "admin", "bots.html"));
 });
-app.get("/vods.html", requirePageAuth, (_req: Request, res: Response) => {
+app.get("/vods.html", (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "..", "public", "vods.html"));
 });
 

@@ -528,6 +528,14 @@ export const stmts = {
     `UPDATE bots SET cookies = ? WHERE id = ?`
   ),
 
+  updateBotBearer: prepareStmt<{ q_bearer: string; q_id: number }, any>(
+    `UPDATE bots SET encrypted_bearer = ? WHERE id = ?`
+  ),
+
+  deleteBot: prepareStmt<{ q_id: number }, any>(
+    `DELETE FROM bots WHERE id = ?`
+  ),
+
   // ─── Triggers / Actions ────────────────────────────────────────────────────
 
   insertTrigger: prepareStmt<{ id: string; name: string; enabled: number; source: string; event: string; filters: string | null; action_ids: string; created_at: number }, any>(

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/jwt.middleware";
-import { handleChatSend, handleListMyBots, handleSendRandom, handleListPools } from "../controllers/chat.controller";
+import { handleChatSend, handleListMyBots, handleSendRandom, handleListPools, handleCreatePool, handleDeletePool } from "../controllers/chat.controller";
 import { RateLimiter } from "../middleware/rate-limiter";
 import { recordMessage } from "../telemetry";
 import type { Request, Response } from "express";
@@ -16,6 +16,8 @@ router.get("/api/client/permissions", requireAuth, (req: Request, res: Response)
 });
 
 router.get("/api/chat/pools", requireAuth, handleListPools);
+router.post("/api/chat/pools", requireAuth, handleCreatePool);
+router.delete("/api/chat/pools/:id", requireAuth, handleDeletePool);
 
 router.post("/chat/send", requireAuth, async (req: Request, res: Response) => {
   const userId = req.user?.sub;

@@ -5,50 +5,81 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SCB – Pools de Mensajes</title>
   <link rel="stylesheet" href="../css/main.css" />
+  <style>
+    .admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; width: 100%; }
+  </style>
 </head>
-<body class="chat-page">
-  <header class="app-header">
-    <span class="app-title">StreamChat Bridge · Pools</span>
-    <div class="connection-status">
-      <span id="status-badge" class="status-dot status-disconnected"></span>
-      <span id="status-label">Desconectado</span>
-      <button id="logout-btn" class="btn btn-ghost" style="margin-left:12px">Cerrar sesión</button>
-    </div>
-  </header>
+<body>
+  <div class="pl-scene" aria-hidden="true"></div>
+  <div class="pl-grid" aria-hidden="true"></div>
+  <div class="pl-orbs" aria-hidden="true"><div class="pl-orb"></div><div class="pl-orb"></div><div class="pl-orb"></div></div>
+  <div class="pl-grain" aria-hidden="true"></div>
 
-  <nav class="tab-nav">
-    <a href="/admin/dashboard" class="tab-btn">Dashboard</a>
-    <a href="/admin/bots" class="tab-btn">Bots</a>
-    <a href="/admin/clientes" class="tab-btn">Clientes</a>
-    <a href="/admin/proxies" class="tab-btn">Proxies</a>
-    <a href="/admin/pools" class="tab-btn active">Pools</a>
-  </nav>
-
-  <section class="tab-panel active">
-    <div class="admin-grid">
-      <div class="admin-card">
-        <h3 class="admin-card-title">Nuevo Pool</h3>
-        <div class="field">
-          <label for="pool-name">Nombre del Pool</label>
-          <input id="pool-name" type="text" placeholder="ej: Casino, Saludos, Deportivas" />
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="logo-mark">
+          <svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="26" cy="26" r="25" stroke="#2A9D6F" stroke-width="1.2" opacity="0.4"/>
+            <circle cx="14" cy="26" r="5.5" fill="#11151B" stroke="#3DDC97" stroke-width="2"/>
+            <circle cx="38" cy="26" r="5.5" fill="#11151B" stroke="#3DDC97" stroke-width="2"/>
+            <path d="M19.5 26H32.5" stroke="#3DDC97" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="26" cy="26" r="2" fill="#6FF0B8"/>
+          </svg>
         </div>
-        <div class="field">
-          <label for="pool-messages">Mensajes (uno por línea)</label>
-          <textarea id="pool-messages" class="bulk-textarea" rows="10" placeholder="mensaje 1&#10;mensaje 2&#10;mensaje 3"></textarea>
-        </div>
-        <button id="add-pool-btn" class="btn btn-primary">Guardar Pool</button>
-        <p id="pool-msg" class="settings-msg" hidden></p>
+        <span>StreamChat</span>
       </div>
 
-      <div class="admin-card admin-card-wide">
-        <h3 class="admin-card-title">Todos los Pools</h3>
-        <div id="pool-list">
-          <p style="opacity:0.6;font-style:italic">Cargando...</p>
+      <nav class="nav-group">
+        <div class="nav-eyebrow">General</div>
+        <a href="/admin/dashboard" class="nav-link">📊 Dashboard</a>
+        <a href="/admin/bots" class="nav-link">🤖 Bots</a>
+        <a href="/admin/clientes" class="nav-link">👥 Clientes</a>
+        <a href="/admin/proxies" class="nav-link">🌐 Proxies</a>
+        <a href="/admin/pools" class="nav-link active">📦 Pools</a>
+      </nav>
+
+      <div style="margin-top:auto;padding-top:16px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px">
+        <span class="status-pill" style="align-self:flex-start">
+          <span id="status-badge" class="status-dot"></span>
+          <span id="status-label">Verificando…</span>
+        </span>
+        <button id="logout-btn" class="btn btn-primary" style="width:100%;font-size:11px;padding:9px 12px;background:transparent;color:var(--text-secondary);border:1px solid var(--line)">Cerrar sesión</button>
+      </div>
+    </aside>
+
+    <main class="main-panel">
+      <header class="page-header">
+        <h2>Pools de Mensajes</h2>
+        <p>Agrupá mensajes para envío aleatorio</p>
+      </header>
+
+      <div class="admin-grid">
+        <div class="card pl-bounce">
+          <h3 class="admin-card-title">Nuevo Pool</h3>
+          <div class="field">
+            <label for="pool-name">Nombre del Pool</label>
+            <input id="pool-name" type="text" placeholder="ej: Casino, Saludos, Deportivas" />
+          </div>
+          <div class="field">
+            <label for="pool-messages">Mensajes (uno por línea)</label>
+            <textarea id="pool-messages" class="bulk-textarea" rows="10" placeholder="mensaje 1&#10;mensaje 2&#10;mensaje 3"></textarea>
+          </div>
+          <button id="add-pool-btn" class="btn btn-primary">Guardar Pool</button>
+          <p id="pool-msg" class="settings-msg" hidden></p>
+        </div>
+
+        <div class="card admin-card-wide pl-bounce" style="animation-delay:0.08s">
+          <h3 class="admin-card-title">Todos los Pools</h3>
+          <div id="pool-list">
+            <p style="opacity:0.6;font-style:italic">Cargando...</p>
+          </div>
         </div>
       </div>
-    </div>
-  </section>
+    </main>
+  </div>
 
+  <script src="../js/pl-mascot.js"></script>
   <script type="module" src="../js/admin-pools.js"></script>
 </body>
 </html>

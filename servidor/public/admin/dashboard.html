@@ -10,14 +10,14 @@
     .dash-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
     .dash-num { font-size: 28px; font-weight: 700; font-family: var(--font-mono); line-height: 1.2; }
     .dash-label { font-size: 11px; color: var(--text-secondary); margin-top: 4px; text-transform: uppercase; letter-spacing: .5px; }
-    .dash-card { animation: field-in 0.5s cubic-bezier(0.16,1,0.3,1) both; }
-    .dash-card:nth-child(1) { animation-delay:0.04s; }
-    .dash-card:nth-child(2) { animation-delay:0.08s; }
-    .dash-card:nth-child(3) { animation-delay:0.12s; }
-    .dash-card:nth-child(4) { animation-delay:0.16s; }
-    .dash-card:nth-child(5) { animation-delay:0.20s; }
-    .dash-card:nth-child(6) { animation-delay:0.24s; }
-    .dash-card:nth-child(7) { animation-delay:0.28s; }
+    .dash-card { animation: pl-bounce-in 0.45s cubic-bezier(0.34,1.56,0.64,1) both; }
+    .dash-card:nth-child(1) { animation-delay:0.03s; }
+    .dash-card:nth-child(2) { animation-delay:0.06s; }
+    .dash-card:nth-child(3) { animation-delay:0.09s; }
+    .dash-card:nth-child(4) { animation-delay:0.12s; }
+    .dash-card:nth-child(5) { animation-delay:0.15s; }
+    .dash-card:nth-child(6) { animation-delay:0.18s; }
+    .dash-card:nth-child(7) { animation-delay:0.21s; }
     .dash-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
     .dash-section { min-height: 200px; }
     @media (max-width: 720px) { .dash-grid { grid-template-columns: 1fr; } }
@@ -25,8 +25,10 @@
   </style>
 </head>
 <body>
-  <div class="scene" aria-hidden="true"></div>
-  <div class="grain" aria-hidden="true"></div>
+  <div class="pl-scene" aria-hidden="true"></div>
+  <div class="pl-grid" aria-hidden="true"></div>
+  <div class="pl-orbs" aria-hidden="true"><div class="pl-orb"></div><div class="pl-orb"></div><div class="pl-orb"></div></div>
+  <div class="pl-grain" aria-hidden="true"></div>
 
   <div class="app-shell">
     <aside class="sidebar">
@@ -97,6 +99,7 @@
     </main>
   </div>
 
+  <script src="../js/pl-mascot.js"></script>
   <script type="module" src="../js/admin-dashboard.js"></script>
 </body>
 </html>
