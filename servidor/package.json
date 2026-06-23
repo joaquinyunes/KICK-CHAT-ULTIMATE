@@ -5,7 +5,7 @@
   "main": "dist/server-engine.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server-engine.ts",
-    "build": "tsc",
+    "build": "tsc && copy /Y vod_viewer_worker.py dist\\vod_viewer_worker.py",
     "start": "node dist/server-engine.js",
     "encrypt-bearers": "ts-node scripts/encrypt-bearers.ts",
     "add-bot": "ts-node scripts/add-bot.ts",

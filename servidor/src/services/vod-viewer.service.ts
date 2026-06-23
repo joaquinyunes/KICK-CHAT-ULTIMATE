@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from "child_process";
 import path from "path";
-import { stmts, type ClientVodRow } from "../models/database";
-import { getRandomActiveProxy } from "./proxy-manager.service";
+import fs from "fs";
+import { stmts } from "../models/database";
 
 interface ViewerInstance {
   process: ChildProcess;
@@ -15,47 +15,72 @@ interface ViewerInstance {
 
 const viewers = new Map<number, ViewerInstance>();
 
-function getDbPath(): string {
-  return path.resolve(process.cwd(), "data", "streamchat.db");
+let stdoutBuffer = "";
+
+function logDebug(msg: string) {
+  try {
+    const logPath = path.resolve(process.cwd(), "data", "viewer_debug.log");
+    fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${msg}\n`);
+  } catch {}
 }
 
 function parseLine(instance: ViewerInstance, line: string): void {
   try {
     const data = JSON.parse(line);
+    logDebug(`stdout: ${line}`);
     switch (data.type) {
       case "start":
         instance.status = "running";
         break;
       case "view_ok":
         instance.viewsGenerated = data.total ?? instance.viewsGenerated + 1;
+        try {
+          stmts.insertViewLog.run([instance.userId, data.vod_id ?? null, null, 1, null]);
+          if (data.vod_id) {
+            stmts.incrementVodViews.run({ id: data.vod_id });
+          }
+        } catch (dbErr) {
+          console.error("[vod-viewer] DB error:", dbErr);
+          logDebug(`DB error on view_ok: ${dbErr}`);
+        }
         break;
       case "view_fail":
         instance.viewsFailed = data.failed ?? instance.viewsFailed + 1;
+        try {
+          stmts.insertViewLog.run([instance.userId, data.vod_id ?? null, null, 0, data.error ?? null]);
+        } catch (dbErr) {
+          console.error("[vod-viewer] DB error:", dbErr);
+          logDebug(`DB error on view_fail: ${dbErr}`);
+        }
         break;
       case "paused":
-        // hourly limit reached, normal
         break;
       case "warn":
         console.warn("[vod-viewer]", data.message);
         break;
       case "error":
         console.error("[vod-viewer]", data.message);
+        logDebug(`Worker error: ${data.message}`);
         instance.status = "error";
         break;
       case "stopped":
         instance.status = "stopped";
         break;
     }
-  } catch { /* ignore malformed lines */ }
+  } catch (e) {
+    logDebug(`parseLine error for line "${line}": ${e}`);
+  }
 }
 
 export function startViewer(userId: number): { success: boolean; error?: string } {
+  logDebug(`startViewer called for userId=${userId}`);
+
   if (viewers.has(userId)) {
     const existing = viewers.get(userId)!;
+    logDebug(`existing instance found: status=${existing.status}`);
     if (existing.status === "running") {
       return { success: false, error: "Ya hay un visor corriendo para este usuario" };
     }
-    // Clean up stopped/error instances
     if (existing.process && existing.process.exitCode === null) {
       existing.process.kill("SIGTERM");
     }
@@ -70,11 +95,31 @@ export function startViewer(userId: number): { success: boolean; error?: string 
   const vods = stmts.listActiveClientVods.all([userId]);
   if (vods.length === 0) return { success: false, error: "El cliente no tiene VODs activos" };
 
-  const dbPath = getDbPath();
-  const scriptPath = path.join(__dirname, "..", "vod_viewer_worker.py");
-  const config = JSON.stringify({ user_id: userId, hourly_limit: hourlyLimit, db_path: dbPath });
+  const recentViews = stmts.getViewStats.all([userId])[0] || { total_views: 0, successful: 0, last_hour: 0 };
 
-  const child = spawn("python", [scriptPath], {
+  const vodsData = vods.map(v => ({ id: v.id, url: v.url, type: v.type }));
+  const scriptPath = path.resolve(process.cwd(), "vod_viewer_worker.py");
+  const config = JSON.stringify({
+    user_id: userId,
+    hourly_limit: hourlyLimit,
+    vods: vodsData,
+    hourly_views: (recentViews.last_hour ?? 0),
+  });
+
+  logDebug(`scriptPath=${scriptPath} config=${config}`);
+
+  // Check if script exists
+  if (!fs.existsSync(scriptPath)) {
+    logDebug(`Script NOT FOUND at ${scriptPath}`);
+    return { success: false, error: `Script no encontrado: ${scriptPath}` };
+  }
+
+  // Check python
+  const pythonCmd = "python";
+  logDebug(`Spawning: ${pythonCmd} ${scriptPath}`);
+
+  stdoutBuffer = "";
+  const child = spawn(pythonCmd, [scriptPath], {
     stdio: ["pipe", "pipe", "pipe"],
   });
 
@@ -89,31 +134,43 @@ export function startViewer(userId: number): { success: boolean; error?: string 
   };
 
   child.stdout!.on("data", (data: Buffer) => {
-    const lines = data.toString().split("\n").filter(Boolean);
+    stdoutBuffer += data.toString();
+    const lines = stdoutBuffer.split("\n");
+    stdoutBuffer = lines.pop() || "";
     for (const line of lines) {
-      parseLine(instance, line);
+      if (line) parseLine(instance, line);
     }
   });
 
   child.stderr!.on("data", (data: Buffer) => {
-    console.error("[vod-viewer:stderr]", data.toString());
+    const msg = data.toString();
+    console.error("[vod-viewer:stderr]", msg);
+    logDebug(`stderr: ${msg}`);
   });
 
-  child.on("exit", (code) => {
-    instance.status = "stopped";
-    console.log(`[vod-viewer] Proceso terminado para user ${userId}, código ${code}`);
+  child.on("exit", (code, signal) => {
+    instance.status = code === 0 ? "stopped" : "error";
+    const msg = `Proceso terminado user=${userId} code=${code} signal=${signal}`;
+    logDebug(msg);
+    if (code !== 0) {
+      console.error(`[vod-viewer] ${msg}`);
+    } else {
+      console.log(`[vod-viewer] ${msg}`);
+    }
   });
 
   child.on("error", (err) => {
     instance.status = "error";
-    console.error("[vod-viewer] Error al iniciar proceso:", err.message);
+    const msg = `Error al iniciar proceso: ${err.message}`;
+    console.error("[vod-viewer]", msg);
+    logDebug(msg);
   });
 
-  // Send config via stdin
   child.stdin!.write(config + "\n");
   child.stdin!.end();
 
   viewers.set(userId, instance);
+  logDebug(`Viewer started for userId=${userId}`);
   return { success: true };
 }
 
@@ -124,7 +181,6 @@ export function stopViewer(userId: number): { success: boolean; error?: string }
   }
   if (instance.process && instance.process.exitCode === null) {
     instance.process.kill("SIGTERM");
-    // Force kill after 5 seconds
     setTimeout(() => {
       if (instance.process && instance.process.exitCode === null) {
         instance.process.kill("SIGKILL");
