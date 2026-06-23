@@ -138,18 +138,7 @@
         <li class="empty-state">Sin archivos cargados.</li>
       </ul>
     </div>
-    <div class="files-section" id="pools-section" style="display:none">
-      <div class="files-header">
-        <span class="files-title">Pools (mensajes aleatorios)</span>
-        <button id="pool-toggle-form" class="btn btn-secondary btn-sm">+ Nuevo</button>
-      </div>
-      <div id="pool-create-form" style="display:none;background:var(--surface2,#13161c);border:1px solid var(--border,#2a2d35);border-radius:6px;padding:10px;margin-bottom:8px">
-        <input id="pool-create-name" type="text" placeholder="Nombre del pool" style="width:100%;margin-bottom:6px;font-size:12px" />
-        <textarea id="pool-create-msgs" rows="4" placeholder="Un mensaje por línea" style="width:100%;font-size:12px;resize:vertical;background:var(--surface2,#1a1d25);border:1px solid var(--border,#2a2d35);border-radius:4px;color:var(--text);padding:6px 8px;font-family:inherit"></textarea>
-        <button id="pool-create-btn" class="btn btn-primary" style="margin-top:6px;font-size:11px;padding:6px 12px">Guardar Pool</button>
-      </div>
-      <div id="pool-buttons" class="pool-buttons"></div>
-    </div>
+
     <div class="progress-track">
       <div id="progress-bar" class="progress-bar" style="width:0%"></div>
     </div>
@@ -166,6 +155,7 @@
         <button id="send-once-btn" class="btn btn-ghost" disabled>Enviar siguiente</button>
         <button id="start-btn"     class="btn btn-primary" disabled>▶ Iniciar</button>
         <button id="stop-btn"      class="btn btn-danger"  disabled>■ Detener</button>
+        <button id="reset-btn"     class="btn btn-ghost"   style="display:none">↻ Reiniciar</button>
       </div>
     </footer>
   </section>

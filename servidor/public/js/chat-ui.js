@@ -213,15 +213,13 @@ async function sendCurrentMessage() {
   isSendingBlock = true;
   const statusEl = document.getElementById('send-status');
 
-  // advance past already-sent blocks
-  while (file.currentBlock < file.blocks.length && file.blocks[file.currentBlock].sent) {
-    file.currentBlock++;
-  }
-  if (file.currentBlock >= file.blocks.length) {
+  // pick a random unsent block
+  const unsentIndices = file.blocks.map((b, i) => b.sent ? -1 : i).filter(i => i >= 0);
+  if (unsentIndices.length === 0) {
     isSendingBlock = false;
     return;
   }
-
+  file.currentBlock = unsentIndices[Math.floor(Math.random() * unsentIndices.length)];
   const block = file.blocks[file.currentBlock];
 
   for (let i = 0; i < block.messages.length; i++) {
@@ -254,7 +252,7 @@ async function sendCurrentMessage() {
   renderMessageList();
 
   if (allBlocksSent(file)) {
-    if (statusEl) statusEl.textContent = '✓ Todos los bloques enviados.';
+    if (statusEl) statusEl.textContent = '✓ Todos los bloques enviados. — ↻ Reiniciar para reenviar';
     isSendingBlock = false;
     stopAutoSend();
     return;
@@ -312,12 +310,28 @@ function updateButtonStates() {
   const start = document.getElementById('start-btn');
   const stop = document.getElementById('stop-btn');
   const sendOnce = document.getElementById('send-once-btn');
+  const resetBtn = document.getElementById('reset-btn');
   const file = currentFileIndex >= 0 && currentFileIndex < files.length ? files[currentFileIndex] : null;
   const hasPendingBlocks = file && file.blocks && !allBlocksSent(file);
+  const allDone = file && file.blocks && allBlocksSent(file);
   const running = autoMode;
   if (start) start.disabled = running || !hasPendingBlocks;
   if (stop) stop.disabled = !running;
   if (sendOnce) sendOnce.disabled = running || !hasPendingBlocks;
+  if (resetBtn) resetBtn.style.display = allDone && !running ? '' : 'none';
+}
+
+function resetFile() {
+  if (!confirm('¿Reiniciar todos los bloques para volver a enviarlos?')) return;
+  const file = currentFileIndex >= 0 && currentFileIndex < files.length ? files[currentFileIndex] : null;
+  if (!file || !file.blocks) return;
+  for (const b of file.blocks) b.sent = false;
+  file.currentBlock = 0;
+  saveFiles();
+  renderMessageList();
+  updateButtonStates();
+  const statusEl = document.getElementById('send-status');
+  if (statusEl) statusEl.textContent = 'Bloques reiniciados.';
 }
 
 function loadSettings() {
@@ -384,18 +398,12 @@ export async function initChatUI() {
   startPingLoop();
   loadBotsInfo();
   renderNavLinks();
-  loadPools();
-
   document.getElementById('load-file-btn')?.addEventListener('click', handleLoadFile);
   document.getElementById('start-btn')?.addEventListener('click', startAutoSend);
   document.getElementById('stop-btn')?.addEventListener('click', stopAutoSend);
   document.getElementById('send-once-btn')?.addEventListener('click', sendCurrentMessage);
   document.getElementById('save-settings-btn')?.addEventListener('click', handleSaveSettings);
-  document.getElementById('pool-toggle-form')?.addEventListener('click', () => {
-    const f = document.getElementById('pool-create-form');
-    if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
-  });
-  document.getElementById('pool-create-btn')?.addEventListener('click', createPool);
+  document.getElementById('reset-btn')?.addEventListener('click', resetFile);
 
   loadSettings();
   loadSavedFiles();
@@ -405,82 +413,7 @@ export async function initChatUI() {
   updateButtonStates();
 }
 
-async function loadPools() {
-  const section = document.getElementById('pools-section');
-  const container = document.getElementById('pool-buttons');
-  if (!section || !container) return;
-  try {
-    const res = await fetch(getServerUrl() + '/api/chat/pools', { headers: getAuthHeaders() });
-    const data = await res.json();
-    if (!data.success) { section.style.display = 'none'; return; }
-    const pools = data.pools || [];
-    if (pools.length === 0) { section.style.display = 'none'; return; }
-    section.style.display = 'block';
-    container.innerHTML = pools.map(p =>
-      `<div style="display:flex;gap:4px;align-items:stretch">
-        <button class="pool-btn" data-pool-id="${p.id}" data-pool-name="${esc(p.name)}">${esc(p.name)} (${p.messages.length})</button>
-        <button class="pool-btn pool-del" data-pool-id="${p.id}" title="Eliminar pool" style="color:var(--alert);font-size:11px;padding:4px 6px">✕</button>
-      </div>`
-    ).join('');
-    container.querySelectorAll('.pool-btn:not(.pool-del)').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const channel = channelName || document.getElementById('cfg-channel')?.value?.trim();
-        if (!channel) { alert('Configurá el canal en Ajustes primero.'); return; }
-        const poolId = parseInt(btn.dataset.poolId, 10);
-        btn.classList.add('send');
-        btn.textContent = 'Enviando...';
-        try {
-          const r = await fetch(getServerUrl() + '/api/chat/send-random', {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify({ channel, pool_id: poolId })
-          });
-          const d = await r.json();
-          btn.textContent = d.success ? '✓ Enviado' : '✗ ' + (d.message || 'Error');
-          setTimeout(() => { btn.classList.remove('send'); loadPools(); }, 2000);
-        } catch {
-          btn.textContent = 'Error';
-          setTimeout(() => { btn.classList.remove('send'); loadPools(); }, 2000);
-        }
-      });
-    });
-    container.querySelectorAll('.pool-del').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        if (!confirm('Eliminar este pool?')) return;
-        const poolId = parseInt(btn.dataset.poolId, 10);
-        try {
-          await fetch(getServerUrl() + '/api/chat/pools/' + poolId, { method: 'DELETE', headers: getAuthHeaders() });
-          loadPools();
-        } catch {}
-      });
-    });
-  } catch { section.style.display = 'none'; }
-}
 
-async function createPool() {
-  const nameInput = document.getElementById('pool-create-name');
-  const msgsInput = document.getElementById('pool-create-msgs');
-  if (!nameInput || !msgsInput) return;
-  const name = nameInput.value.trim();
-  if (!name) { alert('Escribí un nombre para el pool.'); return; }
-  const lines = msgsInput.value.split('\n').filter(l => l.trim());
-  if (lines.length === 0) { alert('Agregá al menos un mensaje.'); return; }
-  try {
-    const res = await fetch(getServerUrl() + '/api/chat/pools', {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ name, messages: lines })
-    });
-    const data = await res.json();
-    if (data.success) {
-      nameInput.value = '';
-      msgsInput.value = '';
-      loadPools();
-    } else {
-      alert(data.error || 'Error al crear pool');
-    }
-  } catch { alert('Error de conexión'); }
-}
 
 window.addGeneratedMessages = function (msgs, name) {
   const msgLines = msgs.map(m => `${m.user}: ${m.message}`);
