@@ -1,4 +1,4 @@
-import { execSync } from "child_process";
+import { spawnSync } from "child_process";
 import path from "path";
 import { logger } from "../utils/logger";
 
@@ -16,7 +16,7 @@ const PYTHON_CANDIDATES = [
 function findPython(): string {
   for (const exe of PYTHON_CANDIDATES) {
     try {
-      execSync('"' + exe + '" -c "import requests"', { timeout: 3000, encoding: "utf-8" });
+      spawnSync(exe, ["-c", "import requests"], { timeout: 3000, encoding: "utf-8" });
       return exe;
     } catch {}
   }
@@ -33,18 +33,18 @@ export interface PlaywrightSendResult {
 export function sendViaPlaywright(channel: string, message: string, cookies: any[], bearer?: string): PlaywrightSendResult {
   try {
     const cookiesB64 = Buffer.from(JSON.stringify(cookies)).toString("base64");
-    const channelEsc = channel.replace(/"/g, '\\"');
-    const msgEsc = message.replace(/"/g, '\\"');
-    const bearerEsc = bearer ? bearer.replace(/"/g, '\\"') : "";
-    const cmd = `"${PYTHON}" "${SCRIPT}" "${channelEsc}" "${msgEsc}" "${cookiesB64}" "${bearerEsc}"`;
-    const out = execSync(cmd, { timeout: 20000, encoding: "utf-8" }).trim();
-    const result = JSON.parse(out);
-    if (result.status === 200) {
+    const args = [SCRIPT, channel, message, cookiesB64, bearer || ""];
+    const result = spawnSync(PYTHON, args, { timeout: 20000, encoding: "utf-8" });
+    if (result.error) throw result.error;
+    const out = result.stdout?.trim() || "";
+    if (!out) throw new Error("No output from script");
+    const parsed = JSON.parse(out);
+    if (parsed.status === 200) {
       logger.info(TAG, "Mensaje enviado por cookies", channel);
       return { success: true };
     }
-    logger.warn(TAG, "Cookies fallo", "status=" + result.status, "body=" + (result.body || "").substring(0, 200));
-    return { success: false, reason: result.body || "Error desconocido" };
+    logger.warn(TAG, "Cookies fallo", "status=" + parsed.status, "body=" + (parsed.body || "").substring(0, 200));
+    return { success: false, reason: parsed.body || "Error desconocido" };
   } catch (err: any) {
     logger.error(TAG, "Excepcion en cookies sender", err.message);
     return { success: false, reason: "Error enviando por cookies: " + err.message };
