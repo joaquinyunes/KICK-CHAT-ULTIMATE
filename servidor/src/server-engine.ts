@@ -28,7 +28,7 @@ import { requirePageAuth } from "./middleware/auth-page.middleware";
 const app = express();
 
 app.use(cors({
-  origin: process.env.NODE_ENV === "production" ? [env.KICK_API_URL].filter(Boolean) : "*",
+  origin: process.env.NODE_ENV === "production" ? (process.env.APP_URL || false) : "*",
   credentials: true,
 }));
 app.use(helmet({

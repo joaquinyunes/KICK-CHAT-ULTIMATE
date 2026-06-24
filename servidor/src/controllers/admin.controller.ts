@@ -68,7 +68,7 @@ export function adminCreateUser(req: Request, res: Response): void {
 }
 
 export function adminListUsers(_req: Request, res: Response): void {
-  const users = stmts.listAllUsers.all();
+  const users = stmts.listAllUsers.all().map(({ password_hash, ...u }) => u);
   res.json({ success: true, users });
 }
 
