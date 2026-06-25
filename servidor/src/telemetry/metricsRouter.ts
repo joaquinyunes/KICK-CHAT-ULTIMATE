@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "crypto";
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { getSnapshot, pruneInactiveSessions, store } from "./store";
+import { logger } from "../utils/logger";
 
 const router = Router();
 
@@ -8,7 +9,7 @@ function requireAdminSecret(req: Request, res: Response, next: NextFunction): vo
   const secret = process.env.ADMIN_SECRET;
 
   if (!secret) {
-    console.error("[telemetry] ADMIN_SECRET env var is not set — metrics endpoint is locked.");
+    logger.error("telemetry", "ADMIN_SECRET env var is not set — metrics endpoint is locked.");
     res.status(503).json({ error: "Metrics endpoint is not configured (ADMIN_SECRET missing)." });
     return;
   }

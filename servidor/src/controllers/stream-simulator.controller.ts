@@ -3,6 +3,7 @@ import { env } from "../config/env";
 import { getDb } from "../models/database";
 import path from "path";
 import fs from "fs";
+import { logger } from "../utils/logger";
 
 const OR_MODEL = "openai/gpt-oss-20b:free";
 const OR_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -400,7 +401,7 @@ export async function generateChat(req: Request, res: Response): Promise<void> {
     // Get cached news
     const cachedNews = getCachedNews();
     if (cachedNews) {
-      console.log(`[simulator] Using ${cachedNews.length} cached news items`);
+      logger.info("simulator", `Using ${cachedNews.length} cached news items`);
     }
 
     // Get user memories
@@ -451,7 +452,7 @@ export async function generateChat(req: Request, res: Response): Promise<void> {
 
     if (allMessages.length === 0) {
       const preview = rawText.substring(0, 500);
-      console.error("[simulator] Parse error, raw:", preview);
+      logger.error("simulator", `Parse error, raw: ${preview}`);
       res.status(502).json({ error: "Error al parsear respuesta", raw: preview });
       return;
     }
@@ -493,7 +494,7 @@ export async function generateChat(req: Request, res: Response): Promise<void> {
     });
 
   } catch (err: any) {
-    console.error("[simulator] Error:", err);
+    logger.error("simulator", `Error: ${err}`);
     res.status(500).json({ error: "Error interno del simulador" });
   }
 }
@@ -587,7 +588,7 @@ Máximo 8 items en total, mezcla los 3 tipos. Priorizá Argentina y Latinoaméri
     res.json({ noticias: parsed, cache: false });
 
   } catch (err: any) {
-    console.error("[simulator] News error:", err);
+    logger.error("simulator", `News error: ${err}`);
     res.status(500).json({ error: "Error interno del simulador" });
   }
 }

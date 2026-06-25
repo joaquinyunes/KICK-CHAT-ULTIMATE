@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { recordRequest } from "./store";
+import { logger } from "../utils/logger";
 
 const LEVEL = {
   info: "\x1b[36mINFO \x1b[0m",
@@ -66,7 +67,7 @@ function requestLogger(req: Request, res: Response, next: NextFunction): void {
     };
 
     recordRequest(entry);
-    console.log(formatLog(entry));
+    logger.info("http", formatLog(entry));
   });
 
   next();

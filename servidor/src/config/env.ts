@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import path from "path";
+import { logger } from "../utils/logger";
 const envPath = path.resolve(__dirname, "../../.env");
 dotenv.config({ path: envPath });
 
@@ -26,7 +27,7 @@ function requireVar(label: string, value: string | undefined, minLen: number): s
 
 function optionalVar(label: string, value: string | undefined): string {
   if (!value) {
-    console.warn(`[env] ⚠ ${label} no definida`);
+    logger.warn("env", `${label} no definida`);
   }
   return value || "";
 }

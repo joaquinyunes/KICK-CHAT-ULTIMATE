@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from "child_process";
 import path from "path";
 import fs from "fs";
 import { stmts } from "../models/database";
+import { logger } from "../utils/logger";
 
 interface ViewerInstance {
   process: ChildProcess;
@@ -11,6 +12,7 @@ interface ViewerInstance {
   viewsFailed: number;
   startedAt: number;
   hourlyLimit: number;
+  currentVisit: { vodId: number; vodUrl: string; startedAt: number } | null;
 }
 
 const viewers = new Map<number, ViewerInstance>();
@@ -31,6 +33,7 @@ function parseLine(instance: ViewerInstance, line: string): void {
     switch (data.type) {
       case "start":
         instance.status = "running";
+        instance.currentVisit = null;
         break;
       case "view_ok":
         instance.viewsGenerated = data.total ?? instance.viewsGenerated + 1;
@@ -40,7 +43,7 @@ function parseLine(instance: ViewerInstance, line: string): void {
             stmts.incrementVodViews.run({ id: data.vod_id });
           }
         } catch (dbErr) {
-          console.error("[vod-viewer] DB error:", dbErr);
+          logger.error("vod-viewer", `DB error: ${dbErr}`);
           logDebug(`DB error on view_ok: ${dbErr}`);
         }
         break;
@@ -49,22 +52,26 @@ function parseLine(instance: ViewerInstance, line: string): void {
         try {
           stmts.insertViewLog.run([instance.userId, data.vod_id ?? null, null, 0, data.error ?? null]);
         } catch (dbErr) {
-          console.error("[vod-viewer] DB error:", dbErr);
+          logger.error("vod-viewer", `DB error: ${dbErr}`);
           logDebug(`DB error on view_fail: ${dbErr}`);
         }
+        break;
+      case "navigating":
+        instance.currentVisit = { vodId: data.vod_id, vodUrl: data.url ?? "", startedAt: Math.floor(Date.now() / 1000) };
         break;
       case "paused":
         break;
       case "warn":
-        console.warn("[vod-viewer]", data.message);
+        logger.warn("vod-viewer", data.message);
         break;
       case "error":
-        console.error("[vod-viewer]", data.message);
+        logger.error("vod-viewer", data.message);
         logDebug(`Worker error: ${data.message}`);
         instance.status = "error";
         break;
       case "stopped":
         instance.status = "stopped";
+        instance.currentVisit = null;
         break;
     }
   } catch (e) {
@@ -131,6 +138,7 @@ export function startViewer(userId: number): { success: boolean; error?: string 
     viewsFailed: 0,
     startedAt: Math.floor(Date.now() / 1000),
     hourlyLimit,
+    currentVisit: null,
   };
 
   child.stdout!.on("data", (data: Buffer) => {
@@ -144,7 +152,7 @@ export function startViewer(userId: number): { success: boolean; error?: string 
 
   child.stderr!.on("data", (data: Buffer) => {
     const msg = data.toString();
-    console.error("[vod-viewer:stderr]", msg);
+    logger.error("vod-viewer:stderr", msg);
     logDebug(`stderr: ${msg}`);
   });
 
@@ -153,16 +161,16 @@ export function startViewer(userId: number): { success: boolean; error?: string 
     const msg = `Proceso terminado user=${userId} code=${code} signal=${signal}`;
     logDebug(msg);
     if (code !== 0) {
-      console.error(`[vod-viewer] ${msg}`);
+      logger.error("vod-viewer", msg);
     } else {
-      console.log(`[vod-viewer] ${msg}`);
+      logger.info("vod-viewer", msg);
     }
   });
 
   child.on("error", (err) => {
     instance.status = "error";
     const msg = `Error al iniciar proceso: ${err.message}`;
-    console.error("[vod-viewer]", msg);
+    logger.error("vod-viewer", msg);
     logDebug(msg);
   });
 
@@ -198,10 +206,11 @@ export function getViewerStatus(userId: number): {
   viewsFailed: number;
   startedAt: number | null;
   hourlyLimit: number;
+  currentVisit: { vodId: number; vodUrl: string; startedAt: number } | null;
 } {
   const instance = viewers.get(userId);
   if (!instance) {
-    return { running: false, status: "stopped", viewsGenerated: 0, viewsFailed: 0, startedAt: null, hourlyLimit: 50 };
+    return { running: false, status: "stopped", viewsGenerated: 0, viewsFailed: 0, startedAt: null, hourlyLimit: 50, currentVisit: null };
   }
   return {
     running: instance.status === "running",
@@ -210,6 +219,7 @@ export function getViewerStatus(userId: number): {
     viewsFailed: instance.viewsFailed,
     startedAt: instance.startedAt,
     hourlyLimit: instance.hourlyLimit,
+    currentVisit: instance.currentVisit,
   };
 }
 
