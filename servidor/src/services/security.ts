@@ -1,3 +1,5 @@
+import { logger } from "../utils/logger";
+
 // services/security.ts - Cifrado AES-256-GCM y lectura de bearers.enc
 /**
  * services/security.ts
@@ -120,7 +122,7 @@ export function loadBearers(): string[] {
   }
 
   _bearersCache = bearers as string[];
-  console.log(`✅  ${_bearersCache.length} bearer(s) cargado(s) en memoria`);
+  logger.info("security", `${_bearersCache.length} bearer(s) cargado(s) en memoria`);
   return _bearersCache;
 }
 

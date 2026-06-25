@@ -9,6 +9,7 @@ import initSqlJs, { type Database as SqlJsDatabase } from "sql.js";
 import path from "path";
 import fs from "fs";
 import bcrypt from "bcryptjs";
+import { logger } from "../utils/logger";
 
 const DB_PATH = path.resolve(process.cwd(), "data", "streamchat.db");
 
@@ -54,7 +55,7 @@ async function initDb(): Promise<SqlJsDatabase> {
   if (adminExists.length === 0) {
     const adminHash = bcrypt.hashSync("admin123", 12);
     db.run("INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'admin')", ["admin", adminHash]);
-    console.log("[DB] Usuario admin creado (admin / admin123) — CAMBIA LA CONTRASEÑA");
+    logger.warn("DB", "Usuario admin creado (admin / admin123) — CAMBIA LA CONTRASEÑA");
   }
 
   db.run(`
@@ -288,7 +289,7 @@ function saveDb(): void {
       const data = db.export();
       fs.writeFileSync(DB_PATH, Buffer.from(data));
     } catch (err) {
-      console.error("[DB] Error al guardar:", err);
+      logger.error("DB", `Error al guardar: ${err}`);
     }
   }, 200);
 }

@@ -81,6 +81,16 @@ async function loadVods() {
   }
 }
 
+function formatUptime(seconds) {
+  if (!seconds || seconds < 0) return '—';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
 async function loadViewerStats() {
   try {
     const res = await fetch(getServerUrl() + '/api/client/vods/stats', { headers: getAuthHeaders() });
@@ -90,12 +100,28 @@ async function loadViewerStats() {
     const s = data.stats;
     const limit = data.hourly_limit || 50;
 
-    document.getElementById('stat-status').textContent = v.running ? 'Corriendo' : 'Detenido';
-    document.getElementById('stat-status').style.color = v.running ? 'var(--success,#27ae60)' : 'var(--text-muted)';
+    const running = v.running;
+    document.getElementById('stat-status').textContent = running ? 'Corriendo' : 'Detenido';
+    document.getElementById('stat-status').style.color = running ? 'var(--success,#27ae60)' : 'var(--text-muted)';
     document.getElementById('stat-views-gen').textContent = v.viewsGenerated || 0;
     document.getElementById('stat-views-fail').textContent = v.viewsFailed || 0;
     document.getElementById('stat-hourly').textContent = (s.last_hour || 0) + ' / ' + limit;
     document.getElementById('stat-total').textContent = s.total_views || 0;
+
+    const uptime = running && v.startedAt ? Math.floor(Date.now() / 1000 - v.startedAt) : null;
+    document.getElementById('stat-uptime').textContent = formatUptime(uptime);
+
+    const visitEl = document.getElementById('stat-current-visit');
+    if (running && v.currentVisit) {
+      const elapsed = Math.floor(Date.now() / 1000 - v.currentVisit.startedAt);
+      const remaining = Math.max(0, 60 - elapsed);
+      const url = v.currentVisit.vodUrl || '(VOD #' + v.currentVisit.vodId + ')';
+      visitEl.textContent = `${url} — ${elapsed}s (próxima en ~${remaining}s)`;
+    } else if (running) {
+      visitEl.textContent = 'Esperando...';
+    } else {
+      visitEl.textContent = '—';
+    }
 
     const pct = limit > 0 ? Math.min(100, ((s.last_hour || 0) / limit) * 100) : 0;
     const bar = document.getElementById('hourly-progress');
@@ -105,8 +131,8 @@ async function loadViewerStats() {
       fill.style.width = pct + '%';
     }
 
-    document.getElementById('btn-start-viewer').style.display = v.running ? 'none' : '';
-    document.getElementById('btn-stop-viewer').style.display = v.running ? '' : 'none';
+    document.getElementById('btn-start-viewer').style.display = running ? 'none' : '';
+    document.getElementById('btn-stop-viewer').style.display = running ? '' : 'none';
   } catch {}
 }
 
@@ -181,7 +207,7 @@ async function init() {
 
   await loadVods();
   await loadViewerStats();
-  viewerInterval = setInterval(loadViewerStats, 5000);
+  viewerInterval = setInterval(loadViewerStats, 1000);
 }
 
 init();

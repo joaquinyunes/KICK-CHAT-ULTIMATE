@@ -16,6 +16,7 @@ import bcrypt from "bcryptjs";
 import jwt, { type JwtPayload } from "jsonwebtoken";
 import { env } from "../config/env";
 import { stmts, type UserRow } from "../models/database";
+import { logger } from "../utils/logger";
 
 // ─── Tipos públicos ────────────────────────────────────────────────────────────
 
@@ -57,7 +58,7 @@ export async function registerUser(
   const result = stmts.insertUser.run([username, password_hash]);
   const newId  = result.lastInsertRowid as number;
 
-  console.log(`[auth-manager] Usuario registrado → id=${newId} username=${username}`);
+  logger.info("auth-manager", `Usuario registrado → id=${newId} username=${username}`);
   return { id: newId, username };
 }
 
@@ -110,9 +111,7 @@ export async function loginUser(
   // Log del login exitoso
   stmts.insertLog.run([user.id, "login", ipAddress ?? null, JSON.stringify({ expiresAt })]);
 
-  console.log(
-    `[auth-manager] Login exitoso → username=${username} exp=${new Date(expiresAt * 1000).toISOString()}`
-  );
+  logger.info("auth-manager", `Login exitoso → username=${username} exp=${new Date(expiresAt * 1000).toISOString()}`);
 
   return { token, expiresAt };
 }
