@@ -13,11 +13,11 @@ interface ViewerInstance {
   startedAt: number;
   hourlyLimit: number;
   currentVisit: { vodId: number; vodUrl: string; startedAt: number } | null;
+  stdoutBuffer: string;
+  killTimeout?: ReturnType<typeof setTimeout>;
 }
 
 const viewers = new Map<number, ViewerInstance>();
-
-let stdoutBuffer = "";
 
 function logDebug(msg: string) {
   try {
@@ -125,7 +125,6 @@ export function startViewer(userId: number): { success: boolean; error?: string 
   const pythonCmd = "python";
   logDebug(`Spawning: ${pythonCmd} ${scriptPath}`);
 
-  stdoutBuffer = "";
   const child = spawn(pythonCmd, [scriptPath], {
     stdio: ["pipe", "pipe", "pipe"],
   });
@@ -139,12 +138,13 @@ export function startViewer(userId: number): { success: boolean; error?: string 
     startedAt: Math.floor(Date.now() / 1000),
     hourlyLimit,
     currentVisit: null,
+    stdoutBuffer: "",
   };
 
   child.stdout!.on("data", (data: Buffer) => {
-    stdoutBuffer += data.toString();
-    const lines = stdoutBuffer.split("\n");
-    stdoutBuffer = lines.pop() || "";
+    instance.stdoutBuffer += data.toString();
+    const lines = instance.stdoutBuffer.split("\n");
+    instance.stdoutBuffer = lines.pop() || "";
     for (const line of lines) {
       if (line) parseLine(instance, line);
     }
@@ -187,9 +187,10 @@ export function stopViewer(userId: number): { success: boolean; error?: string }
   if (!instance) {
     return { success: false, error: "No hay visor activo para este usuario" };
   }
+  if (instance.killTimeout) clearTimeout(instance.killTimeout);
   if (instance.process && instance.process.exitCode === null) {
     instance.process.kill("SIGTERM");
-    setTimeout(() => {
+    instance.killTimeout = setTimeout(() => {
       if (instance.process && instance.process.exitCode === null) {
         instance.process.kill("SIGKILL");
       }

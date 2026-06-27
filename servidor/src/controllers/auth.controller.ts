@@ -8,6 +8,7 @@ const COOKIE_OPTS = {
   sameSite: "lax" as const,
   path: "/",
   maxAge: 24 * 60 * 60 * 1000,
+  secure: process.env.NODE_ENV === "production",
 };
 
 export async function handleRegister(req: Request, res: Response) {

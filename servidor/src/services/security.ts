@@ -129,10 +129,6 @@ export function loadBearers(): string[] {
 /**
  * Invalida el cache de bearers (útil para hot-reload en desarrollo).
  */
-export function invalidateBearersCache(): void {
-  _bearersCache = null;
-}
-
 /**
  * Retorna un Bearer aleatorio de la lista en cache.
  * Llama a loadBearers() si el cache está vacío.

@@ -26,7 +26,13 @@ export function showMsg(elId, msg, type) {
   const el = document.getElementById(elId);
   if (!el) return;
   el.textContent = msg; el.dataset.type = type; el.hidden = false;
-  setTimeout(() => { el.hidden = true; }, 4000);
+  el.style.animation = 'none';
+  el.offsetHeight;
+  el.style.animation = 'toast-in 0.25s ease';
+  setTimeout(() => {
+    el.style.animation = 'toast-out 0.25s ease forwards';
+    setTimeout(() => { el.hidden = true; el.style.animation = ''; }, 250);
+  }, 3500);
 }
 
 export async function handleLogout() {

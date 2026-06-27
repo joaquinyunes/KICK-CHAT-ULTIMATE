@@ -264,16 +264,6 @@ async function initDb(): Promise<SqlJsDatabase> {
     )
   `);
 
-  // ─── Message Pools table ──────────────────────────────────────
-  db.run(`
-    CREATE TABLE IF NOT EXISTS message_pools (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      name        TEXT    NOT NULL UNIQUE,
-      messages    TEXT    NOT NULL,
-      created_at  INTEGER NOT NULL DEFAULT (unixepoch())
-    )
-  `);
-
   saveDb();
   return db;
 }
@@ -652,20 +642,6 @@ export const stmts = {
        SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful,
        SUM(CASE WHEN created_at > (unixepoch() - 3600) THEN 1 ELSE 0 END) as last_hour
      FROM view_log WHERE user_id = ?`
-  ),
-
-  // ─── Message Pools ─────────────────────────────────────────────────────────
-  insertPool: prepareStmt<{ name: string; messages: string }, any>(
-    `INSERT INTO message_pools (name, messages) VALUES (?, ?)`
-  ),
-  listPools: prepareStmt<never, { id: number; name: string; messages: string; created_at: number }>(
-    `SELECT * FROM message_pools ORDER BY name ASC`
-  ),
-  findPoolById: prepareStmt<[number], { id: number; name: string; messages: string; created_at: number }>(
-    `SELECT * FROM message_pools WHERE id = ? LIMIT 1`
-  ),
-  deletePool: prepareStmt<[number], any>(
-    `DELETE FROM message_pools WHERE id = ?`
   ),
 
   // ─── Permissions ───────────────────────────────────────────────────────────
