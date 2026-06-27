@@ -1,10 +1,7 @@
 import type { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { stmts } from "../models/database";
-
-function audit(adminId: number, action: string, targetType: string | null, targetId: string | null, details: string | null, ip: string | null): void {
-  try { stmts.insertAuditLog.run([adminId, action, targetType, targetId, details, ip]); } catch {}
-}
+import { audit } from "../utils/audit";
 
 export function adminCreateUser(req: Request, res: Response): void {
   const { username, password, link_url, expires_at, permissions, hourly_view_limit } = req.body;

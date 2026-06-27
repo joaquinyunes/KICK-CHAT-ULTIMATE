@@ -4,6 +4,8 @@ import { stmts } from "../models/database";
 import path from "path";
 import { logger } from "../utils/logger";
 import { sendViaPlaywright } from "./playwright-sender.service";
+import { findPython } from "../utils/python";
+import { mapKickError } from "../utils/kick";
 
 const TAG = "proxy-controller";
 
@@ -23,25 +25,7 @@ export interface ProxyResult {
 
 const SCRIPT = path.resolve(process.cwd(), "send_to_kick.py");
 
-const PYTHON_CANDIDATES = [
-  process.env.PYTHON_PATH,
-  "C:\\Users\\joaqii\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
-  "python",
-  "python3",
-  "py",
-].filter(Boolean) as string[];
-
-function findPython(): string {
-  for (const exe of PYTHON_CANDIDATES) {
-    try {
-      execSync('"' + exe + '" -c "import tls_client"', { timeout: 3000, encoding: "utf-8" });
-      return exe;
-    } catch {}
-  }
-  return "python";
-}
-
-const PYTHON = findPython();
+const PYTHON = findPython("tls_client");
 
 function pyExec(...args: string[]): { status: number; body: string } {
   const cmd = '"' + PYTHON + '" "' + SCRIPT + '"';
@@ -131,15 +115,4 @@ export async function sendToKick(req: ProxyRequest): Promise<ProxyResult> {
   return { success: false, reason: "Intenté con: " + triedBots.join(", ") + " — " + lastError, sentAt };
 }
 
-function mapKickError(status: number, body?: string): string {
-  let msg = "";
-  if (body) {
-    try { const j = JSON.parse(body); msg = j.message || j.error || j.status?.message || ""; } catch { msg = body.substring(0, 100); }
-  }
-  if (status === 429) return msg || "Demasiadas peticiones. Espera un momento.";
-  if (status === 422) return msg || "El mensaje fue rechazado por Kick.";
-  if (status >= 500) return msg || "El servicio de chat no esta disponible.";
-  if (status === 403) return msg || "No tienes permiso para enviar mensajes en este canal.";
-  if (status === 404) return msg || "El canal especificado no existe.";
-  return msg || "No se pudo enviar el mensaje.";
-}
+

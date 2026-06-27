@@ -90,10 +90,6 @@
 #panel-chat, #panel-settings { display:none; }
 #panel-chat.active, #panel-settings.active { display:flex; flex-direction:column; }
 #panel-chat.active { flex:1; overflow:hidden; }
-.pool-buttons { display:flex; gap:4px; flex-wrap:wrap; padding:4px 0; }
-.pool-btn { background:var(--surface2,#1a1d25); border:1px solid var(--border,#2a2d35); color:var(--text-muted); padding:4px 10px; border-radius:4px; font-size:10px; cursor:pointer; font-family:inherit; transition:all .15s; }
-.pool-btn:hover { border-color:var(--accent,#6d5afc); color:var(--accent); }
-.pool-btn.send { background:var(--accent); color:#fff; border-color:var(--accent); }
 .block-divider { padding:2px 10px; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; background:var(--surface2,#13161c); border-top:1px solid var(--border,#2a2d35); border-bottom:1px solid var(--border,#2a2d35); color:var(--text-muted); display:flex; align-items:center; gap:4px; position:sticky; top:0; z-index:1; }
 .block-done { color:var(--success,#00b37e); }
 .block-current { color:var(--accent,#6d5afc); }
@@ -387,7 +383,6 @@
     document.getElementById("simNewsBox").innerHTML='<span style="color:var(--text-muted)">Buscando...</span>';
     try {
       const headers={'Content-Type':'application/json'};
-      if(key) headers['x-openrouter-key']=key;
       const r=await fetch('/api/chat/news',{method:'POST',headers});
       const d=await r.json();
       if(d.noticias&&d.noticias.length>0){simNews=d.noticias;document.getElementById("simNewsBox").innerHTML=d.noticias.map(n=>`<div class="n-item"><span class="n-badge ${n.tipo}">${n.tipo}</span>${n.texto}</div>`).join("")}
@@ -409,7 +404,6 @@
     mostrarTyping(cant>100);
     try {
       const headers={'Content-Type':'application/json'};
-      if(key) headers['x-openrouter-key']=key;
       const r=await fetch('/api/chat/generate',{method:'POST',headers,body:JSON.stringify({stream_context:simAuto?'auto':ctx,categoria_stream:simCat,cantidad:cant,energia_chat:simEnergy,temperature:temp})});
       const d=await r.json();
       ocultarTyping();

@@ -22,7 +22,6 @@ import adminProxiesRoutes from "./routes/admin-proxies.routes";
 import clientVodsRoutes from "./routes/client-vods.routes";
 import simulatorRoutes from "./routes/simulator.routes";
 import actionsRoutes from "./routes/actions.routes";
-import adminPoolsRoutes from "./routes/admin-pools.routes";
 import { requirePageAuth } from "./middleware/auth-page.middleware";
 
 const app = express();
@@ -74,10 +73,6 @@ app.get("/admin/clientes", (_req: Request, res: Response) => {
 app.get("/admin/proxies", (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "..", "public", "admin", "proxies.html"));
 });
-app.get("/admin/pools", (_req: Request, res: Response) => {
-  res.sendFile(path.join(__dirname, "..", "public", "admin", "pools.html"));
-});
-
 // ─── Telemetry ───────────────────────────────────────────────────
 app.use(requestLogger);
 
@@ -96,7 +91,6 @@ app.use(adminProxiesRoutes);
 app.use(clientVodsRoutes);
 app.use(simulatorRoutes);
 app.use(actionsRoutes);
-app.use(adminPoolsRoutes);
 
 // ─── Metrics ─────────────────────────────────────────────────────
 app.use(metricsRouter);
@@ -115,14 +109,35 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 
 // ─── Process handlers ────────────────────────────────────────────
 process.on("unhandledRejection", (reason: any) => { logger.error(TAG, "Unhandled Rejection", reason); });
-process.on("uncaughtException", (err) => { logger.error(TAG, "Uncaught Exception", err.message, err.stack); });
+process.on("uncaughtException", (err) => { logger.error(TAG, "Uncaught Exception", err.message, err.stack); process.exit(1); });
+
+let server: ReturnType<typeof app.listen> | null = null;
+
+function gracefulShutdown(signal: string): void {
+  logger.info(TAG, `Recibido ${signal} — cerrando servidor...`);
+  if (server) {
+    server.close(() => {
+      logger.info(TAG, "Servidor HTTP cerrado");
+      process.exit(0);
+    });
+    setTimeout(() => {
+      logger.error(TAG, "Fallo shutdown graceful — forzando salida");
+      process.exit(1);
+    }, 10000);
+  } else {
+    process.exit(0);
+  }
+}
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 async function bootstrap(): Promise<void> {
   logger.info(TAG, "Inicializando base de datos...");
   await initDatabase();
   logger.info(TAG, "Verificando bearers...");
   try { loadBearers(); } catch { logger.warn(TAG, "Sin bearers.enc — solo bots OAuth disponibles"); }
-  app.listen(env.PORT, () => {
+  server = app.listen(env.PORT, () => {
     logger.info(TAG, "StreamChat Bridge en puerto " + env.PORT);
   });
 }

@@ -1,29 +1,12 @@
 import { spawnSync } from "child_process";
 import path from "path";
 import { logger } from "../utils/logger";
+import { findPython } from "../utils/python";
 
 const TAG = "playwright-sender";
 const SCRIPT = path.resolve(process.cwd(), "send_to_kick_playwright.py");
 
-const PYTHON_CANDIDATES = [
-  process.env.PYTHON_PATH,
-  "C:\\Users\\joaqii\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
-  "python",
-  "python3",
-  "py",
-].filter(Boolean) as string[];
-
-function findPython(): string {
-  for (const exe of PYTHON_CANDIDATES) {
-    try {
-      spawnSync(exe, ["-c", "import requests"], { timeout: 3000, encoding: "utf-8" });
-      return exe;
-    } catch {}
-  }
-  return "python";
-}
-
-const PYTHON = findPython();
+const PYTHON = findPython("requests");
 
 export interface PlaywrightSendResult {
   success: boolean;

@@ -208,6 +208,13 @@ async function init() {
   await loadVods();
   await loadViewerStats();
   viewerInterval = setInterval(loadViewerStats, 1000);
+  // Refresh VOD list every 5s while viewer runs for live view counts
+  setInterval(() => {
+    const statusEl = document.getElementById('stat-status');
+    if (statusEl && statusEl.textContent === 'Corriendo') {
+      loadVods();
+    }
+  }, 5000);
 }
 
 init();

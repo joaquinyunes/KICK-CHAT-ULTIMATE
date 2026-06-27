@@ -380,7 +380,7 @@ export async function generateChat(req: Request, res: Response): Promise<void> {
 
     const cantidadMsgs = Math.min(cantidad || 20, 600);
     const sessionId = session_id || `stream_${Date.now()}`;
-    const orKey = req.headers["x-openrouter-key"] as string || env.OPENROUTER_API_KEY;
+    const orKey = env.OPENROUTER_API_KEY;
     if (!orKey) { res.status(500).json({ error: "OpenRouter API key requerida" }); return; }
 
     const energiaRaw = (typeof energia_chat === "string") ? energia_chat : (temperature !== undefined ? "custom" : "normal");
@@ -522,7 +522,7 @@ export async function getHistory(req: Request, res: Response): Promise<void> {
 // ============================================================
 export async function fetchNews(req: Request, res: Response): Promise<void> {
   try {
-    const orKey = req.headers["x-openrouter-key"] as string || env.OPENROUTER_API_KEY;
+    const orKey = env.OPENROUTER_API_KEY;
     if (!orKey) { res.status(500).json({ error: "OpenRouter API key requerida" }); return; }
 
     // Check cache: if we fetched news in the last 5 minutes, return cached

@@ -6,7 +6,7 @@ import { handleOAuthLogin, handleOAuthStart, handleOAuthCallback } from "../cont
 const router = Router();
 
 router.get("/auth/kick/login", requireAuth, requireAdmin, handleOAuthLogin);
-router.post("/auth/kick/start", requireAuth, handleOAuthStart);
+router.post("/auth/kick/start", requireAuth, requireAdmin, handleOAuthStart);
 router.get("/auth/kick/callback", handleOAuthCallback);
 
 export default router;
