@@ -1,5 +1,6 @@
 import { onStatusChange, ping, sendMessage, fetchMyBots } from './bridge-client.js';
 import { getServerUrl, getAuthHeaders } from './admin-common.js';
+import { renderNav, renderAuthHeader, startStatusLoop } from './client-nav.js';
 
 function esc(str) { if (str == null) return ''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
@@ -12,6 +13,7 @@ let chatroomId = '';
 let autoMode = false;
 let autoTimeoutId = null;
 let isSendingBlock = false;
+let statsTimerId = null;
 
 function parseToBlocks(text) {
   const raw = text.split(/\n\s*\n/);
@@ -21,50 +23,6 @@ function parseToBlocks(text) {
     if (lines.length > 0) blocks.push({ messages: lines, sent: false });
   }
   return blocks;
-}
-
-function initTabs() {
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById(`panel-${btn.dataset.tab}`)?.classList.add('active');
-    });
-  });
-}
-
-function updateStatusUI(status) {
-  const badge = document.getElementById('status-badge');
-  const label = document.getElementById('status-label');
-  if (!badge || !label) return;
-  badge.className = `status-dot status-${status}`;
-  label.textContent = status === 'connected' ? 'Conectado' : status === 'checking' ? 'Verificando…' : 'Desconectado';
-}
-
-async function renderNavLinks() {
-  const container = document.getElementById('nav-links');
-  if (!container) return;
-  try {
-    const res = await fetch(getServerUrl() + '/api/client/permissions', { headers: getAuthHeaders() });
-    const data = await res.json();
-    if (!data.success) return;
-    const perms = data.permissions || [];
-    const links = [];
-    if (perms.includes('vods')) links.push('<a href="/vods.html" style="color:var(--text-muted);text-decoration:none;padding:2px 6px;border-radius:3px">🎬 VODs</a>');
-    container.innerHTML = links.join('');
-  } catch {}
-}
-
-function startPingLoop() { ping(); setInterval(() => ping(), 15000); }
-
-async function loadBotsInfo() {
-  const el = document.getElementById('bots-info');
-  if (!el) return;
-  const bots = await fetchMyBots();
-  el.textContent = bots.length === 0
-    ? 'No tenés bots asignados. Contactá al administrador.'
-    : `${bots.length} bot(es) asignado(s) — se usan automáticamente`;
 }
 
 function getBlockCount(file) {
@@ -81,23 +39,27 @@ function allBlocksSent(file) {
 }
 
 function renderFileList() {
-  const list = document.getElementById('file-list');
-  if (!list) return;
+  const grid = document.getElementById('file-grid');
+  if (!grid) return;
   if (files.length === 0) {
-    list.innerHTML = '<li class="empty-state">Sin archivos cargados.</li>';
+    grid.innerHTML = '<div class="empty-state full">Sin archivos cargados. Agregá tus .txt.</div>';
     document.getElementById('active-file-name').textContent = 'Ningún archivo seleccionado';
     document.getElementById('msg-count').textContent = '';
     return;
   }
-  list.innerHTML = files.map((f, i) => {
+  grid.innerHTML = files.map((f, i) => {
     const total = getBlockCount(f);
     const done = getTotalSentBlocks(f);
-    return `<li class="file-item${i === currentFileIndex ? ' file-active' : ''}" data-index="${i}">
-      <span class="file-name">${esc(f.name)}</span>
-      <span class="file-count">${done}/${total} bloques</span>
-    </li>`;
+    const allDone = total > 0 && done === total;
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    return `<div class="file-card${i === currentFileIndex ? ' file-active' : ''}${allDone ? ' done' : ''}" data-index="${i}">
+      <span class="fc-check">${allDone ? '✓' : ''}</span>
+      <span class="fc-name">${esc(f.name)}</span>
+      <div class="fc-prog"><div class="fc-bar" style="width:${pct}%"></div></div>
+      <span class="fc-meta">${done}/${total} bloques</span>
+    </div>`;
   }).join('');
-  list.querySelectorAll('.file-item').forEach(el => {
+  grid.querySelectorAll('.file-card').forEach(el => {
     el.addEventListener('click', () => {
       currentFileIndex = parseInt(el.dataset.index, 10);
       renderFileList();
@@ -113,7 +75,7 @@ function renderMessageList() {
   const countEl = document.getElementById('msg-count');
   if (!list) return;
   if (currentFileIndex < 0 || currentFileIndex >= files.length) {
-    list.innerHTML = '<li class="empty-state">Seleccioná un archivo de la lista.</li>';
+    list.innerHTML = '<li class="empty-state">Seleccioná un archivo de la grilla.</li>';
     if (nameEl) nameEl.textContent = 'Ningún archivo seleccionado';
     if (countEl) countEl.textContent = '';
     return;
@@ -159,11 +121,9 @@ function loadSavedFiles() {
     const saved = localStorage.getItem('scb_files');
     if (saved) {
       const parsed = JSON.parse(saved);
-      // migrate old format (flat messages) to blocks
       for (const f of parsed) {
-        if (!f.blocks && f.messages) {
-          f.blocks = [{ messages: f.messages, sent: false }];
-          delete f.messages;
+        if (!f.blocks) {
+          f.blocks = [{ messages: [f.name || ''], sent: false }];
         }
       }
       files = parsed;
@@ -213,7 +173,6 @@ async function sendCurrentMessage() {
   isSendingBlock = true;
   const statusEl = document.getElementById('send-status');
 
-  // pick a random unsent block
   const unsentIndices = file.blocks.map((b, i) => b.sent ? -1 : i).filter(i => i >= 0);
   if (unsentIndices.length === 0) {
     isSendingBlock = false;
@@ -232,13 +191,16 @@ async function sendCurrentMessage() {
     if (res.ok) {
       if (statusEl) statusEl.textContent = `✓ Bloque ${file.currentBlock + 1}: "${msg.substring(0, 30)}…"`;
       renderMessageList();
+      refreshStats();
     } else {
-      if (statusEl) statusEl.textContent = `Error: ${res.message || res.error}`;
-      if (res.status !== 401) {
+      if (res.status === 401) {
+        if (statusEl) statusEl.textContent = `Error de sesión: ${res.message || res.error}`;
         isSendingBlock = false;
         stopAutoSend();
         return;
       }
+      if (statusEl) statusEl.textContent = `Error, sigo: ${res.message || res.error}`;
+      renderMessageList();
     }
 
     if (i < block.messages.length - 1) {
@@ -249,7 +211,9 @@ async function sendCurrentMessage() {
   block.sent = true;
   file.currentBlock++;
   saveFiles();
+  renderFileList();
   renderMessageList();
+  refreshStats();
 
   if (allBlocksSent(file)) {
     if (statusEl) statusEl.textContent = '✓ Todos los bloques enviados. — ↻ Reiniciar para reenviar';
@@ -277,7 +241,7 @@ function startAutoSend() {
   const file = files[currentFileIndex];
   if (!file || !file.blocks || file.blocks.length === 0) { alert('El archivo no tiene bloques.'); return; }
   if (allBlocksSent(file)) { alert('Todos los bloques ya fueron enviados.'); return; }
-  if (!channelName) { alert('Configurá el canal en Ajustes.'); switchTab('settings'); return; }
+  if (!channelName && !chatroomId) { alert('Configurá el canal en Ajustes (nombre del canal o Chatroom ID).'); return; }
   autoMode = true;
   updateButtonStates();
   sendCurrentMessage().then(() => {
@@ -328,49 +292,67 @@ function resetFile() {
   for (const b of file.blocks) b.sent = false;
   file.currentBlock = 0;
   saveFiles();
+  renderFileList();
   renderMessageList();
   updateButtonStates();
   const statusEl = document.getElementById('send-status');
   if (statusEl) statusEl.textContent = 'Bloques reiniciados.';
 }
 
+function normalizeChannel(input) {
+  if (!input) return '';
+  let s = String(input).trim();
+  try {
+    const u = new URL(s);
+    s = u.pathname;
+  } catch {}
+  s = s.replace(/^https?:\/\/(www\.)?kick\.com\//i, '');
+  s = s.split('?')[0].split('#')[0].replace(/^\/+|\/+$/g, '');
+  return s;
+}
+
 function loadSettings() {
   const saved = JSON.parse(localStorage.getItem('scb_settings') || '{}');
-  if (saved.channelName) { document.getElementById('cfg-channel').value = saved.channelName; channelName = saved.channelName; }
-  if (saved.intervalMin) { document.getElementById('cfg-interval-min').value = saved.intervalMin; intervalMin = saved.intervalMin; }
-  if (saved.intervalMax) { document.getElementById('cfg-interval-max').value = saved.intervalMax; intervalMax = saved.intervalMax; }
-  if (saved.chatroomId) { document.getElementById('cfg-chatroom-id').value = saved.chatroomId; chatroomId = saved.chatroomId; }
+  if (saved.channelName) {
+    const slug = normalizeChannel(saved.channelName);
+    channelName = slug;
+  }
+  if (saved.intervalMin) intervalMin = saved.intervalMin;
+  if (saved.intervalMax) intervalMax = saved.intervalMax;
+  if (saved.chatroomId) chatroomId = saved.chatroomId;
+  localStorage.setItem('scb_settings', JSON.stringify({
+    channelName, intervalMin, intervalMax, chatroomId,
+  }));
 }
 
-function handleSaveSettings() {
-  const channel = document.getElementById('cfg-channel')?.value.trim() || '';
-  const min = parseInt(document.getElementById('cfg-interval-min')?.value || '3', 10);
-  const max = parseInt(document.getElementById('cfg-interval-max')?.value || '8', 10);
-  const roomId = document.getElementById('cfg-chatroom-id')?.value.trim() || '';
-  if (!channel) { showSettingsMsg('Ingresá el nombre del canal.', 'error'); return; }
-  if (min < 1 || max < 1) { showSettingsMsg('Los intervalos mínimos son 1 seg.', 'error'); return; }
-  localStorage.setItem('scb_settings', JSON.stringify({ channelName: channel, intervalMin: min, intervalMax: max, chatroomId: roomId }));
-  channelName = channel;
-  intervalMin = min;
-  intervalMax = max;
-  chatroomId = roomId;
-  showSettingsMsg('Configuración guardada.', 'success');
-  ping();
+// ─── Stats de bots ───
+async function refreshStats() {
+  const container = document.getElementById('bots-stats');
+  if (!container) return;
+  try {
+    const url = getServerUrl();
+    const res = await fetch(url + '/api/chat/send-stats', { headers: getAuthHeaders() });
+    const data = await res.json();
+    if (!data.success) { container.innerHTML = '<div class="empty-state full">Sin datos.</div>'; return; }
+    if (!data.bots || data.bots.length === 0) {
+      container.innerHTML = '<div class="empty-state full">Aún no se enviaron mensajes.</div>';
+      return;
+    }
+    container.innerHTML = data.bots.map(b => `
+      <div class="bot-stat ${b.count > 0 ? 'top' : ''}">
+        <span class="bs-count">${b.count || 0}</span>
+        <span class="bs-name" title="${esc(b.botId)}">${esc(b.botId)}</span>
+      </div>`).join('');
+  } catch {}
 }
 
-function showSettingsMsg(msg, type) {
-  const el = document.getElementById('settings-msg');
-  if (!el) return;
-  el.textContent = msg; el.dataset.type = type; el.hidden = false;
-  setTimeout(() => { el.hidden = true; }, 3000);
-}
-
-function switchTab(name) {
-  document.querySelector(`[data-tab="${name}"]`)?.click();
+function resetStats() {
+  try {
+    fetch(getServerUrl() + '/api/chat/send-stats/reset', { method: 'POST', headers: getAuthHeaders() }).then(refreshStats);
+  } catch {}
 }
 
 export async function initChatUI() {
-  initTabs();
 
   const token = sessionStorage.getItem('scb_jwt') || localStorage.getItem('scb_jwt');
   const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
@@ -394,16 +376,15 @@ export async function initChatUI() {
     return;
   }
 
-  onStatusChange(updateStatusUI);
-  startPingLoop();
-  loadBotsInfo();
-  renderNavLinks();
+  renderAuthHeader('chat');
+  renderNav('chat');
+  startStatusLoop();
   document.getElementById('load-file-btn')?.addEventListener('click', handleLoadFile);
   document.getElementById('start-btn')?.addEventListener('click', startAutoSend);
   document.getElementById('stop-btn')?.addEventListener('click', stopAutoSend);
   document.getElementById('send-once-btn')?.addEventListener('click', sendCurrentMessage);
-  document.getElementById('save-settings-btn')?.addEventListener('click', handleSaveSettings);
   document.getElementById('reset-btn')?.addEventListener('click', resetFile);
+  document.getElementById('reset-stats-btn')?.addEventListener('click', resetStats);
 
   loadSettings();
   loadSavedFiles();
@@ -411,9 +392,13 @@ export async function initChatUI() {
   renderFileList();
   renderMessageList();
   updateButtonStates();
+  refreshStats();
+  statsTimerId = setInterval(refreshStats, 2500);
 }
 
-
+window.addEventListener('beforeunload', () => {
+  if (statsTimerId) clearInterval(statsTimerId);
+});
 
 window.addGeneratedMessages = function (msgs, name) {
   const msgLines = msgs.map(m => `${m.user}: ${m.message}`);

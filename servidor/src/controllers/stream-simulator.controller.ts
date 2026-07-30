@@ -4,9 +4,23 @@ import { getDb } from "../models/database";
 import path from "path";
 import fs from "fs";
 import { logger } from "../utils/logger";
+import { sendWithBearer, resolveChatroomId, getSentCounters, resetSendCounters, getRealUsername } from "../services/bearer-sender.service";
+import { getRandomBearer, decryptFromHex } from "../services/security";
+import { stmts } from "../models/database";
 
 const OR_MODEL = "openai/gpt-oss-20b:free";
 const OR_URL = "https://openrouter.ai/api/v1/chat/completions";
+
+let userApiKey: string | null = null;
+
+export function setUserApiKey(key: string): void {
+  if (key && typeof key === "string") userApiKey = key.trim();
+}
+
+function getOrKey(): string {
+  if (userApiKey) return userApiKey;
+  return env.OPENROUTER_API_KEY;
+}
 
 const ENERGY_CONFIGS: Record<string, { temp: number; desc: string; capsBoost: string }> = {
   tranquilo:  { temp: 0.55, desc: "tranquilo, más conversación, menos spam, más preguntas", capsBoost: "bajo" },
@@ -363,6 +377,157 @@ function getCachedNews(): string[] | null {
 }
 
 // ============================================================
+// Generador LOCAL (sin API) — siempre disponible
+// ============================================================
+const LOCAL_USERS = [
+  "eduardohn", "darkings", "seba09", "camiworld", "nico_surl", "juanpaxd",
+  "mateBOLUDO", "ltv_", "franelz", "agusBear", "mari_prod", "elTocafondos",
+  "canalTTV", "ximoVZLA", "rocky_cl", "pedro91", "lauraPRO", "vickyStream",
+  "Dukiboo", "soyTomi", "generver", "caropk", "elFacaR", "alemix",
+];
+
+const LOCAL_TEMPLATES: Record<string, string[]> = {
+  justchatting: [
+    "boludo van a creer que me levante solo para esto",
+    "nadie va a matchear el nivel de TODO EL RESTO",
+    "vengo raja2 por el email de mitad de precio",
+    "mi pila no aguanta",
+    "jajaja que grande",
+    "alguien más re loco con esta charla?",
+    "yo la veo por el celu igual",
+    "banco la onda del stream hoy",
+  ],
+  gaming: [
+    "que rank sos? decime que no sos bronce",
+    "GG buen game",
+    "flashie que era carry pero ni",
+    "increíble esa jugada",
+    "le metiste bien la intensidad",
+  ],
+  sports: [
+    "que partidazo boludo",
+    "lo perdieron por dormidos",
+    "arbitro no cobró eso",
+    "vamos carajo que se puede",
+  ],
+  music: [
+    "esta canción es un temazo",
+    "subi el volumen de la guitarra",
+    "que artista toca este tema?",
+  ],
+  arts: [
+    "que dibujo piola",
+    "tiene mucha pinta ese fondo",
+    "te quedó bárbaro el trazo",
+  ],
+  irl: [
+    "que lindo paisaje",
+    "donde estás ahora?",
+    "tenes que girar la cámara",
+  ],
+};
+
+function randomOf<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function randInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function hooksForChat(channel: string): string[] {
+  const c = channel.replace(/[^a-z0-9_]/gi, "");
+  return [
+    `que onda ${c} encendiste bien hoy`,
+    `${c} tenes que aguantar hasta el cierre`,
+    `yo sin el stream de ${c} no vivo`,
+    `dale ${c} hoy va con todo`,
+    `vengo raja2 por el archivo de ${c}`,
+    `${c} activo el modo papu`,
+  ];
+}
+
+function randomMessage(channel: string, energia: string, capsBoost: string, categoria: string): string {
+  const pool: string[] = [];
+  const templates = LOCAL_TEMPLATES[categoria] || LOCAL_TEMPLATES.justchatting;
+  pool.push(...(templates || []));
+  if (channel && channel.trim()) pool.push(...hooksForChat(channel));
+  if (energia === "hype" || energia === "caotico") {
+    pool.push("WTF QUE HACE ESTE TEAM SI ESTA ANDANDO", "LA VIDA ES UN VIDEO NO ME JUZGUEN", "GG GG GG", "NADIE TE DIJO QUE PARE");
+  }
+  let msg = randomOf(pool);
+  if (capsBoost === "alto" || capsBoost === "maximo") msg = msg.toUpperCase();
+  return msg;
+}
+
+const CATEGORIA_LABELS: Record<string, string> = {
+  justchatting: "charla",
+  gaming: "un juego",
+  music: "música",
+  arts: "arte en vivo",
+  sports: "un partido",
+  irl: "un paseo en la calle",
+};
+
+function generateLocalChat(
+  cantidad: number,
+  energia: string,
+  streamContext: string,
+  categoria: string,
+  historial: any[]
+): any[] {
+  const cfg = ENERGY_CONFIGS[energia] || ENERGY_CONFIGS.normal;
+  const msgs: any[] = [];
+  const users = [...LOCAL_USERS];
+  for (let i = 0; i < cantidad; i++) {
+    const user = randomOf(users);
+    const tipoRoll = Math.random();
+    let text = "";
+    if (tipoRoll < 0.15) {
+      const followUp = historial[Math.max(0, historial.length - 1 - randInt(0, 3))];
+      text = followUp && followUp.message ? `+1 a "${followUp.message}"` : "jaja exacto";
+    } else if (tipoRoll < 0.25) {
+      const label = CATEGORIA_LABELS[categoria] || "la transmisión";
+      text = `quien arranca a comentar ${label}? no dejemos el chat muerto`;
+    } else {
+      text = randomMessage("", energia, cfg.capsBoost, categoria);
+    }
+    const extraCaps = (energia === "caotico" && Math.random() < 0.3);
+    if ((cfg.capsBoost === "alto" || cfg.capsBoost === "maximo" || extraCaps) && Math.random() < 0.4) text = text.toUpperCase();
+    msgs.push({ user, message: text, tipo: i % 8 === 0 ? "destacado" : "fondo" });
+  }
+  return msgs;
+}
+
+function persistSimulation(
+  mensajes: any[],
+  sessionId: string,
+  context: string,
+  energia: string,
+  temp: number
+): void {
+  const existing = dbGet("SELECT id FROM sim_sessions WHERE id = ?", [sessionId]);
+  if (!existing) {
+    dbRun("INSERT INTO sim_sessions (id, stream_context, total_mensajes) VALUES (?, ?, ?)",
+      [sessionId, context, mensajes.length]);
+  } else {
+    dbRun("UPDATE sim_sessions SET total_mensajes = total_mensajes + ?, ultimo_bloque = unixepoch() WHERE id = ?",
+      [mensajes.length, sessionId]);
+  }
+  const countRows = dbAll("SELECT COUNT(*) as cnt FROM sim_mensajes WHERE session_id = ?", [sessionId]);
+  const bloqueNum = Math.floor((countRows[0]?.cnt || 0) / 20);
+  for (let i = 0; i < mensajes.length; i++) {
+    const msg = mensajes[i];
+    dbRun(
+      "INSERT INTO sim_mensajes (session_id, bloque_numero, posicion, user_name, message, tipo) VALUES (?, ?, ?, ?, ?, ?)",
+      [sessionId, bloqueNum, i, msg.user || "desconocido", msg.message || "", msg.tipo || "fondo"]
+    );
+  }
+  saveToTxt(mensajes, sessionId, context);
+  updateUserMemory(mensajes);
+}
+
+// ============================================================
 // POST /api/chat/generate
 // ============================================================
 function sanitizeContext(input: string): string {
@@ -380,8 +545,30 @@ export async function generateChat(req: Request, res: Response): Promise<void> {
 
     const cantidadMsgs = Math.min(cantidad || 20, 600);
     const sessionId = session_id || `stream_${Date.now()}`;
-    const orKey = env.OPENROUTER_API_KEY;
-    if (!orKey) { res.status(500).json({ error: "OpenRouter API key requerida" }); return; }
+    const orKey = getOrKey();
+
+    if (!orKey) {
+      // ── Modo local sin API: generador procedural siempre disponible ──
+      const energiaRawLocal = (typeof energia_chat === "string") ? energia_chat : "normal";
+      const energyKeyLocal = ENERGY_CONFIGS[energiaRawLocal] ? energiaRawLocal : "normal";
+      const allLocal = generateLocalChat(
+        cantidadMsgs,
+        energyKeyLocal,
+        (stream_context && stream_context.trim() && stream_context !== "auto") ? stream_context : "transmisión en vivo",
+        categoria_stream || "justchatting",
+        historial_db || []
+      );
+      persistSimulation(allLocal, sessionId, stream_context, energyKeyLocal, ENERGY_CONFIGS[energyKeyLocal].temp);
+      res.json({
+        mensajes: allLocal,
+        session_id: sessionId,
+        cantidad: allLocal.length,
+        energia_usada: energyKeyLocal,
+        modo: "local",
+        temperatura_usada: ENERGY_CONFIGS[energyKeyLocal].temp,
+      });
+      return;
+    }
 
     const energiaRaw = (typeof energia_chat === "string") ? energia_chat : (temperature !== undefined ? "custom" : "normal");
     const energyKey = ENERGY_CONFIGS[energiaRaw] ? energiaRaw : "normal";
@@ -590,5 +777,204 @@ Máximo 8 items en total, mezcla los 3 tipos. Priorizá Argentina y Latinoaméri
   } catch (err: any) {
     logger.error("simulator", `News error: ${err}`);
     res.status(500).json({ error: "Error interno del simulador" });
+  }
+}
+
+// ============================================================
+// POST /api/chat/export-txt — guarda los mensajes en un .txt
+// ============================================================
+export async function exportSimTxt(req: Request, res: Response): Promise<void> {
+  try {
+    const { mensajes, nombre } = req.body || {};
+    if (!Array.isArray(mensajes) || mensajes.length === 0) {
+      res.status(400).json({ error: "No hay mensajes para exportar" });
+      return;
+    }
+
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const safeName = (typeof nombre === "string" && nombre.trim())
+      ? nombre.trim().replace(/[^a-z0-9_-]/gi, "")
+      : `sim_${stamp}`;
+    const filePath = path.resolve(process.cwd(), "data", "exports", `${safeName}.txt`);
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+
+    const lines = [
+      `=== Simulación ${new Date().toLocaleString("es-AR")} ===`,
+      `=== ${mensajes.length} mensajes ===`,
+      "",
+    ];
+    for (const m of mensajes) {
+      lines.push(`${m.user || "anónimo"}: ${m.message || ""}`);
+    }
+    fs.writeFileSync(filePath, lines.join("\n"), "utf-8");
+
+    res.json({ success: true, archivo: safeName + ".txt", ruta: filePath });
+  } catch (err: any) {
+    logger.error("simulator", `Export error: ${err}`);
+    res.status(500).json({ error: "Error al exportar el .txt" });
+  }
+}
+
+// ============================================================
+// GET /api/chat/send-stats — conteo de mensajes por bot
+// ============================================================
+const ACCOUNT_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
+const usernameCache = new Map<string, string | null>();
+
+async function resolveKickUsername(bearer: string): Promise<string | null> {
+  // 1) nombre ya aprendido de un send exitoso (fuente confiable, sin API extra)
+  const learned = getRealUsername(bearer);
+  if (learned) return learned;
+  if (usernameCache.has(bearer)) return usernameCache.get(bearer) || null;
+  try {
+    const res = await fetch("https://kick.com/api/v2/self", {
+      headers: {
+        Accept: "application/json, text/plain, */*",
+        "User-Agent": ACCOUNT_UA,
+        Authorization: bearer.startsWith("Bearer ") ? bearer : "Bearer " + bearer,
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (res.status !== 200) {
+      usernameCache.set(bearer, null);
+      return null;
+    }
+    const data: any = await res.json();
+    const name = data?.username || data?.data?.username || data?.identity?.username || null;
+    usernameCache.set(bearer, name);
+    return name;
+  } catch {
+    usernameCache.set(bearer, null);
+    return null;
+  }
+}
+
+export async function getSendStats(_req: Request, res: Response): Promise<void> {
+  try {
+    const counters = getSentCounters();
+    const bots = stmts.listAllBots.all() as any[];
+    const out: any[] = [];
+    for (const b of bots) {
+      let token = "";
+      try { token = (decryptFromHex(b?.encrypted_bearer || "") || "").trim(); } catch {}
+      const count = token ? counters.get(token) || 0 : 0;
+      const storedName = (b?.kick_username || "").trim();
+      let name = storedName || b.bot_name;
+      if (token && !storedName) {
+        const real = await resolveKickUsername(token);
+        if (real) {
+          name = real;
+          try { stmts.updateBotKickUsername.run([real, b.id]); } catch {}
+        }
+      }
+      out.push({ botId: name, count, botName: b.bot_name, used: count > 0 });
+    }
+    out.sort((a, b) => (b.count || 0) - (a.count || 0));
+    res.json({ success: true, total: out.reduce((s, u) => s + (u.count || 0), 0), bots: out });
+  } catch (err: any) {
+    logger.error("simulator", `Send stats error: ${err}`);
+    res.status(500).json({ error: "Error obteniendo estadísticas" });
+  }
+}
+
+export async function resetSendStats(_req: Request, res: Response): Promise<void> {
+  resetSendCounters();
+  res.json({ success: true });
+}
+
+// ============================================================
+// POST /api/chat/send-sim — envía en vivo los mensajes con los bearers
+// ============================================================
+export async function sendSimMessages(req: Request, res: Response): Promise<void> {
+  try {
+    const body = req.body || {};
+    const mensajes: any[] = Array.isArray(body.mensajes) ? body.mensajes : [];
+    const channel = (typeof body.channel === "string" && body.channel.trim())
+      ? body.channel.trim()
+      : "";
+    const chatroomId: number | undefined = body.chatroom_id ?? undefined;
+    const randomOrder = body.random_order !== false;
+    const delay = Math.max(800, Number(body.delay) || 2500);
+
+    if (mensajes.length === 0) { res.status(400).json({ error: "No hay mensajes para enviar" }); return; }
+    if (!channel && chatroomId == null) { res.status(400).json({ error: "Falta el canal o chatroom_id" }); return; }
+
+    let resolvedChatroomId = chatroomId;
+    if (channel && resolvedChatroomId == null) {
+      const r = await resolveChatroomId(channel);
+      if (r.chatId == null) { res.status(400).json({ error: "No se pudo resolver el canal: " + channel }); return; }
+      resolvedChatroomId = r.chatId;
+    }
+
+    const order = randomOrder ? mensajes.map((_, i) => i).sort(() => Math.random() - 0.5) : mensajes.map((_, i) => i);
+    const results: any[] = [];
+    let ok = 0, fail = 0;
+
+    for (const idx of order) {
+      const m = mensajes[idx];
+      if (!m.message) continue;
+      const texto = `${m.user || "anonymous"}: ${m.message}`;
+      const r = await sendWithBearer(channel || "", texto, { chatroomId: resolvedChatroomId });
+      if (r.ok) ok++; else fail++;
+      results.push({ user: m.user, status: r.status, ok: r.ok });
+      await new Promise(s => setTimeout(s, delay));
+    }
+
+    res.json({ ok: true, enviados: ok, fallidos: fail, detalles: results, chatroom_id: resolvedChatroomId });
+  } catch (err: any) {
+    logger.error("simulator", `Send error: ${err}`);
+    res.status(500).json({ error: "Error al enviar mensajes" });
+  }
+}
+
+// ============================================================
+// POST /api/chat/build-prompt — arma un prompt con las reglas
+// adaptadas a un tema, para pegarlo en Gemini/ChatGPT/OpenRouter
+// ============================================================
+export async function buildPrompt(req: Request, res: Response): Promise<void> {
+  try {
+    const body = req.body || {};
+    const tema = (typeof body.tema === "string" && body.tema.trim()) ? body.tema.trim() : "";
+    const categoria = (typeof body.categoria === "string" && body.categoria.trim()) ? body.categoria.trim() : "justchatting";
+    const energiaRaw = (typeof body.energia === "string" && body.energia.trim()) ? body.energia.trim() : "normal";
+    const energia = ENERGY_CONFIGS[energiaRaw] ? energiaRaw : "normal";
+    const cantidad = Math.min(Math.max(Number(body.cantidad) || 50, 10), 600);
+
+    if (!tema) { res.status(400).json({ error: "Escribí un tema de conversación" }); return; }
+
+    const cfg = ENERGY_CONFIGS[energia];
+    const energiaDesc = `ENERGÍA: ${energia.charAt(0).toUpperCase() + energia.slice(1)} — ${cfg.desc} | CAPS boost: ${cfg.capsBoost}`;
+
+    const prompt = `${SYSTEM_PROMPT.replace("{energia_desc}", energiaDesc)}
+
+═══════════════════════════════════════════════════════════════
+## TEMA / CONTEXTO DE ESTA TRANSMISIÓN (adaptá TODAS las reglas a esto)
+═══════════════════════════════════════════════════════════════
+Tema: ${tema}
+
+Categoría detectada: ${categoria}
+
+═══════════════════════════════════════════════════════════════
+## INSTRUCCIÓN FINAL PARA VOS (IA)
+═══════════════════════════════════════════════════════════════
+Generá ${cantidad} mensajes de chat en vivo (Kick/Twitch, español rioplatense) que reaccionen EXCLUSIVAMENTE a este tema: "${tema}".
+
+Segú TODAS las reglas R1 a R13:
+- Mezclá las 50 personalidades, repetí las que correspondan (spammers, emoters, hype).
+- Respetá la energía: ${energia} (${cfg.desc}).
+- Los primeros mensajes abren el tema, los del medio lo desarrollan, los finales lo cierran (narrativa continua R13).
+- Cero frases de bot: nada de "claro", "entiendo", "por supuesto". Lenguaje callejero: dale, wacho, naa, bro, crack, posta, capo.
+- Mínimo 15 usuarios distintos cada 20 mensajes.
+- En ${Math.ceil(cantidad / 5)} mensajes al azar usá SOLO emotes (emote_puro), con usuarios tipo j00p_t7, Stebwb, DanielaSleep.
+
+Respondé ÚNICAMENTE con un JSON array, sin markdown, así:
+[{"user":"usuario","message":"texto","tipo":"hype|pregunta|respuesta|emote_puro|spam|analisis|risa|saludo"}]
+
+El array debe tener exactamente ${cantidad} objetos.`;
+
+    res.json({ success: true, prompt, cantidad, energia, categoria });
+  } catch (err: any) {
+    logger.error("simulator", `Build prompt error: ${err}`);
+    res.status(500).json({ error: "Error armando el prompt" });
   }
 }

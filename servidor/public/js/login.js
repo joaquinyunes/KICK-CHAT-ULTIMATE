@@ -100,9 +100,9 @@ async function handleSubmit(e) {
     if (role === 'admin') {
       window.location.href = '/admin/dashboard';
     } else if (permissions.includes('vods') && !permissions.includes('chat')) {
-      window.location.href = '/vods.html';
+      window.location.href = '/vods';
     } else {
-      window.location.href = '/chat.html';
+      window.location.href = '/chat';
     }
   } catch (err) {
     showError(err?.name === 'TypeError' ? 'No se puede conectar al servidor.' : 'Error: ' + (err?.message || 'desconocido'));

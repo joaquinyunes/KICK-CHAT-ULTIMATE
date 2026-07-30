@@ -10,7 +10,8 @@
     "encrypt-bearers": "ts-node scripts/encrypt-bearers.ts",
     "add-bot": "ts-node scripts/add-bot.ts",
     "create-user": "ts-node scripts/create-user.ts",
-    "assign-bot": "ts-node scripts/assign-bot.ts"
+    "assign-bot": "ts-node scripts/assign-bot.ts",
+    "probe-bots": "ts-node scripts/probe-bots.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -66,6 +66,15 @@ app.get("/admin/bots", (_req: Request, res: Response) => {
 app.get("/vods.html", (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "..", "public", "vods.html"));
 });
+app.get("/vods", (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, "..", "public", "vods.html"));
+});
+app.get("/chat.html", (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, "..", "public", "chat.html"));
+});
+app.get("/chat", (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, "..", "public", "chat.html"));
+});
 
 app.get("/admin/clientes", (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "..", "public", "admin", "clientes.html"));

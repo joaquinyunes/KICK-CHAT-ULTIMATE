@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>StreamChat – VODs</title>
 <link rel="stylesheet" href="css/main.css" />
+<link rel="stylesheet" href="css/client-nav.css" />
 <style>
 .vod-container { max-width:900px; margin:0 auto; padding:20px; }
 .vod-form { display:flex; gap:8px; margin-bottom:16px; }
@@ -45,6 +46,8 @@
     </div>
   </header>
 
+  <div id="client-nav" class="client-nav"></div>
+
   <div class="vod-container">
     <div id="nav-links" class="nav-links"></div>
 
@@ -81,5 +84,9 @@
 
   <script src="js/pl-mascot.js"></script>
   <script type="module" src="js/vods-ui.js"></script>
+  <script type="module">
+    import { renderNav } from './js/client-nav.js';
+    renderNav('vods');
+  </script>
 </body>
 </html>

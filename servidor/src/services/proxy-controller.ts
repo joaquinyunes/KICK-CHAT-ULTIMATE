@@ -6,6 +6,7 @@ import { logger } from "../utils/logger";
 import { sendViaPlaywright } from "./playwright-sender.service";
 import { findPython } from "../utils/python";
 import { mapKickError } from "../utils/kick";
+import { sendWithBearer, resolveChatroomId } from "./bearer-sender.service";
 
 const TAG = "proxy-controller";
 
@@ -44,10 +45,35 @@ function logMessage(botId: number | null, userId: number, channel: string, messa
 export async function sendToKick(req: ProxyRequest): Promise<ProxyResult> {
   const sentAt = Date.now();
 
-  // Pick bots randomly, try each one, up to 3 attempts
+  const triedBots: string[] = [];
   let lastError = "No hay tokens disponibles para enviar mensajes";
-  let triedBots: string[] = [];
 
+  // ── Estrategia 1: Node directo con bearer (no requiere Python) ──
+  try {
+    let chatroomId = req.chatroomId;
+    if (chatroomId == null) {
+      const r = await resolveChatroomId(req.channel);
+      chatroomId = r.chatId ?? undefined;
+    }
+    if (chatroomId != null) {
+      const res = await sendWithBearer(req.channel, req.message, { chatroomId });
+      if (res.ok) {
+        logger.info(TAG, "Bearer OK", "channel=" + req.channel);
+        logMessage(null, req.userId, req.channel, req.message, true);
+        return { success: true, sentAt };
+      }
+      triedBots.push("bearer(" + res.status + ")");
+      lastError = mapKickError(res.status, res.body || "");
+    } else {
+      triedBots.push("bearer(no chatroom)");
+      lastError = "No se pudo resolver el chatroom del canal: " + req.channel;
+    }
+  } catch (err: any) {
+    triedBots.push("bearer(error)");
+    lastError = err.message || "Error al usar bearer";
+  }
+
+  // ── Estrategia 2: por bot con Python (si está disponible) ──
   let candidateBots: any[] = stmts.listBotsForUser.all(req.userId);
   if (candidateBots.length === 0) {
     candidateBots = stmts.listAllBots.all();
@@ -60,7 +86,6 @@ export async function sendToKick(req: ProxyRequest): Promise<ProxyResult> {
     }
   }
 
-  // Shuffle & try up to 3 random bots
   const shuffled = candidateBots.sort(() => Math.random() - 0.5);
   const maxAttempts = Math.min(shuffled.length, 3);
   for (let i = 0; i < maxAttempts; i++) {
@@ -112,6 +137,7 @@ export async function sendToKick(req: ProxyRequest): Promise<ProxyResult> {
     } catch {}
   }
 
+  if (triedBots.length === 0) triedBots.push("sin bots");
   return { success: false, reason: "Intenté con: " + triedBots.join(", ") + " — " + lastError, sentAt };
 }
 

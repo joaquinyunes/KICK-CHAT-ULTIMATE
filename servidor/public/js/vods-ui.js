@@ -148,9 +148,9 @@ async function refreshPermissions() {
 function renderNav(permissions) {
   const container = document.getElementById('nav-links');
   const links = [];
-  if (permissions.includes('chat')) links.push({ href: '/chat.html', label: '💬 Chat' });
-  if (permissions.includes('simulator')) links.push({ href: '/stream-simulator.html', label: '🤖 Simulador' });
-  if (permissions.includes('vods')) links.push({ href: '/vods.html', label: '🎬 VODs', active: true });
+  if (permissions.includes('chat')) links.push({ href: '/chat', label: '💬 Chat' });
+  if (permissions.includes('simulator')) links.push({ href: '/simulador', label: '🤖 Simulador' });
+  if (permissions.includes('vods')) links.push({ href: '/vods', label: '🎬 VODs', active: true });
   container.innerHTML = links.map(l =>
     `<a href="${l.href}" class="${l.active ? 'active' : ''}">${l.label}</a>`
   ).join('');

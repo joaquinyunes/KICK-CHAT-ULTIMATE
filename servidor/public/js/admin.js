@@ -380,7 +380,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const s = sessionStorage.getItem(k);
     if (s && !localStorage.getItem(k)) localStorage.setItem(k, s);
   });
-  if (!isAdmin()) { window.location.href = '/chat.html'; return; }
+  if (!isAdmin()) { window.location.href = '/chat'; return; }
 
   onStatusChange(updateStatusUI);
   ping();
