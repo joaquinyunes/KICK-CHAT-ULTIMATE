@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StreamChat – Ajustes</title>
+<link rel="stylesheet" href="css/main.css" />
+<link rel="stylesheet" href="css/client-nav.css" />
+<style>
+  .settings-form { max-width:480px; margin:0 auto; padding:20px; display:flex; flex-direction:column; gap:14px; }
+  .chat-page { display:flex; flex-direction:column; height:100vh; overflow:auto; }
+</style>
+</head>
+<body class="chat-page">
+  <div class="pl-scene" aria-hidden="true"></div>
+  <div class="pl-grid" aria-hidden="true"></div>
+  <div class="pl-orbs" aria-hidden="true"><div class="pl-orb"></div><div class="pl-orb"></div><div class="pl-orb"></div></div>
+  <div class="pl-grain" aria-hidden="true"></div>
+  <header id="chat-header" class="app-header"></header>
+  <div id="client-nav"></div>
+
+  <div class="client-form-wrap" style="flex:1;overflow:auto">
+    <div class="settings-form">
+      <div class="field">
+        <label for="cfg-channel">Canal de destino</label>
+        <input id="cfg-channel" type="text" placeholder="yundev (solo el nombre, no la URL)" spellcheck="false" />
+      </div>
+      <div class="field">
+        <label for="cfg-interval-min">Intervalo mínimo (segundos)</label>
+        <input id="cfg-interval-min" type="number" min="1" max="3600" value="3" />
+      </div>
+      <div class="field">
+        <label for="cfg-interval-max">Intervalo máximo (segundos)</label>
+        <input id="cfg-interval-max" type="number" min="1" max="3600" value="8" />
+      </div>
+      <div class="field">
+        <label for="cfg-chatroom-id">Chatroom ID (opcional)</label>
+        <input id="cfg-chatroom-id" type="number" placeholder="ej: 20548413" />
+      </div>
+      <button id="save-settings-btn" class="btn btn-primary">Guardar</button>
+      <p id="settings-msg" class="settings-msg" hidden></p>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:8px 0" />
+
+      <div class="field">
+        <label>API Key OpenRouter (para el simulador — gratis en openrouter.ai)</label>
+        <input id="simKeyInput" type="password" placeholder="Pegá tu API Key acá">
+      </div>
+      <p style="font-size:11px;color:var(--text-muted);margin:0">Si no ponés una key, el simulador usará su <b>modo local</b> (genera sin conexión, menos variado pero siempre funciona).</p>
+      <button id="save-or-key-btn" class="btn btn-secondary btn-sm" style="margin-top:4px">Guardar Key</button>
+    </div>
+  </div>
+
+  <script src="js/pl-mascot.js"></script>
+  <script type="module" src="js/ajustes-ui.js"></script>
+</body>
+</html>

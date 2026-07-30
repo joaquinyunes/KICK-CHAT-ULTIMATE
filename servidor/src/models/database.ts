@@ -95,6 +95,7 @@ async function initDb(): Promise<SqlJsDatabase> {
   try { db.run("ALTER TABLE bots ADD COLUMN oauth_access_token TEXT"); } catch {}
   try { db.run("ALTER TABLE bots ADD COLUMN oauth_token_expires_at INTEGER"); } catch {}
   try { db.run("ALTER TABLE bots ADD COLUMN cookies TEXT DEFAULT ''"); } catch {}
+  try { db.run("ALTER TABLE bots ADD COLUMN kick_username TEXT DEFAULT ''"); } catch {}
 
   db.run(`
     CREATE TABLE IF NOT EXISTS bot_assignments (
@@ -521,6 +522,10 @@ export const stmts = {
 
   updateBotBearer: prepareStmt<{ q_bearer: string; q_id: number }, any>(
     `UPDATE bots SET encrypted_bearer = ? WHERE id = ?`
+  ),
+
+  updateBotKickUsername: prepareStmt<{ q_username: string; q_id: number }, any>(
+    `UPDATE bots SET kick_username = ? WHERE id = ?`
   ),
 
   deleteBot: prepareStmt<{ q_id: number }, any>(

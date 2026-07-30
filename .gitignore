@@ -6,3 +6,6 @@ dist/
 data/*.db
 *.log
 .DS_Store
+
+servidor/server_run.err
+servidor/server_run.out

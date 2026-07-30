@@ -173,6 +173,14 @@ textarea.ctx::placeholder { color:var(--text3); }
   </div>
 </div>
 
+<div class="client-nav" id="client-nav"></div>
+<style>
+  .client-nav { display:flex; gap:6px; flex-wrap:wrap; padding:8px 16px; background:var(--surface2, #13161c); border-bottom:1px solid var(--border, #2a2d35); font-size:12px; font-family:'Inter',system-ui,sans-serif; }
+  .client-nav-item { color:var(--text-muted); text-decoration:none; padding:6px 12px; border-radius:6px; font-weight:600; transition:all .15s; }
+  .client-nav-item:hover { background:var(--surface3, #1a1d25); color:var(--text); }
+  .client-nav-item.active { background:rgba(109,90,252,.12); color:var(--accent); }
+</style>
+
 <!-- SETTINGS MODAL -->
 <div class="modal-overlay" id="settingsModal" onclick="if(event.target===this)closeSettings()">
   <div class="modal">
@@ -578,7 +586,7 @@ async function fetchNews() {
 // ============================================================
 async function generateMessages() {
   if (isGenerating) return;
-  if (!apiKey) { openSettings(); return; }
+  if (!apiKey) { apiKey = 'local'; localStorage.setItem('gemini_api_key', apiKey); }
 
   const context = document.getElementById('ctxInput').value.trim();
   const cantidad = parseInt(document.getElementById('cantidadSelect').value);
@@ -725,5 +733,9 @@ function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
 init();
 </script>
 <script src="js/pl-mascot.js"></script>
+<script type="module">
+  import { renderNav } from './js/client-nav.js';
+  renderNav('simulador');
+</script>
 </body>
 </html>
