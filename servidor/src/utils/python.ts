@@ -7,7 +7,7 @@ const CANDIDATES = [
   "py",
 ].filter(Boolean) as string[];
 
-export function findPython(module?: string): string {
+export function findPython(module?: string): string | null {
   const check = module ? `-c "import ${module}"` : "-c \"\"";
   for (const exe of CANDIDATES) {
     try {
@@ -15,5 +15,5 @@ export function findPython(module?: string): string {
       return exe;
     } catch {}
   }
-  return "python";
+  return null;
 }
