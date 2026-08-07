@@ -29,6 +29,7 @@ const SCRIPT = path.resolve(process.cwd(), "send_to_kick.py");
 const PYTHON = findPython("tls_client");
 
 function pyExec(...args: string[]): { status: number; body: string } {
+  if (!PYTHON) return { status: 0, body: "Python no está disponible en este sistema" };
   const cmd = '"' + PYTHON + '" "' + SCRIPT + '"';
   const input = JSON.stringify(args);
   const out = execSync(cmd, { timeout: 15000, encoding: "utf-8", input }).trim();
@@ -74,6 +75,7 @@ export async function sendToKick(req: ProxyRequest): Promise<ProxyResult> {
   }
 
   // ── Estrategia 2: por bot con Python (si está disponible) ──
+  if (PYTHON) {
   let candidateBots: any[] = stmts.listBotsForUser.all(req.userId);
   if (candidateBots.length === 0) {
     candidateBots = stmts.listAllBots.all();
@@ -109,6 +111,9 @@ export async function sendToKick(req: ProxyRequest): Promise<ProxyResult> {
       logger.error(TAG, "Error con bot " + bot.bot_name, err.message);
       lastError = "Error ejecutando Python: " + (err.message || "desconocido");
     }
+  }
+  } else {
+    lastError = lastError + " (Python no disponible: se omitió el fallback con Python)";
   }
 
   // Fallback: cookies + bearer (try ALL bots with cookies, not just user's)

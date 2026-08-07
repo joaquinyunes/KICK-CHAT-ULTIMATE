@@ -15,6 +15,7 @@ export interface PlaywrightSendResult {
 
 export function sendViaPlaywright(channel: string, message: string, cookies: any[], bearer?: string): PlaywrightSendResult {
   try {
+    if (!PYTHON) return { success: false, reason: "Python no está disponible en este sistema" };
     const cookiesB64 = Buffer.from(JSON.stringify(cookies)).toString("base64");
     const args = [SCRIPT, channel, message, cookiesB64, bearer || ""];
     const result = spawnSync(PYTHON, args, { timeout: 20000, encoding: "utf-8" });
