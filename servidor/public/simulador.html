@@ -28,6 +28,27 @@
   .chip.active { border-color:var(--accent); background:rgba(109,90,252,.12); color:var(--accent); }
   .field input, .field select { width:100%; }
   .field-input { font-family:inherit; }
+  .sim-modal { position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:90; padding:16px; }
+  .sim-modal[hidden] { display:none; }
+  .sim-modal-box { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); width:100%; max-width:560px; padding:16px; display:flex; flex-direction:column; gap:12px; }
+  .sim-modal-head { display:flex; align-items:center; justify-content:space-between; font-size:14px; font-weight:700; color:var(--text); }
+  .sim-modal-hint { font-size:12px; color:var(--text-muted); margin:0; }
+  .sim-modal-hint code { background:var(--surface2); padding:1px 5px; border-radius:4px; }
+  #sim-paste-input { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:10px 12px; color:var(--text); font-family:var(--font-mono); font-size:12px; resize:vertical; }
+  .sim-modal-actions { display:flex; justify-content:flex-end; }
+  .mode-tabs { display:flex; gap:0; border:1px solid var(--border); border-radius:6px; overflow:hidden; margin-bottom:12px; }
+  .mode-tab { flex:1; padding:8px 12px; font-size:12px; font-weight:600; cursor:pointer; background:var(--surface2); border:none; color:var(--text-muted); font-family:inherit; transition:all .15s; text-align:center; }
+  .mode-tab:first-child { border-right:1px solid var(--border); }
+  .mode-tab.active { background:rgba(109,90,252,.15); color:var(--accent); }
+  .mode-tab:hover:not(.active) { background:var(--surface); color:var(--text); }
+  .screenshot-zone { border:2px dashed var(--border); border-radius:8px; padding:20px; text-align:center; cursor:pointer; transition:all .15s; position:relative; }
+  .screenshot-zone:hover { border-color:var(--accent); background:rgba(109,90,252,.05); }
+  .screenshot-zone.has-img { padding:8px; }
+  .screenshot-zone img { max-width:100%; max-height:200px; border-radius:6px; display:block; margin:0 auto; }
+  .screenshot-zone .hint { font-size:11px; color:var(--text-muted); margin-top:8px; }
+  .betting-field { display:none; }
+  .betting-field.visible { display:block; }
+  #screenshot-input { display:none; }
 </style>
 </head>
 <body class="chat-page">
@@ -42,10 +63,33 @@
     <!-- CONTROLES -->
     <div class="sim-controls">
       <div class="sim-card">
+        <h3>Modo</h3>
+        <div class="mode-tabs">
+          <button class="mode-tab active" data-mode="general">💬 Chat General</button>
+          <button class="mode-tab" data-mode="betting">🎰 Apuestas Esports</button>
+        </div>
+      </div>
+
+      <div class="sim-card">
         <h3>Contexto</h3>
-        <div class="field">
+        <div class="field general-field">
           <textarea id="sim-ctx" class="field-input" rows="3" placeholder="¿Qué está pasando en el stream? (ej: "jugando LoL ranked, casi choco a un amigo")" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:inherit;resize:vertical"></textarea>
           <button id="sim-auto-btn" class="btn btn-ghost btn-sm">🤖 Auto (que lo invente)</button>
+        </div>
+        <div class="betting-field" id="betting-fields">
+          <div class="field" style="margin-bottom:8px">
+            <label style="font-size:11px;color:var(--text-muted)">Estado de apuestas</label>
+            <textarea id="betting-state" class="field-input" rows="2" placeholder='Ej: "La mayoría del chat tiene plata en el Over de rondas o en el equipo que va perdiendo"' style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:inherit;resize:vertical;font-size:12px"></textarea>
+          </div>
+          <div class="field" style="margin-bottom:8px">
+            <label style="font-size:11px;color:var(--text-muted)">Screenshot del stream</label>
+            <div class="screenshot-zone" id="screenshot-zone">
+              <span id="screenshot-label">📸 Subí una captura del stream</span>
+              <p class="hint" id="screenshot-hint">Arrastrá o tocá para seleccionar. La IA analiza el marcador, la economía, las cuotas.</p>
+              <img id="screenshot-preview" src="" alt="" hidden>
+            </div>
+            <input type="file" id="screenshot-input" accept="image/*">
+          </div>
         </div>
       </div>
 
@@ -54,7 +98,7 @@
         <div class="chips" id="sim-cats"></div>
       </div>
 
-      <div class="sim-card">
+      <div class="sim-card general-field">
         <h3>Energía del chat</h3>
         <div class="chips" id="sim-energies"></div>
       </div>
@@ -71,7 +115,8 @@
           </select>
         </div>
         <button id="sim-gen-btn" class="btn btn-primary" style="width:100%">✨ Generar chat</button>
-        <button id="sim-prompt-btn" class="btn btn-secondary btn-sm" style="width:100%;margin-top:8px" title="Arma un prompt con las reglas adaptadas a tu tema y lo copia para pegarlo en Gemini/ChatGPT">📋 Generar prompt para IA</button>
+        <button id="sim-prompt-btn" class="btn btn-secondary btn-sm" style="width:100%;margin-top:8px" title="Arma un prompt con las reglas adaptadas a tu tema y lo copia para pegarlo en Gemini/OpenAI">📌 Generar prompt para IA</button>
+        <button id="sim-paste-btn" class="btn btn-secondary btn-sm" style="width:100%;margin-top:8px" title="Pegá un JSON con user/message y quedan solo los mensajes">⬇️ Pegar JSON de chat</button>
         <p id="sim-msg" class="settings-msg" hidden></p>
       </div>
     </div>
@@ -95,5 +140,19 @@
 
   <script src="js/pl-mascot.js"></script>
   <script type="module" src="js/simulador-ui.js"></script>
+
+  <div id="sim-modal" class="sim-modal" hidden>
+    <div class="sim-modal-box">
+      <div class="sim-modal-head">
+        <span>⬇️ Pegar JSON de chat</span>
+        <button id="sim-modal-close" class="btn btn-ghost btn-sm">✕</button>
+      </div>
+      <p class="sim-modal-hint">Pegá el JSON (con <code>user</code>/<code>message</code>). Se importan <b>solo los mensajes</b>, sin usuarios.</p>
+      <textarea id="sim-paste-input" class="field-input" rows="10" spellcheck="false" placeholder='[{"user":"alguien","message":"hola"},{"user":"otro","message":"que tal"}]'></textarea>
+      <div class="sim-modal-actions">
+        <button id="sim-paste-go" class="btn btn-primary">Importar solo mensajes</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
