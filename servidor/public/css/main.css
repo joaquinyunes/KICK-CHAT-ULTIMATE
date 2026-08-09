@@ -374,7 +374,8 @@ input:focus, select:focus { border-color: var(--accent); }
 .empty-state { padding: 24px; text-align: center; color: var(--text-muted); font-size: 13px; }
 .send-controls { display: flex; align-items: center; justify-content: space-between; padding-top: 12px; border-top: 1px solid var(--border); margin-top: 10px; flex-shrink: 0; flex-wrap: wrap; gap: 8px; }
 .send-status { font-size: 12px; color: var(--text-muted); }
-.send-btns { display: flex; gap: 8px; }
+.send-btns { display: flex; gap: 8px; align-items: center; }
+.send-order-select { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 12px; padding: 6px 8px; cursor: pointer; }
 
 /* Settings */
 .settings-form { max-width: 400px; }
