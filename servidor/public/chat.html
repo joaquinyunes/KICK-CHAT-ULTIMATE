@@ -10,10 +10,8 @@
 </head>
 <body class="chat-page">
   <div class="pl-feed" aria-hidden="true">
-    <div class="pl-feed-col"></div>
-    <div class="pl-feed-col"></div>
-    <div class="pl-feed-col"></div>
-    <div class="pl-feed-col"></div>
+    <div class="pl-feed-col"></div><div class="pl-feed-col"></div>
+    <div class="pl-feed-col"></div><div class="pl-feed-col"></div>
   </div>
   <div class="pl-feeds-overlay"></div>
   <header id="chat-header" class="app-header"></header>
@@ -21,44 +19,107 @@
 
   <main class="chat-shell">
 
-    <!-- ─── MITAD SUPERIOR: grilla de archivos .txt ─── -->
-    <section class="pair-top">
-      <div class="pair-top-header">
-        <span class="pair-title">Archivos de mensajes (.txt)</span>
-        <div class="pair-actions">
-          <button id="load-file-btn" class="btn btn-secondary btn-sm">+ Agregar .txt</button>
+    <!-- ═══ COLA A ═══ -->
+    <section class="dual-colas">
+      <div class="cola-card cola-a">
+        <div class="cola-header">
+          <span class="cola-label">🟢 COLA A</span>
+          <div class="cola-top-row">
+            <select id="file-a-select" class="cola-file-select"><option value="">— Elegí archivo —</option></select>
+          </div>
+          <div class="cola-interval-row">
+            <div class="interval-box">
+              <span class="interval-label">MIN</span>
+              <input id="interval-a-min" type="number" min="1" max="300" value="15" class="interval-input">
+              <span class="interval-unit">seg</span>
+            </div>
+            <div class="interval-box">
+              <span class="interval-label">MAX</span>
+              <input id="interval-a-max" type="number" min="1" max="300" value="20" class="interval-input">
+              <span class="interval-unit">seg</span>
+            </div>
+          </div>
+          <div class="cola-actions">
+            <select id="order-a" class="cola-order-select" title="Modo de envío">
+              <option value="random">🔀 Aleatorio</option>
+              <option value="sequential">➡️ Ordenado</option>
+            </select>
+            <button id="start-a" class="btn btn-primary">▶ Iniciar</button>
+            <button id="stop-a" class="btn btn-danger" disabled>■ Parar</button>
+            <button id="reset-a" class="btn btn-ghost btn-sm">↻ Reset</button>
+          </div>
+          <span id="status-a" class="cola-status"></span>
+          <div class="cola-progress">
+            <div id="bar-a" class="cola-bar" style="width:0%"></div>
+          </div>
+          <span id="count-a" class="cola-count">0/0 bloques</span>
         </div>
       </div>
-      <div id="file-grid" class="file-grid">
-        <div class="empty-state full">Sin archivos cargados. Agregá tus .txt.</div>
+
+      <!-- ═══ COLA B ═══ -->
+      <div class="cola-card cola-b">
+        <div class="cola-header">
+          <span class="cola-label">🟣 COLA B</span>
+          <div class="cola-top-row">
+            <select id="file-b-select" class="cola-file-select"><option value="">— Elegí archivo —</option></select>
+          </div>
+          <div class="cola-interval-row">
+            <div class="interval-box">
+              <span class="interval-label">MIN</span>
+              <input id="interval-b-min" type="number" min="1" max="300" value="1" class="interval-input">
+              <span class="interval-unit">seg</span>
+            </div>
+            <div class="interval-box">
+              <span class="interval-label">MAX</span>
+              <input id="interval-b-max" type="number" min="1" max="300" value="3" class="interval-input">
+              <span class="interval-unit">seg</span>
+            </div>
+          </div>
+          <div class="cola-actions">
+            <select id="order-b" class="cola-order-select" title="Modo de envío">
+              <option value="random">🔀 Aleatorio</option>
+              <option value="sequential">➡️ Ordenado</option>
+            </select>
+            <button id="start-b" class="btn btn-primary">▶ Iniciar</button>
+            <button id="stop-b" class="btn btn-danger" disabled>■ Parar</button>
+            <button id="reset-b" class="btn btn-ghost btn-sm">↻ Reset</button>
+          </div>
+          <span id="status-b" class="cola-status"></span>
+          <div class="cola-progress">
+            <div id="bar-b" class="cola-bar" style="width:0%"></div>
+          </div>
+          <span id="count-b" class="cola-count">0/0 bloques</span>
+        </div>
       </div>
     </section>
 
-    <!-- ── MITAD INFERIOR: mensajes enviados | bots estadísticas ── -->
-    <section class="pair-bottom">
-      <div class="half-left">
-        <div class="pair-title">Enviando</div>
-        <div class="progress-track">
-          <div id="progress-bar" class="progress-bar" style="width:0%"></div>
+    <!-- ═══ SPAM RÁPIDO ═══ -->
+    <section class="spam-rapido">
+      <div class="spam-header">
+        <span class="cola-label">⚡ Spam Rápido (1 min)</span>
+        <select id="spam-file-select" class="cola-file-select"><option value="">— Elegí archivo spam —</option></select>
+        <div class="spam-interval">
+          <label>Cada</label><input id="spam-interval" type="number" min="0.5" max="10" step="0.5" value="1" class="cola-input">
+          <span class="cola-unit">seg</span>
         </div>
-        <div class="msg-preview-header">
-          <span id="active-file-name" class="active-file-name">Ningún archivo seleccionado</span>
-          <span id="msg-count" class="msg-count"></span>
-        </div>
-        <ul id="msg-list" class="msg-list">
-          <li class="empty-state">Seleccioná un archivo de arriba y tocá Iniciar.</li>
-        </ul>
-        <footer class="send-controls">
-          <span id="send-status" class="send-status"></span>
-          <div class="send-btns">
-            <button id="send-once-btn" class="btn btn-ghost" disabled>Añadir sg</button>
-            <button id="start-btn"     class="btn btn-primary" disabled>▶ Iniciar</button>
-            <button id="stop-btn"      class="btn btn-danger"  disabled>■ Detener</button>
-            <button id="reset-btn"     class="btn btn-ghost"   style="display:none">↻ Reiniciar</button>
-          </div>
-        </footer>
+        <button id="spam-start" class="btn btn-danger btn-sm">⚡ Activar Spam</button>
+        <button id="spam-stop" class="btn btn-ghost btn-sm" disabled>■ Parar</button>
+        <span id="spam-timer" class="spam-timer"></span>
+        <span id="spam-status" class="cola-status"></span>
       </div>
+    </section>
 
+    <!-- ═══ ARCHIVOS + ESTADÍSTICAS ═══ -->
+    <section class="chat-bottom">
+      <div class="half-left">
+        <div class="pair-top-header">
+          <span class="pair-title">Archivos (.txt)</span>
+          <button id="load-file-btn" class="btn btn-secondary btn-sm">+ Agregar</button>
+        </div>
+        <div id="file-grid" class="file-grid">
+          <div class="empty-state full">Sin archivos. Agregá tus .txt.</div>
+        </div>
+      </div>
       <div class="half-right">
         <div class="pair-title">
           Bots — mensajes enviados
