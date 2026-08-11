@@ -11,7 +11,9 @@
     "add-bot": "ts-node scripts/add-bot.ts",
     "create-user": "ts-node scripts/create-user.ts",
     "assign-bot": "ts-node scripts/assign-bot.ts",
-    "probe-bots": "ts-node scripts/probe-bots.ts"
+    "probe-bots": "ts-node scripts/probe-bots.ts",
+    "probe-silent": "ts-node scripts/probe-bearers-silent.ts",
+    "renew-tokens": "ts-node scripts/renew-tokens.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
