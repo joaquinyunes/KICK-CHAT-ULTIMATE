@@ -9,7 +9,7 @@
 
 import type { Request, Response, NextFunction } from "express";
 
-const INTERVAL_MS = 1000; // 1 mensaje por segundo máximo
+const INTERVAL_MS = 200; // 5 mensajes por segundo máximo (para 4 colas simultáneas)
 
 interface RateLimitEntry {
   lastSentAt: number; // timestamp del último mensaje permitido

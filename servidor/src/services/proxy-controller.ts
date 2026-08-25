@@ -16,12 +16,14 @@ export interface ProxyRequest {
   userId: number;
   botName?: string;
   chatroomId?: number;
+  cola?: string;
 }
 
 export interface ProxyResult {
   success: boolean;
   reason?: string;
   sentAt: number;
+  username?: string;
 }
 
 const SCRIPT = path.resolve(process.cwd(), "send_to_kick.py");
@@ -57,11 +59,11 @@ export async function sendToKick(req: ProxyRequest): Promise<ProxyResult> {
       chatroomId = r.chatId ?? undefined;
     }
     if (chatroomId != null) {
-      const res = await sendWithBearer(req.channel, req.message, { chatroomId });
+      const res = await sendWithBearer(req.channel, req.message, { chatroomId, cola: req.cola });
       if (res.ok) {
         logger.info(TAG, "Bearer OK", "channel=" + req.channel);
         logMessage(null, req.userId, req.channel, req.message, true);
-        return { success: true, sentAt };
+        return { success: true, sentAt, username: res.username };
       }
       triedBots.push("bearer(" + res.status + ")");
       lastError = mapKickError(res.status, res.body || "");

@@ -2,7 +2,6 @@ import { Router } from "express";
 import { requireAuth } from "../middleware/jwt.middleware";
 import { requireFeature } from "../middleware/feature.middleware";
 import { handleChatSend, handleListMyBots } from "../controllers/chat.controller";
-import { RateLimiter } from "../middleware/rate-limiter";
 import { recordMessage } from "../telemetry";
 import type { Request, Response } from "express";
 
@@ -21,20 +20,12 @@ router.post("/chat/send", requireAuth, async (req: Request, res: Response) => {
   if (!userId) {
     return res.status(500).json({ error: "Error de autenticación" });
   }
-  if (!RateLimiter.canSend(userId)) {
-    const wait = RateLimiter.secondsUntilNext(userId);
-    return res.status(429).json({ error: "Rate limit alcanzado.", retryAfterSeconds: wait });
-  }
+  console.log(`[CHAT/SEND] userId=${userId} channel=${req.body?.channel} msg="${(req.body?.message||'').substring(0,40)}"`);
   await handleChatSend(req, res);
+  console.log(`[CHAT/SEND] result=${res.statusCode}`);
   if (res.statusCode === 200) {
-    RateLimiter.recordSend(userId);
     recordMessage();
   }
-});
-
-router.delete("/session/:sessionId", requireAuth, (req: Request, res: Response) => {
-  RateLimiter.clearSession(req.params.sessionId);
-  res.status(200).json({ success: true, message: "Sesión cerrada" });
 });
 
 export default router;

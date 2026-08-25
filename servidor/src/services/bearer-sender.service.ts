@@ -22,15 +22,49 @@ export interface BearerSendResult {
   body?: string;
   bearer?: string;
   chatroomId?: number;
+  username?: string;
 }
 
 // Contador de mensajes enviados por bearer (en memoria)
 const sentCounters = new Map<string, number>();
 // Nombre real de Kick por token (se aprende de la respuesta del send)
 const tokenUsernames = new Map<string, string | null>();
+// Token → username inverso (para stats)
+const tokenToUsername = new Map<string, string>();
+// Round-robin: índice del próximo bearer a usar (reparte parejo)
+let roundRobinIndex = 0;
+// Tokens marcados como muertos en esta sesión
+const deadTokens = new Set<string>();
+// Cooldown por bearer: timestamp del último envío exitoso (60s cooldown)
+const bearerCooldown = new Map<string, number>();
+const COOLDOWN_MS = 60000; // 60 segundos entre usos del mismo bearer
+
+function isCoolingDown(bearer: string): boolean {
+  const last = bearerCooldown.get(bearer);
+  if (!last) return false;
+  return Date.now() - last < COOLDOWN_MS;
+}
+
+function markSent(bearer: string): void {
+  bearerCooldown.set(bearer, Date.now());
+}
+
+// Pool por cola: reparte los 19 vivos en 4 grupos
+function getColaPool(pool: string[], cola: string): string[] {
+  const alive = pool.filter(t => t && !deadTokens.has(t));
+  const colaMap: Record<string, number> = { a: 0, b: 1, c: 2, d: 3, e: 4, f: 5, g: 6, h: 7 };
+  const idx = colaMap[cola] ?? 0;
+  const perCola = Math.ceil(alive.length / 8);
+  const start = idx * perCola;
+  return alive.slice(start, start + perCola);
+}
 export function learnTokenUsername(bearer: string | undefined, username: string | null): void {
   if (!bearer || !username) return;
   tokenUsernames.set(bearer, username);
+  tokenToUsername.set(bearer, username);
+}
+export function getTokenUsername(bearer: string): string | undefined {
+  return tokenToUsername.get(bearer);
 }
 export function getRealUsername(bearer: string): string | null {
   return tokenUsernames.get(bearer) || null;
@@ -45,6 +79,7 @@ export function getSentCounters(): Map<string, number> {
 export function resetSendCounters(): void {
   sentCounters.clear();
   tokenUsernames.clear();
+  roundRobinIndex = 0;
 }
 
 /**
@@ -78,7 +113,7 @@ export async function resolveChatroomId(
 export async function sendWithBearer(
   channel: string,
   message: string,
-  opts: { bearer?: string; chatroomId?: number } = {}
+  opts: { bearer?: string; chatroomId?: number; cola?: string } = {}
 ): Promise<BearerSendResult> {
   let b = opts.bearer;
   let chatId = opts.chatroomId;
@@ -96,23 +131,36 @@ export async function sendWithBearer(
   const ref = String(Date.now());
   const payload = { content: message, type: "message", message_ref: ref };
 
-  // Build pool of tokens to try (no repeats) + barajar para repartir emisores
-  const pool = (() => {
+  // Build pool: vivos primero, muertos al final
+  const rawPool = (() => {
     try { return loadBearers(); } catch { return [b].filter(Boolean) as string[]; }
   })();
-  const candidates = opts.bearer
-    ? [opts.bearer, ...pool.filter(x => x !== opts.bearer && x)]
-    : (b && pool.length ? [...pool.filter(x => x && x !== b), b] : [...pool]);
 
-  // Fisher–Yates: cada mensaje arranca con un bearer aleatorio distinto
-  for (let i = candidates.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  // Pool global: todos los tokens vivos (sin dividir por cola)
+  const pool = rawPool.filter(t => t && !deadTokens.has(t));
+
+  // Filtrar tokens en cooldown
+  const available = pool.filter(t => !isCoolingDown(t));
+  // Si todos están en cooldown, usar el pool completo (forzar uso)
+  const workingPool = available.length > 0 ? available : pool;
+
+  // Round-robin sobre el pool
+  const candidates: string[] = [];
+  if (workingPool.length > 0) {
+    for (let i = 0; i < workingPool.length; i++) {
+      const idx = (roundRobinIndex + i) % workingPool.length;
+      if (workingPool[idx]) candidates.push(workingPool[idx]);
+    }
+    roundRobinIndex = (roundRobinIndex + 1) % workingPool.length;
+  } else if (b) {
+    candidates.push(b);
   }
 
-  let lastRes: { ok: boolean; status: number; body?: string; bearer?: string; chatroomId?: number } | null = null;
+  console.log(`[BEARER] cola=${opts.cola||'all'} pool=${pool.length} available=${available.length} rrIdx=${(roundRobinIndex - 1 + workingPool.length) % workingPool.length} msg="${message.substring(0,30)}"`);
 
-  const maxTries = Math.min(Math.max(candidates.length, 1), 8);
+  let lastRes: { ok: boolean; status: number; body?: string; bearer?: string; chatroomId?: number; username?: string } | null = null;
+
+  const maxTries = candidates.length;
   for (let attempt = 0; attempt < maxTries; attempt++) {
     const candidate = candidates[attempt] || getRandomBearer();
     try {
@@ -132,14 +180,25 @@ export async function sendWithBearer(
       // 200 → éxito; 403/401 → probar otro token; otro error (429/500) → no rotar, falla de servidor
       if (res.status === 200) {
         countSent(lastRes.bearer);
+        markSent(lastRes.bearer);
+        console.log(`[BEARER] OK status=200 bearer=${String(candidate).slice(0,12)}… cooldown=60s msg="${message.substring(0,30)}"`);
         try {
           const parsed = JSON.parse(text);
           const uname = parsed?.data?.sender?.username;
-          if (uname) learnTokenUsername(candidate, String(uname));
+          if (uname) {
+            learnTokenUsername(candidate, String(uname));
+            lastRes.username = String(uname);
+          }
         } catch {}
         break;
       }
-      if (res.status !== 401 && res.status !== 403) break;
+      if (res.status !== 401 && res.status !== 403) {
+        console.log(`[BEARER] FAIL status=${res.status} bearer=${String(candidate).slice(0,12)}… body=${text.substring(0,100)}`);
+        break;
+      }
+      deadTokens.add(candidate);
+      console.log(`[BEARER] dead token status=${res.status} bearer=${String(candidate).slice(0,12)}…, marked dead, trying next`);
+      continue;
       logger.warn(TAG, "token muerto, pruebo otro", "status=" + res.status, "token=" + String(candidate).slice(0, 12) + "…");
     } catch (e: any) {
       lastRes = { ok: false, status: 0, body: e.message, bearer: candidate, chatroomId: chatId };

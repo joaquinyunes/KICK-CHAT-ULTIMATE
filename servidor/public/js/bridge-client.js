@@ -60,6 +60,7 @@ export async function sendMessage(payload) {
     const body = { sessionId: crypto.randomUUID?.() || Date.now().toString(), message: payload.message, channel: payload.channel };
     if (payload.bot_name) body.bot_name = payload.bot_name;
     if (payload.chatroom_id) body.chatroom_id = payload.chatroom_id;
+    if (payload.cola) body.cola = payload.cola;
     const res = await fetch(url + '/chat/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
@@ -72,7 +73,7 @@ export async function sendMessage(payload) {
       window.location.href = '/';
       return { ok: false, error: 'Session expired', status: 401 };
     }
-    return { ok: res.ok, status: res.status, ...data };
+    return { ok: res.ok, status: res.status, username: data.username || null, ...data };
   } catch (err) {
     return { ok: false, error: err.message, status: 0 };
   }

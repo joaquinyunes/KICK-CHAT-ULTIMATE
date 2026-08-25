@@ -30,10 +30,11 @@ export async function handleChatSend(
   }
 
   const { channel, message, bot_name, chatroom_id } = validation.data as ChatSendInput;
+  const cola = (req.body as any)?.cola || undefined;
   const userId = parseInt(req.user!.sub, 10);
   const ip     = req.ip ?? req.socket.remoteAddress;
 
-  const result = await sendToKick({ channel, message, userId, botName: bot_name, chatroomId: chatroom_id });
+  const result = await sendToKick({ channel, message, userId, botName: bot_name, chatroomId: chatroom_id, cola });
 
   if (!result.success) {
     logger.warn(TAG, "sendToKick fallo", result.reason);
@@ -50,5 +51,6 @@ export async function handleChatSend(
   res.status(200).json({
     success: true,
     message: "Mensaje enviado correctamente",
+    username: result.username || null,
   } as GenericResponse);
 }

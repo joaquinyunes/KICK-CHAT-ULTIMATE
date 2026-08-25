@@ -9,11 +9,33 @@ let channelName = '';
 let chatroomId = '';
 let statsTimerId = null;
 
-const colas = {
-  a: { fileIndex: -1, intervalMin: 15, intervalMax: 20, running: false, timerId: null, sending: false },
-  b: { fileIndex: -1, intervalMin: 1, intervalMax: 3, running: false, timerId: null, sending: false },
-};
-const spam = { fileIndex: -1, interval: 1, running: false, timerId: null, sending: false, startTime: 0, elapsedId: null };
+const COLA_KEYS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+const colas = {};
+COLA_KEYS.forEach(function(k) {
+  colas[k] = { fileIndex: -1, intervalMin: 1, intervalMax: 3, running: false, sending: false, order: 'random', spam: false };
+});
+
+// Global scheduler: round-robin through active colas
+let globalScheduler = { running: false, timerId: null, nextIdx: 0 };
+
+// Unified time mode
+function isUnifiedMode() {
+  var cb = document.getElementById('unified-mode');
+  return cb ? cb.checked : false;
+}
+function isColaInUnified(key) {
+  var cb = document.getElementById('unified-' + key);
+  return cb ? cb.checked : false;
+}
+function getColaInterval(key) {
+  var c = colas[key];
+  if (isUnifiedMode() && isColaInUnified(key)) {
+    var min = parseFloat(document.getElementById('unified-min').value) || 4;
+    var max = parseFloat(document.getElementById('unified-max').value) || 10;
+    return { min: min, max: max };
+  }
+  return { min: c.intervalMin, max: c.intervalMax };
+}
 
 function parseToBlocks(text) {
   const lines = text.split('\n').filter(l => l.trim());
@@ -46,16 +68,42 @@ function renderFileGrid() {
   g.innerHTML = files.map((f, i) => {
     const t = getBlockCount(f), d = getTotalSentBlocks(f);
     const pct = t > 0 ? Math.round((d / t) * 100) : 0;
-    const isA = colas.a.fileIndex === i, isB = colas.b.fileIndex === i;
-    let badge = isA ? '<span class="fc-badge badge-a">A</span>' : isB ? '<span class="fc-badge badge-b">B</span>' : '';
-    return '<div class="file-card' + (isA ? ' file-a-active' : '') + (isB ? ' file-b-active' : '') + '" data-index="' + i + '">' + badge + '<span class="fc-name">' + esc(f.name) + '</span><div class="fc-prog"><div class="fc-bar" style="width:' + pct + '%"></div></div><span class="fc-meta">' + d + '/' + t + ' bloques</span></div>';
+    var badges = '';
+    COLA_KEYS.forEach(function(k) { if (colas[k].fileIndex === i) badges += '<span class="fc-badge badge-' + k + '">' + k.toUpperCase() + '</span>'; });
+    var activeClass = '';
+    COLA_KEYS.forEach(function(k) { if (colas[k].fileIndex === i) activeClass += ' file-' + k + '-active'; });
+    return '<div class="file-card' + activeClass + '" data-index="' + i + '">' + '<button class="fc-delete" data-index="' + i + '" title="Eliminar">×</button>' + badges + '<span class="fc-name">' + esc(f.name) + '</span><div class="fc-prog"><div class="fc-bar" style="width:' + pct + '%"></div></div><span class="fc-meta">' + d + '/' + t + ' bloques</span></div>';
   }).join('');
+  g.querySelectorAll('.fc-delete').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      deleteFile(parseInt(btn.dataset.index));
+    });
+  });
+}
+
+function deleteFile(index) {
+  if (index < 0 || index >= files.length) return;
+  var f = files[index];
+  if (!confirm('Eliminar "' + f.name + '"?')) return;
+  COLA_KEYS.forEach(function(k) {
+    if (colas[k].fileIndex === index) {
+      stopCola(k);
+      colas[k].fileIndex = -1;
+    } else if (colas[k].fileIndex > index) {
+      colas[k].fileIndex--;
+    }
+  });
+  files.splice(index, 1);
+  saveFiles();
+  renderFileGrid();
+  renderFileSelects();
 }
 
 function renderFileSelects() {
   var opts = '<option value="">Elegí archivo</option>' + files.map(function(f, i) { return '<option value="' + i + '">' + esc(f.name) + '</option>'; }).join('');
-  ['file-a-select', 'file-b-select', 'spam-file-select'].forEach(function(id) {
-    var sel = document.getElementById(id);
+  COLA_KEYS.forEach(function(k) {
+    var sel = document.getElementById('file-' + k + '-select');
     if (sel) { var prev = sel.value; sel.innerHTML = opts; if (prev) sel.value = prev; }
   });
 }
@@ -80,7 +128,7 @@ function updateColaUI(key) {
   }
 }
 
-async function sendOne(msg) {
+async function sendOne(msg, colaKey) {
   try {
     var res = await sendMessage({ channel: channelName, message: msg, chatroom_id: chatroomId || undefined });
     return res;
@@ -89,34 +137,43 @@ async function sendOne(msg) {
   }
 }
 
-async function sendColaBlock(key) {
+// Send ONE message from the next active cola (global round-robin)
+async function globalSendOne() {
+  var activeKeys = COLA_KEYS.filter(function(k) { return colas[k].running && !isNaN(colas[k].fileIndex) && colas[k].fileIndex >= 0; });
+  if (activeKeys.length === 0) return;
+
+  // Pick next cola in round-robin
+  if (globalScheduler.nextIdx >= activeKeys.length) globalScheduler.nextIdx = 0;
+  var key = activeKeys[globalScheduler.nextIdx];
+  globalScheduler.nextIdx = (globalScheduler.nextIdx + 1) % activeKeys.length;
+
   var c = colas[key];
-  if (c.sending || !c.running) return;
+  if (c.sending) return;
+  c.sending = true;
 
   var selEl = document.getElementById('file-' + key + '-select');
   var val = selEl ? selEl.value : '';
   var fileIdx = parseInt(val, 10);
 
   if (isNaN(fileIdx) || fileIdx < 0 || fileIdx >= files.length) {
-    setColaStatus(key, 'Elegí un archivo');
-    stopCola(key);
+    setColaStatus(key, 'Sin archivo');
+    c.sending = false;
     return;
   }
 
   c.fileIndex = fileIdx;
   var file = files[fileIdx];
   if (!file || !file.blocks || file.blocks.length === 0) {
-    setColaStatus(key, 'Archivo sin bloques');
+    setColaStatus(key, 'Archivo vacío');
     c.sending = false;
     return;
   }
 
   if (allBlocksSent(file)) loopBlocks(file);
 
-  c.sending = true;
   var unsent = [];
   for (var i = 0; i < file.blocks.length; i++) { if (!file.blocks[i].sent) unsent.push(i); }
-  if (unsent.length === 0) { loopBlocks(file); c.sending = false; return; }
+  if (unsent.length === 0) { loopBlocks(file); unsent = file.blocks.map(function(_, i) { return i; }); }
 
   var blockIdx;
   if (c.order === 'sequential') {
@@ -127,49 +184,75 @@ async function sendColaBlock(key) {
   file.currentBlock = blockIdx;
   var block = file.blocks[blockIdx];
 
-  for (var mi = 0; mi < block.messages.length; mi++) {
-    if (!c.running) break;
-    var msg = block.messages[mi];
-    setColaStatus(key, '[' + key.toUpperCase() + '] B' + (blockIdx + 1) + ' msg ' + (mi + 1) + '/' + block.messages.length + ': "' + msg.substring(0, 40) + '"');
-    updateColaUI(key);
+  // Pick next message from the block
+  var msgIdx = file._nextMsgIdx || 0;
+  if (msgIdx >= block.messages.length) msgIdx = 0;
+  var msg = block.messages[msgIdx];
+  file._nextMsgIdx = msgIdx + 1;
 
-    var res = await sendOne(msg);
-    if (res.ok) {
-      setColaStatus(key, 'OK [' + key.toUpperCase() + '] B' + (blockIdx + 1) + ' msg ' + (mi + 1) + '/' + block.messages.length + ': "' + msg.substring(0, 40) + '"');
-    } else {
-      setColaStatus(key, 'ERR (' + (res.status || '?') + '): ' + (res.error || res.message || '').substring(0, 50));
-    }
-    refreshStats();
-
-    if (mi < block.messages.length - 1 && c.running) {
-      var waitMs = randInt(c.intervalMin, c.intervalMax);
-      setColaStatus(key, 'Esperando ' + Math.round(waitMs / 1000) + 's...');
-      await new Promise(function(r) { setTimeout(r, waitMs); });
-    }
-  }
-
-  block.sent = true;
-  file.currentBlock++;
-  saveFiles();
-  renderFileGrid();
-  c.sending = false;
+  setColaStatus(key, '[' + key.toUpperCase() + '] ' + msg.substring(0, 45));
   updateColaUI(key);
 
-  if (allBlocksSent(file)) {
-    loopBlocks(file);
+  var res = await sendOne(msg, key);
+  var username = res.username || '?';
+  if (res.ok) {
+    setColaStatus(key, username + ' ✓ [' + key.toUpperCase() + '] ' + msg.substring(0, 35));
+  } else {
+    setColaStatus(key, 'ERR (' + (res.status || '?') + '): ' + (res.error || res.message || '').substring(0, 40));
+  }
+  refreshStats();
+
+  // If all messages in block sent, mark block done
+  if (file._nextMsgIdx >= block.messages.length) {
+    block.sent = true;
+    file._nextMsgIdx = 0;
     saveFiles();
     renderFileGrid();
-    setColaStatus(key, 'Ciclo completo, reiniciando...');
+    if (allBlocksSent(file)) {
+      loopBlocks(file);
+      saveFiles();
+      renderFileGrid();
+    }
   }
+
+  c.sending = false;
+  updateColaUI(key);
 }
 
-function scheduleCola(key) {
-  var c = colas[key];
-  if (!c.running) return;
-  c.timerId = setTimeout(async function() {
-    await sendColaBlock(key);
-    if (c.running) scheduleCola(key);
-  }, randInt(c.intervalMin, c.intervalMax));
+function globalSchedulerTick() {
+  if (!globalScheduler.running) return;
+  globalSendOne().catch(function() {}).then(function() {
+    if (!globalScheduler.running) return;
+    // Pick interval from the cola that just sent
+    var activeKeys = COLA_KEYS.filter(function(k) { return colas[k].running && !isNaN(colas[k].fileIndex) && colas[k].fileIndex >= 0; });
+    if (activeKeys.length === 0) { globalScheduler.running = false; return; }
+    var idx = (globalScheduler.nextIdx - 1 + activeKeys.length) % activeKeys.length;
+    var key = activeKeys[idx];
+    var c = colas[key];
+    var interval = getColaInterval(key);
+    var delay = c.spam ? (500 + Math.random() * 1000) : randInt(interval.min, interval.max);
+    globalScheduler.timerId = setTimeout(globalSchedulerTick, delay);
+  });
+}
+
+function startGlobalScheduler() {
+  if (globalScheduler.running) return;
+  globalScheduler.running = true;
+  globalScheduler.nextIdx = 0;
+  console.log('[GLOBAL] Scheduler started');
+  globalSchedulerTick();
+}
+
+function stopGlobalScheduler() {
+  globalScheduler.running = false;
+  if (globalScheduler.timerId) { clearTimeout(globalScheduler.timerId); globalScheduler.timerId = null; }
+  console.log('[GLOBAL] Scheduler stopped');
+}
+
+function getActiveColaCount() {
+  var count = 0;
+  COLA_KEYS.forEach(function(k) { if (colas[k].running) count++; });
+  return count;
 }
 
 function startCola(key) {
@@ -178,22 +261,34 @@ function startCola(key) {
   var sel = document.getElementById('file-' + key + '-select');
   var fileIdx = parseInt(sel ? sel.value : '', 10);
   if (isNaN(fileIdx)) { alert('Elegí un archivo para la cola ' + key.toUpperCase()); return; }
-  if (!channelName && !chatroomId) { alert('Configurá el canal en Ajustes (nombre del canal o Chatroom ID).'); return; }
+  if (!channelName && !chatroomId) { alert('Configurá el canal en Ajustes.'); return; }
   c.fileIndex = fileIdx;
   c.intervalMin = parseFloat(document.getElementById('interval-' + key + '-min').value) || 3;
   c.intervalMax = parseFloat(document.getElementById('interval-' + key + '-max').value) || 8;
   var orderSel = document.getElementById('order-' + key);
   c.order = orderSel ? orderSel.value : 'random';
+  var spamCb = document.getElementById('spam-' + key);
+  c.spam = spamCb ? spamCb.checked : false;
   c.running = true;
+  var card = document.querySelector('.cola-' + key);
+  if (card) { if (c.spam) card.classList.add('spam-active'); else card.classList.remove('spam-active'); }
   updateColaUI(key);
-  sendColaBlock(key).then(function() { if (c.running) scheduleCola(key); });
+  setColaStatus(key, 'Cola ' + key.toUpperCase() + ' activa');
+
+  // Start global scheduler if not running
+  startGlobalScheduler();
 }
 
 function stopCola(key) {
   var c = colas[key];
   c.running = false;
-  if (c.timerId) { clearTimeout(c.timerId); c.timerId = null; }
+  var card = document.querySelector('.cola-' + key);
+  if (card) card.classList.remove('spam-active');
   updateColaUI(key);
+  setColaStatus(key, 'Parada');
+
+  // Stop global scheduler if no colas active
+  if (getActiveColaCount() === 0) stopGlobalScheduler();
 }
 
 function resetCola(key) {
@@ -209,89 +304,6 @@ function resetCola(key) {
   }
   setColaStatus(key, 'Reiniciado');
   updateColaUI(key);
-}
-
-async function sendSpamBlock() {
-  if (spam.sending || !spam.running) return;
-  var sel = document.getElementById('spam-file-select');
-  var fileIdx = parseInt(sel ? sel.value : '', 10);
-  if (isNaN(fileIdx) || fileIdx < 0 || fileIdx >= files.length) {
-    document.getElementById('spam-status').textContent = 'Elegí un archivo';
-    stopSpam();
-    return;
-  }
-  spam.fileIndex = fileIdx;
-  var file = files[fileIdx];
-  if (!file || !file.blocks || file.blocks.length === 0) return;
-  if (allBlocksSent(file)) loopBlocks(file);
-
-  spam.sending = true;
-  var unsent = [];
-  for (var i = 0; i < file.blocks.length; i++) { if (!file.blocks[i].sent) unsent.push(i); }
-  if (unsent.length === 0) { loopBlocks(file); spam.sending = false; return; }
-
-  var blockIdx = unsent[0];
-  var block = file.blocks[blockIdx];
-
-  for (var mi = 0; mi < block.messages.length; mi++) {
-    if (!spam.running) break;
-    var msg = block.messages[mi];
-    document.getElementById('spam-status').textContent = 'SPAM: "' + msg.substring(0, 45) + '"';
-    await sendOne(msg);
-    refreshStats();
-    if (mi < block.messages.length - 1 && spam.running) {
-      await new Promise(function(r) { setTimeout(r, spam.interval * 1000); });
-    }
-  }
-
-  block.sent = true;
-  file.currentBlock++;
-  saveFiles();
-  renderFileGrid();
-  spam.sending = false;
-}
-
-function scheduleSpam() {
-  if (!spam.running) return;
-  spam.timerId = setTimeout(async function() {
-    await sendSpamBlock();
-    if (spam.running) scheduleSpam();
-  }, spam.interval * 1000);
-}
-
-function startSpam() {
-  if (spam.running) return;
-  var sel = document.getElementById('spam-file-select');
-  var fileIdx = parseInt(sel ? sel.value : '', 10);
-  if (isNaN(fileIdx)) { alert('Elegí un archivo para spam'); return; }
-  if (!channelName && !chatroomId) { alert('Configurá el canal en Ajustes.'); return; }
-  spam.fileIndex = fileIdx;
-  spam.interval = parseFloat(document.getElementById('spam-interval').value) || 1;
-  spam.running = true;
-  spam.startTime = Date.now();
-  var c = document.querySelector('.spam-rapido');
-  if (c) c.classList.add('active');
-  document.getElementById('spam-start').disabled = true;
-  document.getElementById('spam-stop').disabled = false;
-  spam.elapsedId = setInterval(function() {
-    var elapsed = Math.floor((Date.now() - spam.startTime) / 1000);
-    var remaining = Math.max(0, 60 - elapsed);
-    document.getElementById('spam-timer').textContent = remaining > 0 ? remaining + 's' : 'TIEMPO!';
-    if (remaining <= 0) stopSpam();
-  }, 200);
-  sendSpamBlock().then(function() { if (spam.running) scheduleSpam(); });
-}
-
-function stopSpam() {
-  spam.running = false;
-  if (spam.timerId) { clearTimeout(spam.timerId); spam.timerId = null; }
-  if (spam.elapsedId) { clearInterval(spam.elapsedId); spam.elapsedId = null; }
-  var c = document.querySelector('.spam-rapido');
-  if (c) c.classList.remove('active');
-  document.getElementById('spam-start').disabled = false;
-  document.getElementById('spam-stop').disabled = true;
-  document.getElementById('spam-timer').textContent = '';
-  document.getElementById('spam-status').textContent = '';
 }
 
 async function refreshStats() {
@@ -364,15 +376,31 @@ export async function initChatUI() {
   startStatusLoop();
 
   document.getElementById('load-file-btn').addEventListener('click', handleLoadFile);
-  document.getElementById('start-a').addEventListener('click', function() { startCola('a'); });
-  document.getElementById('stop-a').addEventListener('click', function() { stopCola('a'); });
-  document.getElementById('reset-a').addEventListener('click', function() { resetCola('a'); });
-  document.getElementById('start-b').addEventListener('click', function() { startCola('b'); });
-  document.getElementById('stop-b').addEventListener('click', function() { stopCola('b'); });
-  document.getElementById('reset-b').addEventListener('click', function() { resetCola('b'); });
-  document.getElementById('spam-start').addEventListener('click', startSpam);
-  document.getElementById('spam-stop').addEventListener('click', stopSpam);
+
+  COLA_KEYS.forEach(function(k) {
+    document.getElementById('start-' + k).addEventListener('click', function() { startCola(k); });
+    document.getElementById('stop-' + k).addEventListener('click', function() { stopCola(k); });
+    document.getElementById('reset-' + k).addEventListener('click', function() { resetCola(k); });
+    var spamCb = document.getElementById('spam-' + k);
+    if (spamCb) {
+      spamCb.addEventListener('change', function() {
+        colas[k].spam = spamCb.checked;
+        var card = document.querySelector('.cola-' + k);
+        if (card) { if (spamCb.checked) card.classList.add('spam-active'); else card.classList.remove('spam-active'); }
+      });
+    }
+  });
+
   document.getElementById('reset-stats-btn').addEventListener('click', resetStats);
+
+  // Unified time mode toggle
+  var unifiedCb = document.getElementById('unified-mode');
+  if (unifiedCb) {
+    unifiedCb.addEventListener('change', function() {
+      var ui = document.getElementById('unified-interval');
+      if (ui) ui.style.display = unifiedCb.checked ? 'flex' : 'none';
+    });
+  }
 
   loadSettings();
   loadSavedFiles();
@@ -384,9 +412,7 @@ export async function initChatUI() {
 
 window.addEventListener('beforeunload', function() {
   if (statsTimerId) clearInterval(statsTimerId);
-  stopCola('a');
-  stopCola('b');
-  stopSpam();
+  COLA_KEYS.forEach(function(k) { stopCola(k); });
 });
 
 window.addGeneratedMessages = function(msgs, name) {
