@@ -25,7 +25,7 @@ router.post("/api/chat/news", requireAuth, aiLimiter, fetchNews);
 router.post("/api/chat/set-key", requireAuth, (req: Request, res: Response) => {
   const key = typeof req.body?.key === "string" ? req.body.key.trim() : "";
   if (!key) { res.status(400).json({ error: "key requerida" }); return; }
-  setUserApiKey(key);
+  setUserApiKey(req.user!.sub, key);
   res.json({ success: true });
 });
 router.post("/api/chat/export-txt", requireAuth, exportSimTxt);
