@@ -1,11 +1,42 @@
+# ─── Secrets ───────────────────────────────
 .env
 .env.*
 !.env.example
+*.enc
+accounts.json
+servidor/accounts.json
+bearers.json
+
+# ─── Dependencies / build ──────────────────
 node_modules/
 dist/
-data/*.db
-*.log
-.DS_Store
+**/dist/
 
+# ─── Data / runtime ────────────────────────
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+data/sim_ultimos.txt
+
+# ─── Logs / debug dumps ────────────────────
+*.log
 servidor/server_run.err
 servidor/server_run.out
+servidor/server_err.txt
+servidor/server_out.txt
+servidor/server-start.err
+servidor/*.err
+servidor/*_out.txt
+support-bundle*.zip
+
+# ─── Python ────────────────────────────────
+__pycache__/
+*.pyc
+.venv/
+venv/
+stream-context/temp/
+
+# ─── OS / editor ───────────────────────────
+.DS_Store
+Thumbs.db
