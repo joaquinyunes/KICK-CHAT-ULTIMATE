@@ -38,6 +38,43 @@ export interface TokenPayload extends JwtPayload {
 const BCRYPT_ROUNDS   = 12;
 const JWT_EXPIRY_SECS = 24 * 60 * 60; // 24 horas en segundos
 
+// ─── Anti fuerza-bruta (en memoria; suficiente para un solo proceso) ──────────
+const MAX_ATTEMPTS   = 8;
+const LOCK_WINDOW_MS = 15 * 60 * 1000;
+const attempts = new Map<string, { count: number; first: number }>();
+
+export class LockoutError extends Error {
+  constructor(public retryAfterSecs: number) {
+    super("Demasiados intentos fallidos. Probá más tarde.");
+    this.name = "LockoutError";
+  }
+}
+
+function lockKey(username: string, ip?: string): string {
+  return `${(username || "").toLowerCase()}|${ip || "?"}`;
+}
+
+function assertNotLocked(key: string): void {
+  const rec = attempts.get(key);
+  if (!rec) return;
+  if (Date.now() - rec.first > LOCK_WINDOW_MS) {
+    attempts.delete(key);
+    return;
+  }
+  if (rec.count >= MAX_ATTEMPTS) {
+    throw new LockoutError(Math.ceil((rec.first + LOCK_WINDOW_MS - Date.now()) / 1000));
+  }
+}
+
+function registerFailure(key: string): void {
+  const rec = attempts.get(key);
+  if (!rec || Date.now() - rec.first > LOCK_WINDOW_MS) {
+    attempts.set(key, { count: 1, first: Date.now() });
+  } else {
+    rec.count++;
+  }
+}
+
 // ─── Registro ─────────────────────────────────────────────────────────────────
 
 /**
@@ -74,6 +111,9 @@ export async function loginUser(
   password: string,
   ipAddress?: string
 ): Promise<AuthResult> {
+  const key = lockKey(username, ipAddress);
+  assertNotLocked(key);
+
   const user = stmts.findUserByUsername.get(username) as UserRow | undefined;
 
   // Comparamos siempre para evitar timing attacks (no romper el flujo early)
@@ -85,12 +125,15 @@ export async function loginUser(
     : await bcrypt.compare(password, dummyHash).then(() => false);
 
   if (!user || !isValid) {
+    registerFailure(key);
     // Log del intento fallido si el usuario existe
     if (user) {
       stmts.insertLog.run([user.id, "login_failed", ipAddress ?? null, null]);
     }
     throw new Error("Credenciales inválidas");
   }
+
+  attempts.delete(key); // login OK → limpiar contador
 
   // Emitir JWT
   const now       = Math.floor(Date.now() / 1000);

@@ -1,37 +1,54 @@
+# ─── 1. Build (TypeScript → dist/) ─────────────────────────────
 FROM node:20-bookworm-slim AS build
-
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY tsconfig.json ./
 COPY src/ src/
-RUN npx tsc
-COPY vod_viewer_worker.py dist/
+COPY scripts/ scripts/
+COPY vod_viewer_worker.py ./
+RUN npm run build
 
-FROM python:3.11-slim-bookworm
+# ─── 2. Dependencias de producción (solo runtime) ─────────────
+FROM node:20-bookworm-slim AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+# ─── 3. Runtime ───────────────────────────────────────────────
+FROM node:20-bookworm-slim
 
 WORKDIR /app
+ENV PYTHON_PATH=/opt/venv/bin/python \
+    PATH="/opt/venv/bin:$PATH" \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+    NODE_ENV=production
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates \
+      python3 python3-venv python3-pip curl ca-certificates \
+    && python3 -m venv /opt/venv \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=build /app/dist /app/dist
-COPY --from=build /app/node_modules /app/node_modules
-COPY package.json /app/package.json
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt \
+    && mkdir -p /ms-playwright \
+    && playwright install --with-deps chromium \
+    && chmod -R a+rX /ms-playwright
 
-COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+COPY --from=deps  /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+COPY package.json ./
+COPY public/ ./public/
+COPY send_to_kick.py send_to_kick_daemon.py send_to_kick_playwright.py ./
 
-RUN playwright install chromium --with-deps
+RUN useradd --system --uid 10001 --home /app app \
+    && mkdir -p /app/data && chown -R app:app /app
+USER app
 
-COPY send_to_kick.py /app/send_to_kick.py
-COPY send_to_kick_daemon.py /app/send_to_kick_daemon.py
-COPY send_to_kick_playwright.py /app/send_to_kick_playwright.py
-COPY public/ /app/public/
-
-ENV NODE_ENV=production
-
-VOLUME ["/app/data"]
 EXPOSE 3000
+VOLUME ["/app/data"]
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
+  CMD curl -fsS http://localhost:3000/ready || exit 1
+
 CMD ["node", "dist/server-engine.js"]

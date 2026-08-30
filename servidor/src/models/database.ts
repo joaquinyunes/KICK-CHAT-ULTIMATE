@@ -8,6 +8,7 @@
 import initSqlJs, { type Database as SqlJsDatabase } from "sql.js";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { logger } from "../utils/logger";
 
@@ -50,12 +51,19 @@ async function initDb(): Promise<SqlJsDatabase> {
   try { db.run("ALTER TABLE users ADD COLUMN permissions TEXT NOT NULL DEFAULT '[\"chat\",\"simulator\",\"vods\"]'"); } catch {}
   try { db.run("ALTER TABLE users ADD COLUMN hourly_view_limit INTEGER NOT NULL DEFAULT 50"); } catch {}
 
-  // Sembrar admin por defecto si no existe
+  // Sembrar admin por defecto si no existe.
+  // La contraseña sale de ADMIN_PASSWORD; si no está, se genera una aleatoria
+  // y se loguea UNA sola vez (no queda un default conocido en producción).
   const adminExists = db.exec("SELECT id FROM users WHERE username = 'admin' LIMIT 1");
   if (adminExists.length === 0) {
-    const adminHash = bcrypt.hashSync("admin123", 12);
+    const adminPass = process.env.ADMIN_PASSWORD || crypto.randomBytes(12).toString("base64url");
+    const adminHash = bcrypt.hashSync(adminPass, 12);
     db.run("INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'admin')", ["admin", adminHash]);
-    logger.warn("DB", "Usuario admin creado (admin / admin123) — CAMBIA LA CONTRASEÑA");
+    if (process.env.ADMIN_PASSWORD) {
+      logger.warn("DB", "Usuario admin creado con ADMIN_PASSWORD del entorno.");
+    } else {
+      logger.warn("DB", `Usuario admin creado — contraseña temporal: ${adminPass} — cambiala y borrala de los logs.`);
+    }
   }
 
   db.run(`
@@ -273,16 +281,32 @@ async function initDb(): Promise<SqlJsDatabase> {
 
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 
+function writeToDisk(): void {
+  try {
+    const data = db.export();
+    const tmp = DB_PATH + ".tmp";
+    fs.writeFileSync(tmp, Buffer.from(data));
+    fs.renameSync(tmp, DB_PATH); // escritura atómica
+  } catch (err) {
+    logger.error("DB", `Error al guardar: ${err}`);
+  }
+}
+
 function saveDb(): void {
   if (saveTimeout) clearTimeout(saveTimeout);
-  saveTimeout = setTimeout(() => {
-    try {
-      const data = db.export();
-      fs.writeFileSync(DB_PATH, Buffer.from(data));
-    } catch (err) {
-      logger.error("DB", `Error al guardar: ${err}`);
-    }
-  }, 200);
+  saveTimeout = setTimeout(writeToDisk, 200);
+}
+
+/**
+ * Fuerza la escritura pendiente a disco de inmediato.
+ * Llamar en el shutdown para no perder la ventana del debounce.
+ */
+export function flushDb(): void {
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+    saveTimeout = null;
+  }
+  if (db) writeToDisk();
 }
 
 // ─── Wrapper para prepared statements tipo better-sqlite3 ────────────────────
@@ -302,11 +326,12 @@ function prepareStmt<TBind, TRow = any>(
       const values = Array.isArray(params) ? params : Object.values(params);
       stmt.run(values);
       stmt.free();
+      const changes = db.getRowsModified();
       saveDb();
       const idStmt = db.prepare("SELECT last_insert_rowid() as id");
       const lastInsertRowid = idStmt.step() ? (idStmt.getAsObject() as any).id : 0;
       idStmt.free();
-      return { changes: 1, lastInsertRowid };
+      return { changes, lastInsertRowid };
     },
 
     get(params?: any | any[]): TRow | undefined {

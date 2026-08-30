@@ -4,7 +4,7 @@
 import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
-import { initDatabase, stmts } from "../src/models/database";
+import { initDatabase, getDb, stmts } from "../src/models/database";
 import { encryptToHex, encrypt, decrypt } from "../src/services/security";
 
 dotenv.config();
@@ -66,7 +66,7 @@ async function main() {
   console.log(`Renovando tokens: ${accounts.length} cuentas\n`);
 
   await initDatabase();
-  const db = require("../src/models/database").getDb();
+  const db = getDb();
 
   // Leer tokens actuales
   const encPath = path.resolve(process.cwd(), "bearers.enc");

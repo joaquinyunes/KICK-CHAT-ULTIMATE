@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { loginUser, registerUser, verifyToken } from "../services/auth-manager";
+import { loginUser, registerUser, verifyToken, LockoutError } from "../services/auth-manager";
 import { validate, LoginSchema, RegisterSchema, LoginInput, RegisterInput } from "../utils/validators";
 import type { GenericResponse } from "../types/response";
 
@@ -36,6 +36,11 @@ export async function handleLogin(req: Request, res: Response) {
     res.cookie("scb_jwt", result.token, COOKIE_OPTS);
     res.status(200).json({ success: true, token: result.token, expiresAt: result.expiresAt, tokenType: "Bearer" } as GenericResponse);
   } catch (err) {
+    if (err instanceof LockoutError) {
+      res.set("Retry-After", String(err.retryAfterSecs));
+      res.status(429).json({ error: "Demasiados intentos", message: err.message });
+      return;
+    }
     res.status(401).json({ error: "No autorizado", message: "Credenciales inválidas" });
   }
 }

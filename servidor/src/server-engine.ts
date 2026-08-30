@@ -7,7 +7,7 @@ import path from "path";
 import { env } from "./config/env";
 import { loadBearers } from "./services/security";
 import { requestLogger, metricsRouter } from "./telemetry";
-import { initDatabase } from "./models/database";
+import { initDatabase, flushDb, getDb } from "./models/database";
 import { logger } from "./utils/logger";
 
 const TAG = "server";
@@ -26,8 +26,13 @@ import { requirePageAuth } from "./middleware/auth-page.middleware";
 
 const app = express();
 
+// Detrás de un reverse proxy (nginx, Fly, Railway…): confiar en 1 hop
+// para que req.ip / rate-limit / audit log usen la IP real del cliente.
+app.set("trust proxy", 1);
+
 app.use(cors({
-  origin: process.env.NODE_ENV === "production" ? (process.env.APP_URL || false) : "*",
+  // "*" + credentials es inválido; en dev reflejamos el origin.
+  origin: env.NODE_ENV === "production" ? (env.APP_URL ?? false) : true,
   credentials: true,
 }));
 app.use(helmet({
@@ -85,9 +90,19 @@ app.get("/admin/proxies", (_req: Request, res: Response) => {
 // ─── Telemetry ───────────────────────────────────────────────────
 app.use(requestLogger);
 
-// ─── Rate Limiter global ─────────────────────────────────────────
-const globalLimiter = rateLimit({ windowMs: 60_000, max: 120, skip: (req) => req.path.startsWith("/api/admin/") || req.path.startsWith("/me/") });
+// ─── Rate Limiters ───────────────────────────────────────────────
+const globalLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.path.startsWith("/me/"),
+});
 app.use(globalLimiter);
+
+// Límite dedicado (más laxo que el global en ráfaga, pero acotado) para el panel admin.
+const adminLimiter = rateLimit({ windowMs: 60_000, max: 300, standardHeaders: true, legacyHeaders: false });
+app.use("/api/admin", adminLimiter);
 
 // ─── Routers ─────────────────────────────────────────────────────
 app.use("/auth", authRoutes);
@@ -104,9 +119,21 @@ app.use(actionsRoutes);
 // ─── Metrics ─────────────────────────────────────────────────────
 app.use(metricsRouter);
 
-// ─── Health Check ────────────────────────────────────────────────
+// ─── Health / Readiness ──────────────────────────────────────────
 app.get("/health", (_req: Request, res: Response) => {
   res.json({ status: "ok", mode: "on-demand", timestamp: new Date().toISOString() });
+});
+
+let ready = false;
+export function markReady(): void { ready = true; }
+app.get("/ready", (_req: Request, res: Response) => {
+  if (!ready) { res.status(503).json({ status: "starting" }); return; }
+  try {
+    getDb().exec("SELECT 1");
+    res.json({ status: "ready" });
+  } catch {
+    res.status(503).json({ status: "db-unavailable" });
+  }
 });
 
 // ─── Error Handlers ──────────────────────────────────────────────
@@ -122,19 +149,27 @@ process.on("uncaughtException", (err) => { logger.error(TAG, "Uncaught Exception
 
 let server: ReturnType<typeof app.listen> | null = null;
 
+let shuttingDown = false;
 function gracefulShutdown(signal: string): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  ready = false;
   logger.info(TAG, `Recibido ${signal} — cerrando servidor...`);
+  const finish = (code: number) => {
+    try { flushDb(); } catch (e) { logger.error(TAG, "flushDb falló en shutdown", String(e)); }
+    process.exit(code);
+  };
   if (server) {
     server.close(() => {
       logger.info(TAG, "Servidor HTTP cerrado");
-      process.exit(0);
+      finish(0);
     });
     setTimeout(() => {
       logger.error(TAG, "Fallo shutdown graceful — forzando salida");
-      process.exit(1);
-    }, 10000);
+      finish(1);
+    }, 10000).unref();
   } else {
-    process.exit(0);
+    finish(0);
   }
 }
 
@@ -147,6 +182,7 @@ async function bootstrap(): Promise<void> {
   logger.info(TAG, "Verificando bearers...");
   try { loadBearers(); } catch { logger.warn(TAG, "Sin bearers.enc — solo bots OAuth disponibles"); }
   server = app.listen(env.PORT, () => {
+    markReady();
     logger.info(TAG, "StreamChat Bridge en puerto " + env.PORT);
   });
 }

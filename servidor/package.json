@@ -3,10 +3,21 @@
   "version": "1.0.0",
   "description": "StreamChat Bridge - Servidor Central FASE 1",
   "main": "dist/server-engine.js",
+  "engines": {
+    "node": ">=20 <25"
+  },
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server-engine.ts",
-    "build": "tsc && copy /Y vod_viewer_worker.py dist\\vod_viewer_worker.py",
+    "build": "tsc && node scripts/copy-worker.js",
     "start": "node dist/server-engine.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint \"src/**/*.ts\" \"scripts/**/*.ts\"",
+    "lint:fix": "eslint --fix \"src/**/*.ts\" \"scripts/**/*.ts\"",
+    "format": "prettier --write \"src/**/*.{ts,js}\" \"*.{json,md}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,js}\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run typecheck && npm run lint && npm test",
     "encrypt-bearers": "ts-node scripts/encrypt-bearers.ts",
     "add-bot": "ts-node scripts/add-bot.ts",
     "create-user": "ts-node scripts/create-user.ts",
@@ -38,7 +49,12 @@
     "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^20.19.43",
     "@types/sql.js": "^1.4.11",
+    "eslint": "^9.15.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.4.2",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "typescript-eslint": "^8.16.0",
+    "vitest": "^2.1.8"
   }
 }
