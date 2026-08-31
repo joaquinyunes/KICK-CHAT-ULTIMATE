@@ -29,6 +29,7 @@ LOOP_DELAY = (10, 30)
 
 running = True
 vod_index = 0  # round-robin index
+PROXIES = []  # lista de {id, server, username, password} — se rota una por visita
 session_views = []  # timestamps of views generated in this session
 stats = {"views_generated": 0, "views_failed": 0}
 
@@ -75,10 +76,17 @@ async def visit(browser, vod, hourly_limit, initial_hourly):
 
     viewport = random.choice(COMMON_VIEWPORTS)
     context = None
+    ctx_opts = dict(ignore_https_errors=True, user_agent=USER_AGENT, viewport=viewport)
+    proxy = random.choice(PROXIES) if PROXIES else None
+    if proxy:
+        p = {"server": proxy["server"]}
+        if proxy.get("username"):
+            p["username"] = proxy["username"]
+        if proxy.get("password"):
+            p["password"] = proxy["password"]
+        ctx_opts["proxy"] = p
     try:
-        context = await browser.new_context(
-            ignore_https_errors=True, user_agent=USER_AGENT, viewport=viewport
-        )
+        context = await browser.new_context(**ctx_opts)
         page = await context.new_page()
         await page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
@@ -91,7 +99,7 @@ async def visit(browser, vod, hourly_limit, initial_hourly):
 
                 session_views.append(time.time())
                 stats["views_generated"] += 1
-                log(type="view_ok", url=vod["url"], vod_id=vod["id"], total=stats["views_generated"], failed=stats["views_failed"])
+                log(type="view_ok", url=vod["url"], vod_id=vod["id"], proxy_id=(proxy or {}).get("id"), total=stats["views_generated"], failed=stats["views_failed"])
                 return
             except Exception as e:
                 if attempt < MAX_RETRIES - 1:
@@ -115,7 +123,10 @@ async def main_loop():
     vods = config.get("vods", [])
     initial_hourly = config.get("hourly_views", 0)
 
-    log(type="start", user_id=user_id, hourly_limit=hourly_limit, vod_count=len(vods), hourly_views=initial_hourly)
+    global PROXIES
+    PROXIES = config.get("proxies", []) or []
+
+    log(type="start", user_id=user_id, hourly_limit=hourly_limit, vod_count=len(vods), proxy_count=len(PROXIES), hourly_views=initial_hourly)
     logfile(type="start", user_id=user_id, vod_count=len(vods))
 
     if not vods:

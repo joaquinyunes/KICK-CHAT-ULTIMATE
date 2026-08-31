@@ -3,6 +3,8 @@ import path from "path";
 import fs from "fs";
 import { stmts } from "../models/database";
 import { logger } from "../utils/logger";
+import { env } from "../config/env";
+import { findPython } from "../utils/python";
 
 interface ViewerInstance {
   process: ChildProcess;
@@ -38,7 +40,7 @@ function parseLine(instance: ViewerInstance, line: string): void {
       case "view_ok":
         instance.viewsGenerated = data.total ?? instance.viewsGenerated + 1;
         try {
-          stmts.insertViewLog.run([instance.userId, data.vod_id ?? null, null, 1, null]);
+          stmts.insertViewLog.run([instance.userId, data.vod_id ?? null, data.proxy_id ?? null, 1, null]);
           if (data.vod_id) {
             stmts.incrementVodViews.run({ id: data.vod_id });
           }
@@ -105,11 +107,24 @@ export function startViewer(userId: number): { success: boolean; error?: string 
   const recentViews = stmts.getViewStats.all([userId])[0] || { total_views: 0, successful: 0, last_hour: 0 };
 
   const vodsData = vods.map(v => ({ id: v.id, url: v.url, type: v.type }));
+
+  // Proxies activos: el worker rota uno por cada visita para no salir siempre
+  // desde la IP del VPS (Kick deduplica vistas por IP).
+  const proxies = (stmts.listProxies.all() as any[])
+    .filter(p => p.is_active)
+    .map(p => ({
+      id: p.id,
+      server: `${p.protocol || "http"}://${p.host}:${p.port}`,
+      username: p.username || undefined,
+      password: p.password || undefined,
+    }));
+
   const scriptPath = path.resolve(process.cwd(), "vod_viewer_worker.py");
   const config = JSON.stringify({
     user_id: userId,
     hourly_limit: hourlyLimit,
     vods: vodsData,
+    proxies,
     hourly_views: (recentViews.last_hour ?? 0),
   });
 
@@ -121,8 +136,8 @@ export function startViewer(userId: number): { success: boolean; error?: string 
     return { success: false, error: `Script no encontrado: ${scriptPath}` };
   }
 
-  // Check python
-  const pythonCmd = "python";
+  // Check python (con Playwright instalado)
+  const pythonCmd = findPython("playwright") || env.PYTHON_PATH || "python";
   logDebug(`Spawning: ${pythonCmd} ${scriptPath}`);
 
   const child = spawn(pythonCmd, [scriptPath], {

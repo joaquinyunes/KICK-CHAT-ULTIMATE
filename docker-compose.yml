@@ -1,0 +1,39 @@
+services:
+  app:
+    build:
+      context: ./servidor
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    volumes:
+      # Base SQLite + logs de los workers (persisten entre reinicios)
+      - ./data:/app/data
+      # Pool de bearers cifrado (opcional; generalo con: npm run encrypt-bearers)
+      - ./secrets/bearers.enc:/app/bearers.enc:ro
+    expose:
+      - "3000"
+    # Para depurar sin Caddy, descomentá y entrá por http://IP:3000
+    # ports:
+    #   - "3000:3000"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  caddy-data:
+  caddy-config:

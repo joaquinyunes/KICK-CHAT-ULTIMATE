@@ -40,6 +40,7 @@ COPY --from=build /app/dist ./dist
 COPY package.json ./
 COPY public/ ./public/
 COPY send_to_kick.py send_to_kick_daemon.py send_to_kick_playwright.py ./
+COPY vod_viewer_worker.py ./
 
 RUN useradd --system --uid 10001 --home /app app \
     && mkdir -p /app/data && chown -R app:app /app
