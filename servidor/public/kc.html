@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StreamChat – Contexto en vivo</title>
+<link rel="stylesheet" href="css/main.css" />
+<link rel="stylesheet" href="css/client-nav.css" />
+<style>
+  .kc-wrap { flex:1; padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:14px; min-height:0; }
+  .kc-wrap > * { flex-shrink:0; }
+  .kc-topbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .kc-topbar h2 { font-size:15px; margin:0; color:var(--text); font-weight:700; }
+  .kc-pill { font-size:11px; padding:3px 10px; border-radius:20px; border:1px solid var(--border); color:var(--text-muted); background:var(--surface2); white-space:nowrap; }
+  .kc-pill.on { border-color:var(--success); color:var(--success); }
+  .kc-pill.off { border-color:var(--danger,#e5484d); color:var(--danger,#e5484d); }
+  .kc-pill.warn { border-color:#e2a03f; color:#e2a03f; }
+  .kc-statusbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:10px 14px; }
+  .kc-statusbar .big { font-size:13px; font-weight:700; }
+  .kc-statusbar .big.on { color:var(--success); }
+  .kc-statusbar .big.off { color:var(--danger,#e5484d); }
+  .kc-statusbar .big.warn { color:#e2a03f; }
+  .kc-controls { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-left:auto; }
+  .kc-controls select { background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:6px 8px; font-family:inherit; font-size:12px; }
+  .kc-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width:900px){ .kc-grid { grid-template-columns:1fr; } }
+  .kc-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px; display:flex; flex-direction:column; gap:10px; min-height:0; }
+  .kc-card h3 { font-size:12px; margin:0; color:var(--text); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+  .kc-card .sub { font-size:11px; color:var(--text-muted); text-transform:none; letter-spacing:0; }
+  .kc-scroll { overflow-y:auto; max-height:44vh; display:flex; flex-direction:column; gap:8px; }
+  .kc-sum { border:1px solid var(--border); border-radius:8px; padding:8px 10px; background:var(--surface2); }
+  .kc-sum-head { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+  .kc-badge { font-size:10px; padding:2px 8px; border-radius:20px; background:rgba(109,90,252,.14); color:var(--accent); border:1px solid var(--accent); }
+  .kc-time { font-size:10px; color:var(--text-muted); margin-left:auto; }
+  .kc-sum p { margin:2px 0; font-size:12px; line-height:1.45; color:var(--text); }
+  .kc-sum .prev, .kc-sum .trend { color:var(--text-muted); font-size:11px; }
+  .kc-line { display:flex; gap:6px; padding:3px 4px; font-size:12.5px; line-height:1.4; border-bottom:1px solid rgba(255,255,255,.03); }
+  .kc-line .u { font-weight:700; color:var(--accent); flex-shrink:0; }
+  .kc-line .t { color:var(--text); word-break:break-word; }
+  .kc-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .kc-stat { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:8px; text-align:center; }
+  .kc-stat b { display:block; font-size:18px; color:var(--text); }
+  .kc-stat span { font-size:10px; color:var(--text-muted); text-transform:uppercase; }
+  .kc-err { font-size:11px; color:var(--danger,#e5484d); background:rgba(229,72,77,.08); border:1px solid rgba(229,72,77,.25); border-radius:6px; padding:6px 8px; word-break:break-word; }
+  .kc-empty { color:var(--text-muted); font-size:12px; text-align:center; padding:24px 8px; }
+  .kc-meta { font-size:11px; color:var(--text-muted); display:flex; gap:14px; flex-wrap:wrap; }
+  .kc-toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:var(--surface); border:1px solid var(--accent); color:var(--text); font-size:12px; padding:10px 16px; border-radius:8px; z-index:80; box-shadow:0 8px 30px rgba(0,0,0,.4); }
+  .kc-toast[hidden] { display:none; }
+  .kc-set { margin-top:12px; }
+  .kc-set[hidden] { display:none; }
+  .kc-sec { border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:12px; }
+  .kc-sec-t { font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; }
+  .kc-set label { font-size:12px; color:var(--text); display:block; margin:8px 0 3px; }
+  .kc-set textarea, .kc-set input[type=number] { width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:7px 9px; font-family:inherit; font-size:12px; }
+  .kc-set textarea { resize:vertical; }
+  .kc-row { display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap; }
+  .kc-row > div { flex:1; min-width:90px; }
+  .kc-mix { display:flex; flex-direction:column; gap:6px; }
+  .kc-mix > div { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text); }
+  .kc-mix span { width:90px; }
+  .kc-mix input { width:64px; }
+  .kc-radio { display:flex; gap:14px; font-size:12px; margin:4px 0 8px; flex-wrap:wrap; }
+  .kc-radio label { display:inline-flex; gap:5px; align-items:center; margin:0; cursor:pointer; }
+  .kc-set-actions { display:flex; gap:8px; flex-wrap:wrap; }
+</style>
+</head>
+<body class="chat-page">
+  <div class="pl-scene" aria-hidden="true"></div>
+  <div class="pl-grid" aria-hidden="true"></div>
+  <div class="pl-grain" aria-hidden="true"></div>
+  <header id="chat-header" class="app-header"></header>
+  <div id="client-nav"></div>
+
+  <div class="kc-wrap">
+    <div class="kc-topbar">
+      <h2>🎥 Contexto del stream → Gemini → Chat</h2>
+    </div>
+
+    <!-- ESTADO + CONTROLES -->
+    <div class="kc-statusbar">
+      <span id="kc-big" class="big off">■ PIPELINE APAGADO</span>
+      <span id="kc-cap-pill" class="kc-pill">captura: —</span>
+      <span id="kc-chan-pill" class="kc-pill">canal: —</span>
+      <div class="kc-controls">
+        <label style="font-size:11px;color:var(--text-muted)">pantalla:</label>
+        <select id="kc-monitor"><option value="">escritorio completo</option></select>
+        <button id="kc-apply-screen" class="btn btn-ghost btn-sm">Aplicar</button>
+      </div>
+    </div>
+
+    <div class="kc-statusbar">
+      <button id="kc-start" class="btn btn-primary btn-sm">▶ Arrancar</button>
+      <button id="kc-stop" class="btn btn-danger btn-sm">■ Parar</button>
+      <span style="width:1px;height:20px;background:var(--border)"></span>
+      <button id="kc-analyze" class="btn btn-secondary btn-sm">⚡ Analizar contexto ahora</button>
+      <button id="kc-regen" class="btn btn-secondary btn-sm">🗑 Borrar y regenerar mensajes</button>
+      <button id="kc-refresh" class="btn btn-ghost btn-sm" style="margin-left:auto">↻ Refrescar lote</button>
+    </div>
+    <div id="kc-pipe-err"></div>
+
+    <div class="kc-card">
+      <h3 id="kc-set-toggle" style="cursor:pointer;user-select:none">⚙️ Ajustes de contexto, generación y envío <span id="kc-set-caret" style="color:var(--accent)">▸</span></h3>
+      <div id="kc-set-body" class="kc-set" hidden>
+
+        <div class="kc-sec">
+          <div class="kc-sec-t">Contexto</div>
+          <div class="kc-radio">
+            <label><input type="radio" name="kc-modo" value="auto" checked> Automático (Gemini lee la pantalla)</label>
+            <label><input type="radio" name="kc-modo" value="manual"> Manual</label>
+          </div>
+          <label>Contexto manual (se usa EN VEZ de la pantalla)</label>
+          <textarea id="kc-ctx-manual" rows="4" placeholder="Ej: Estoy jugando Gates of Olympus, vengo perdiendo, el chat me tira slots. En un rato paso a mirar el partido de Boca."></textarea>
+          <label>Contexto extra (se SUMA a lo que analiza solo)</label>
+          <textarea id="kc-ctx-extra" rows="3" placeholder="Ej: avisá que en 10 min hago sorteo. No hablen de política."></textarea>
+        </div>
+
+        <div class="kc-sec">
+          <div class="kc-sec-t">Generación</div>
+          <label>Cantidad de mensajes por lote</label>
+          <input type="number" id="kc-cantidad" min="4" max="200" step="1" value="30">
+          <label style="margin-top:12px">Mezcla de tipos (% aprox.)</label>
+          <div class="kc-mix" id="kc-mix">
+            <div><span>Opiniones</span><input type="number" data-k="opiniones" min="0" max="100" value="35"> %</div>
+            <div><span>Preguntas</span><input type="number" data-k="preguntas" min="0" max="100" value="25"> %</div>
+            <div><span>Críticas</span><input type="number" data-k="criticas" min="0" max="100" value="15"> %</div>
+            <div><span>Reacciones</span><input type="number" data-k="reacciones" min="0" max="100" value="15"> %</div>
+            <div><span>Bromas</span><input type="number" data-k="bromas" min="0" max="100" value="10"> %</div>
+          </div>
+        </div>
+
+        <div class="kc-sec">
+          <div class="kc-sec-t">Envío</div>
+          <div class="kc-row">
+            <div><label>Mínimo (seg)</label><input type="number" id="kc-min-seg" min="2" max="600" value="7"></div>
+            <div><label>Máximo (seg)</label><input type="number" id="kc-max-seg" min="2" max="600" value="18"></div>
+          </div>
+          <label style="margin-top:10px"><input type="checkbox" id="kc-bearer-random" checked> Elegir el bearer al azar (si no, rota parejo)</label>
+        </div>
+
+        <div class="kc-sec">
+          <p style="font-size:11px;color:var(--text-muted);margin:0 0 8px">
+            "Guardar" aplica al próximo lote. "Guardar y regenerar" borra la cola y arma uno nuevo ahora.
+          </p>
+          <div class="kc-set-actions">
+            <button id="kc-save" class="btn btn-secondary btn-sm">Guardar</button>
+            <button id="kc-save-regen" class="btn btn-primary btn-sm">Guardar y regenerar</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="kc-grid">
+      <div class="kc-card">
+        <h3>1 · Contexto del stream <span class="sub">Módulo 8 · Gemini lee pantalla + audio</span></h3>
+        <div id="kc-sums" class="kc-scroll"><p class="kc-empty">Esperando el primer resumen…</p></div>
+      </div>
+
+      <div class="kc-card">
+        <h3>2 · Mensajes generados <span class="sub">Módulo 12 · prompt + contexto → Gemini</span></h3>
+        <div class="kc-meta">
+          <span id="kc-lote-count">0 líneas</span>
+          <span id="kc-lote-when">sin lote</span>
+        </div>
+        <div id="kc-lines" class="kc-scroll"><p class="kc-empty">Todavía no llegó ningún lote.</p></div>
+      </div>
+    </div>
+
+    <div class="kc-card">
+      <h3>3 · Envío al chat de Kick <span class="sub">pool de bearers · <span id="kc-send-int">cada 7-18s</span></span></h3>
+      <div class="kc-stats">
+        <div class="kc-stat"><b id="kc-sent">0</b><span>enviados</span></div>
+        <div class="kc-stat"><b id="kc-queued">0</b><span>en cola</span></div>
+        <div class="kc-stat"><b id="kc-failed">0</b><span>fallidos</span></div>
+      </div>
+      <div class="kc-meta">
+        <span id="kc-send-chan">canal: —</span>
+        <span id="kc-send-last">último envío: —</span>
+      </div>
+      <div id="kc-send-err"></div>
+    </div>
+  </div>
+
+  <div id="kc-toast" class="kc-toast" hidden></div>
+
+  <script src="js/pl-mascot.js"></script>
+  <script type="module" src="js/kc-ui.js?v=5"></script>
+</body>
+</html>

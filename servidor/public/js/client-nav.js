@@ -8,6 +8,7 @@ import { onStatusChange, ping } from './bridge-client.js';
 // ─── Config & helpers ────────────────────────────────────────────────────────
 const NAV_ITEMS = [
   { id: 'chat',      label: 'Chat',      ico: '💬', url: '/chat' },
+  { id: 'kc',        label: 'Contexto',  ico: '🎥', url: '/kc' },
   { id: 'simulador', label: 'Simulador', ico: '🤖', url: '/simulador' },
   { id: 'ajustes',   label: 'Ajustes',    ico: '⚙️', url: '/ajustes' },
   { id: 'vods',      label: 'VODs',       ico: '🎬', url: '/vods' },
