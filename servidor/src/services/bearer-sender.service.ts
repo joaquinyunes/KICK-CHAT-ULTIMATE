@@ -2,7 +2,50 @@ import { getRandomBearer, loadBearers } from "./security";
 import { logger } from "../utils/logger";
 
 const TAG = "kick-bearer";
-const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
+
+// Pool de User-Agents: cada bearer usa uno distinto para parecer dispositivos diferentes
+const UA_POOL = [
+  // Chrome Windows
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+  // Chrome Mac
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+  // Firefox Windows
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0",
+  // Firefox Mac
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:133.0) Gecko/20100101 Firefox/133.0",
+  // Edge Windows
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0",
+  // Safari Mac
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15",
+  // Chrome Android
+  "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+  "Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
+  "Mozilla/5.0 (Linux; Android 14; SM-A546B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36",
+  // Safari iOS
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1",
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Mobile/15E148 Safari/604.1",
+  // Edge Mac
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+  // Chrome Linux
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+];
+
+function getUaForBearer(bearer: string | undefined): string {
+  if (!bearer) return UA_POOL[0];
+  // Hash simple del bearer para asignar UA consistente
+  let hash = 0;
+  const str = String(bearer);
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
+  }
+  return UA_POOL[Math.abs(hash) % UA_POOL.length];
+}
 
 function authHeader(bearer: string | undefined): Record<string, string> {
   if (!bearer) return {};
@@ -93,7 +136,7 @@ export async function resolveChatroomId(
   const url = "https://kick.com/api/v2/channels/" + encodeURIComponent(channelSlug);
   try {
     const res = await fetch(url, {
-      headers: { Accept: "application/json, text/plain, */*", "User-Agent": UA, ...authHeader(b) },
+      headers: { Accept: "application/json, text/plain, */*", "User-Agent": getUaForBearer(b), ...authHeader(b) },
       signal: AbortSignal.timeout(12000),
     });
     if (res.status !== 200) return { chatId: null, status: res.status, bearer: b };
@@ -113,7 +156,7 @@ export async function resolveChatroomId(
 export async function sendWithBearer(
   channel: string,
   message: string,
-  opts: { bearer?: string; chatroomId?: number; cola?: string } = {}
+  opts: { bearer?: string; chatroomId?: number; cola?: string; random?: boolean } = {}
 ): Promise<BearerSendResult> {
   let b = opts.bearer;
   let chatId = opts.chatroomId;
@@ -144,14 +187,23 @@ export async function sendWithBearer(
   // Si todos están en cooldown, usar el pool completo (forzar uso)
   const workingPool = available.length > 0 ? available : pool;
 
-  // Round-robin sobre el pool
+  // Orden de intento: round-robin (reparte parejo) o al azar (opts.random)
   const candidates: string[] = [];
   if (workingPool.length > 0) {
-    for (let i = 0; i < workingPool.length; i++) {
-      const idx = (roundRobinIndex + i) % workingPool.length;
-      if (workingPool[idx]) candidates.push(workingPool[idx]);
+    if (opts.random) {
+      const shuffled = [...workingPool];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      candidates.push(...shuffled);
+    } else {
+      for (let i = 0; i < workingPool.length; i++) {
+        const idx = (roundRobinIndex + i) % workingPool.length;
+        if (workingPool[idx]) candidates.push(workingPool[idx]);
+      }
+      roundRobinIndex = (roundRobinIndex + 1) % workingPool.length;
     }
-    roundRobinIndex = (roundRobinIndex + 1) % workingPool.length;
   } else if (b) {
     candidates.push(b);
   }
@@ -168,7 +220,7 @@ export async function sendWithBearer(
         method: "POST",
         headers: {
           Accept: "application/json, text/plain, */*",
-          "User-Agent": UA,
+          "User-Agent": getUaForBearer(candidate),
           "Content-Type": "application/json",
           ...authHeader(candidate),
         },
@@ -197,9 +249,8 @@ export async function sendWithBearer(
         break;
       }
       deadTokens.add(candidate);
-      console.log(`[BEARER] dead token status=${res.status} bearer=${String(candidate).slice(0,12)}…, marked dead, trying next`);
-      continue;
       logger.warn(TAG, "token muerto, pruebo otro", "status=" + res.status, "token=" + String(candidate).slice(0, 12) + "…");
+      continue;
     } catch (e: any) {
       lastRes = { ok: false, status: 0, body: e.message, bearer: candidate, chatroomId: chatId };
       logger.error(TAG, "send excepcion", e.message);

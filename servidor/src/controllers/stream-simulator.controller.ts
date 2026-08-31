@@ -9,6 +9,19 @@ import { getRandomBearer, decryptFromHex } from "../services/security";
 import { stmts } from "../models/database";
 import { SYSTEM_PROMPT } from "../prompts/simulator-chat.es";
 import { parseLlmMessages, sanitizeStreamContext } from "../utils/llm-messages";
+import { execFile } from "child_process";
+import { getKcIngestStatus, getKcSummaries, tick as kcIngestTick, primeForRegenerate, watchForRegenerate } from "../services/kc-ingest.service";
+import {
+  startKcPipeline,
+  stopKcPipeline,
+  restartKcPipeline,
+  getKcPipelineStatus,
+  getCaptureConfig,
+  setCaptureConfig,
+  kcControlDir,
+} from "../services/kc-supervisor.service";
+import { getKcSenderStatus, clearKcSender, getSendConfig, setSendConfig } from "../services/kc-sender.service";
+import { findPython } from "../utils/python";
 
 const OR_MODEL = "openai/gpt-oss-20b:free";
 const OR_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -906,5 +919,362 @@ El array debe tener exactamente ${cantidad} objetos.`;
   } catch (err: any) {
     logger.error("simulator", `Build prompt error: ${err}`);
     res.status(500).json({ error: "Error armando el prompt" });
+  }
+}
+
+// ============================================================
+// Hook: ejecuta comando externo después de generar un lote
+// ============================================================
+function ejecutarHook(filePath: string): void {
+  const hookCmd = env.KICK_COMENTARIO_HOOK_CMD;
+  if (!hookCmd) return;
+
+  const parts = hookCmd.split(/\s+/);
+  const cmd = parts[0];
+  const args = parts.slice(1).concat([filePath]);
+
+  logger.info("hook", `Ejecutando: ${hookCmd} ${filePath}`);
+  execFile(cmd, args, { timeout: 30_000 }, (err, stdout, stderr) => {
+    if (err) {
+      logger.error("hook", `Hook error: ${err.message}`);
+    } else {
+      logger.info("hook", `Hook OK: ${(stdout || "").trim().substring(0, 200)}`);
+    }
+  });
+}
+
+function volcarLote(mensajes: any[], tema: string): string | null {
+  try {
+    const dataDir = path.resolve(process.cwd(), "data", "lotes");
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+
+    const ts = Date.now();
+    const jsonPath = path.join(dataDir, `lote_${ts}.json`);
+    const txtPath = path.join(dataDir, `lote_${ts}.txt`);
+
+    const payload = {
+      timestamp: new Date().toISOString(),
+      tema,
+      mensajes: mensajes.map((m: any) => `${m.user || "anonymous"}: ${m.message || ""}`),
+    };
+
+    fs.writeFileSync(jsonPath, JSON.stringify(payload, null, 2), "utf-8");
+    fs.writeFileSync(txtPath, payload.mensajes.join("\n"), "utf-8");
+
+    logger.info("hook", `Lote volcado: ${jsonPath} (${payload.mensajes.length} msgs)`);
+    ejecutarHook(jsonPath);
+    return jsonPath;
+  } catch (e: any) {
+    logger.error("hook", `Error volcando lote: ${e.message}`);
+    return null;
+  }
+}
+
+// ============================================================
+// POST /api/chat/auto-generate — genera mensajes para auto-refresh
+// ============================================================
+export async function autoGenerate(req: Request, res: Response): Promise<void> {
+  try {
+    const body = req.body || {};
+    const tema = (typeof body.tema === "string" && body.tema.trim()) ? body.tema.trim() : "transmisión en vivo";
+    const cantidad = Math.min(Math.max(Number(body.cantidad) || 30, 10), 200);
+    const orKey = getOrKey(req.user?.sub);
+    const sessionId = `auto_${Date.now()}`;
+
+    if (!orKey) {
+      const all = generateLocalChat(cantidad, "normal", tema, "justchatting", []);
+      const lines = all.map((m: any) => `${m.user}: ${m.message}`);
+      volcarLote(all, tema);
+      res.json({ success: true, lines, cantidad: lines.length, modo: "local" });
+      return;
+    }
+
+    const energiaDesc = `ENERGÍA: Normal — balanceado, variedad natural | CAPS boost: medio`;
+    const prompt = SYSTEM_PROMPT.replace("{energia_desc}", energiaDesc);
+
+    const inputData = {
+      session_id: sessionId,
+      stream_context: tema,
+      categoria_stream: "justchatting",
+      cantidad: cantidad,
+      energia_chat: "normal",
+      temperatura: 0.75,
+      noticias: [],
+      historial_db: [],
+      memoria_usuarios: {},
+      evento: { tipo: "normal", impacto: "bajo", tema: "" },
+    };
+
+    const temp = 0.75;
+    const rawText = await callOpenRouter(prompt, orKey, temp, 1, inputData);
+    const mensajes = parseMessages(rawText);
+
+    const lines = mensajes.map((m: any) => `${m.user || "anonymous"}: ${m.message || ""}`).filter((l: string) => l.length > 3);
+    persistSimulation(mensajes, sessionId, tema, "normal", temp);
+    volcarLote(mensajes, tema);
+    res.json({ success: true, lines, cantidad: lines.length, modo: "ai" });
+  } catch (err: any) {
+    logger.error("simulator", `Auto-generate error: ${err}`);
+    res.status(500).json({ error: "Error generando mensajes automáticos" });
+  }
+}
+
+// ============================================================
+// POST /api/chat/watch-file — lee un .txt del disco local
+// ============================================================
+
+const WATCHED_FILES: Map<string, { filePath: string, lastMtime: number, lines: string[] }> = new Map();
+
+export function watchFile(req: Request, res: Response): void {
+  try {
+    const body = req.body || {};
+    const filePath = (typeof body.path === "string" && body.path.trim()) ? body.path.trim() : "";
+    const intervalSec = Math.max(Number(body.interval) || 30, 10);
+
+    if (!filePath) { res.status(400).json({ error: " path requerido" }); return; }
+
+    if (!fs.existsSync(filePath)) { res.status(404).json({ error: "Archivo no encontrado: " + filePath }); return; }
+
+    const stat = fs.statSync(filePath);
+    const lines = fs.readFileSync(filePath, "utf-8").split(/\r?\n/).filter(l => l.trim());
+    WATCHED_FILES.set(filePath, { filePath, lastMtime: stat.mtimeMs, lines });
+
+    res.json({ success: true, lines, total: lines.length, path: filePath });
+  } catch (err: any) {
+    logger.error("simulator", `Watch file error: ${err}`);
+    res.status(500).json({ error: "Error leyendo archivo" });
+  }
+}
+
+export function getFileStatus(_req: Request, res: Response): void {
+  try {
+    const watched: any[] = [];
+    WATCHED_FILES.forEach((info, key) => {
+      // Re-read to check for changes
+      if (fs.existsSync(info.filePath)) {
+        const stat = fs.statSync(info.filePath);
+        const changed = stat.mtimeMs > info.lastMtime;
+        if (changed) {
+          info.lines = fs.readFileSync(info.filePath, "utf-8").split(/\r?\n/).filter(l => l.trim());
+          info.lastMtime = stat.mtimeMs;
+        }
+        watched.push({ path: key, total: info.lines.length, changed, lines: changed ? info.lines : undefined });
+      }
+    });
+    res.json({ success: true, watched });
+  } catch (err: any) {
+    res.status(500).json({ error: "Error checking files" });
+  }
+}
+
+// ============================================================
+// GET /api/chat/kc-context — estado + líneas absorbidas desde
+// proyecto-kick-context (Módulo 12). El panel lo consulta solo.
+// ============================================================
+export function kcContext(_req: Request, res: Response): void {
+  try {
+    res.json({ success: true, ...getKcIngestStatus(), summaries: getKcSummaries(), pipeline: getKcPipelineStatus(), sender: getKcSenderStatus() });
+  } catch (err: any) {
+    logger.error("simulator", `kc-context error: ${err}`);
+    res.status(500).json({ error: "Error leyendo el contexto de KC" });
+  }
+}
+
+// POST /api/chat/kc-context/refresh — fuerza una lectura de la carpeta de lotes ahora
+export function kcContextRefresh(_req: Request, res: Response): void {
+  try {
+    kcIngestTick();
+    res.json({ success: true, ...getKcIngestStatus(), summaries: getKcSummaries(), pipeline: getKcPipelineStatus(), sender: getKcSenderStatus() });
+  } catch (err: any) {
+    logger.error("simulator", `kc-context refresh error: ${err}`);
+    res.status(500).json({ error: "Error refrescando el contexto de KC" });
+  }
+}
+
+// POST /api/chat/kc-pipeline/start | /stop — controla el pipeline Python de contexto
+export function kcPipelineStart(_req: Request, res: Response): void {
+  try {
+    const r = startKcPipeline({ manual: true });
+    res.json({ success: r.ok, message: r.message, pipeline: getKcPipelineStatus() });
+  } catch (err: any) {
+    logger.error("simulator", `kc-pipeline start error: ${err}`);
+    res.status(500).json({ error: "Error arrancando el pipeline de contexto" });
+  }
+}
+
+export function kcPipelineStop(_req: Request, res: Response): void {
+  try {
+    const r = stopKcPipeline();
+    res.json({ success: r.ok, message: r.message, pipeline: getKcPipelineStatus() });
+  } catch (err: any) {
+    logger.error("simulator", `kc-pipeline stop error: ${err}`);
+    res.status(500).json({ error: "Error deteniendo el pipeline de contexto" });
+  }
+}
+
+// GET /api/chat/kc-monitors — lista de pantallas/monitores de esta PC (Windows)
+const MONITOR_SNIPPET = `
+import json, ctypes, ctypes.wintypes as wt
+try: ctypes.windll.user32.SetProcessDPIAware()
+except Exception: pass
+mons=[]
+PROC=ctypes.WINFUNCTYPE(ctypes.c_int,ctypes.c_ulong,ctypes.c_ulong,ctypes.POINTER(wt.RECT),ctypes.c_double)
+def cb(h,hdc,lprc,data):
+    r=lprc.contents
+    mons.append({"x":r.left,"y":r.top,"w":r.right-r.left,"h":r.bottom-r.top})
+    return 1
+ctypes.windll.user32.EnumDisplayMonitors(0,0,PROC(cb),0)
+print(json.dumps(mons))
+`;
+
+export function kcMonitors(_req: Request, res: Response): void {
+  const py = findPython();
+  const cap = getCaptureConfig();
+  if (!py) {
+    res.json({ success: true, monitors: [], selected: cap, note: "No se encontró Python" });
+    return;
+  }
+  execFile(py, ["-c", MONITOR_SNIPPET], { timeout: 8000 }, (err, stdout) => {
+    if (err) {
+      res.json({ success: true, monitors: [], selected: cap, note: "No se pudieron enumerar los monitores (¿no es Windows?)" });
+      return;
+    }
+    let monitors: any[] = [];
+    try {
+      monitors = JSON.parse(String(stdout).trim()).map((m: any, i: number) => ({ index: i + 1, ...m }));
+    } catch {
+      /* deja monitors vacío */
+    }
+    res.json({ success: true, monitors, selected: cap });
+  });
+}
+
+// POST /api/chat/kc-capture — elige qué pantalla/ventana captura el Módulo 1
+export function kcSetCapture(req: Request, res: Response): void {
+  try {
+    const body = req.body || {};
+    const monitor = body.monitor !== undefined ? String(body.monitor).replace(/\D/g, "") : undefined;
+    const windowTitle = body.windowTitle !== undefined ? String(body.windowTitle).slice(0, 200) : undefined;
+    // Elegir monitor limpia el título de ventana y viceversa.
+    const next = setCaptureConfig({
+      monitor: windowTitle ? "" : monitor,
+      windowTitle: monitor ? "" : windowTitle,
+    });
+    const r = getKcPipelineStatus().running ? restartKcPipeline() : { ok: true, message: "Guardado (el pipeline está apagado)" };
+    res.json({ success: true, capture: next, message: r.message, pipeline: getKcPipelineStatus() });
+  } catch (err: any) {
+    logger.error("simulator", `kc-capture error: ${err}`);
+    res.status(500).json({ error: "Error cambiando la pantalla de captura" });
+  }
+}
+
+function touchControl(name: string): void {
+  const dir = kcControlDir();
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, name), String(Date.now()), "utf-8");
+}
+
+const GEN_CONFIG_FILE = () => path.join(kcControlDir(), "gen_config.json");
+
+interface GenConfig {
+  modo: "auto" | "manual";
+  contexto_manual: string;
+  contexto_extra: string;
+  cantidad: number;
+  mezcla: Record<string, number>;
+}
+
+function readGenConfig(): GenConfig {
+  const def: GenConfig = {
+    modo: "auto",
+    contexto_manual: "",
+    contexto_extra: "",
+    cantidad: 30,
+    mezcla: { opiniones: 35, preguntas: 25, criticas: 15, reacciones: 15, bromas: 10 },
+  };
+  try {
+    const d = JSON.parse(fs.readFileSync(GEN_CONFIG_FILE(), "utf-8"));
+    return {
+      modo: d.modo === "manual" ? "manual" : "auto",
+      contexto_manual: String(d.contexto_manual || ""),
+      contexto_extra: String(d.contexto_extra || ""),
+      cantidad: Math.min(200, Math.max(4, Number(d.cantidad) || def.cantidad)),
+      mezcla: d.mezcla && typeof d.mezcla === "object" ? d.mezcla : def.mezcla,
+    };
+  } catch {
+    return def;
+  }
+}
+
+function writeGenConfig(patch: Partial<GenConfig>): GenConfig {
+  const cur = readGenConfig();
+  const next: GenConfig = {
+    modo: patch.modo === "manual" || patch.modo === "auto" ? patch.modo : cur.modo,
+    contexto_manual: patch.contexto_manual !== undefined ? String(patch.contexto_manual).slice(0, 4000) : cur.contexto_manual,
+    contexto_extra: patch.contexto_extra !== undefined ? String(patch.contexto_extra).slice(0, 2000) : cur.contexto_extra,
+    cantidad: patch.cantidad !== undefined ? Math.min(200, Math.max(4, Math.round(Number(patch.cantidad)))) : cur.cantidad,
+    mezcla: patch.mezcla !== undefined && patch.mezcla && typeof patch.mezcla === "object"
+      ? Object.fromEntries(Object.entries(patch.mezcla).map(([k, v]) => [k.slice(0, 20), Math.max(0, Math.round(Number(v) || 0))]))
+      : cur.mezcla,
+  };
+  fs.mkdirSync(kcControlDir(), { recursive: true });
+  fs.writeFileSync(GEN_CONFIG_FILE(), JSON.stringify(next, null, 2), "utf-8");
+  return next;
+}
+
+// GET /api/chat/kc-config — ajustes de generación + envío
+export function kcConfig(_req: Request, res: Response): void {
+  try {
+    res.json({ success: true, gen: readGenConfig(), send: getSendConfig() });
+  } catch (err: any) {
+    logger.error("simulator", `kc-config get error: ${err}`);
+    res.status(500).json({ error: "Error leyendo los ajustes" });
+  }
+}
+
+// POST /api/chat/kc-config — guarda ajustes. { gen?, send?, applyNow? }
+export function kcSaveConfig(req: Request, res: Response): void {
+  try {
+    const body = req.body || {};
+    const gen = body.gen ? writeGenConfig(body.gen) : readGenConfig();
+    const send = body.send ? setSendConfig(body.send) : getSendConfig();
+    if (body.applyNow) {
+      clearKcSender();
+      primeForRegenerate();
+      touchControl("regenerar_lote");
+      watchForRegenerate();
+    }
+    res.json({ success: true, gen, send, applied: !!body.applyNow });
+  } catch (err: any) {
+    logger.error("simulator", `kc-config save error: ${err}`);
+    res.status(500).json({ error: "Error guardando los ajustes" });
+  }
+}
+
+// POST /api/chat/kc-analyze — fuerza al Módulo 8 a resumir el contexto YA
+export function kcAnalyze(_req: Request, res: Response): void {
+  try {
+    touchControl("analizar_ahora");
+    res.json({ success: true, message: "El Módulo 8 va a analizar el contexto en unos segundos" });
+  } catch (err: any) {
+    logger.error("simulator", `kc-analyze error: ${err}`);
+    res.status(500).json({ error: "Error pidiendo el análisis de contexto" });
+  }
+}
+
+// POST /api/chat/kc-regenerate — borra los mensajes en cola y regenera el lote
+// con el prompt y el contexto actuales, y lo envía.
+export function kcRegenerate(_req: Request, res: Response): void {
+  try {
+    clearKcSender();
+    primeForRegenerate();
+    touchControl("analizar_ahora");   // primero un contexto fresco
+    touchControl("regenerar_lote");   // luego el Módulo 12 regenera ya
+    // Barre la carpeta de lotes hasta absorber el nuevo (Gemini puede tardar).
+    watchForRegenerate();
+    res.json({ success: true, message: "Cola borrada. Regenerando con el contexto actual (puede tardar 1-2 min si Gemini está saturado)…" });
+  } catch (err: any) {
+    logger.error("simulator", `kc-regenerate error: ${err}`);
+    res.status(500).json({ error: "Error regenerando los mensajes" });
   }
 }

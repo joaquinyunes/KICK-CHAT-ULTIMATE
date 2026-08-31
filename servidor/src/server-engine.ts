@@ -6,6 +6,8 @@ import { rateLimit } from "express-rate-limit";
 import path from "path";
 import { env } from "./config/env";
 import { loadBearers } from "./services/security";
+import { startKcIngest } from "./services/kc-ingest.service";
+import { startKcPipeline, killPipelineSync } from "./services/kc-supervisor.service";
 import { requestLogger, metricsRouter } from "./telemetry";
 import { initDatabase, flushDb, getDb } from "./models/database";
 import { logger } from "./utils/logger";
@@ -79,6 +81,9 @@ app.get("/chat.html", (_req: Request, res: Response) => {
 });
 app.get("/chat", (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "..", "public", "chat.html"));
+});
+app.get("/kc", (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, "..", "public", "kc.html"));
 });
 
 app.get("/admin/clientes", (_req: Request, res: Response) => {
@@ -155,6 +160,7 @@ function gracefulShutdown(signal: string): void {
   shuttingDown = true;
   ready = false;
   logger.info(TAG, `Recibido ${signal} — cerrando servidor...`);
+  try { killPipelineSync(); } catch { /* noop */ }
   const finish = (code: number) => {
     try { flushDb(); } catch (e) { logger.error(TAG, "flushDb falló en shutdown", String(e)); }
     process.exit(code);
@@ -185,6 +191,8 @@ async function bootstrap(): Promise<void> {
     markReady();
     logger.info(TAG, "StreamChat Bridge en puerto " + env.PORT);
   });
+  try { startKcPipeline(); } catch (e: any) { logger.warn(TAG, "kc-pipeline no arrancó: " + e.message); }
+  try { startKcIngest(); } catch (e: any) { logger.warn(TAG, "kc-ingest no arrancó: " + e.message); }
 }
 
 bootstrap().catch((err: any) => {

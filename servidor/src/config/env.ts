@@ -38,6 +38,32 @@ const schema = z.object({
 
   // Workers Python (VOD viewer / senders)
   PYTHON_PATH: z.string().optional(),
+
+  // Auto-refresh / batch hook
+  KICK_COMENTARIO_MODO: z.enum(["bloque", "linea"]).optional().default("bloque"),
+  KICK_COMENTARIO_BLOQUE_SEG: z.coerce.number().int().positive().optional().default(300),
+  KICK_COMENTARIO_HOOK_CMD: z.string().optional().default(""),
+
+  // ── Pipeline de contexto (kick-context/, ex proyecto-kick-context) ──
+  // Supervisor: el server Node lanza el orquestador Python (módulos 1-9 + 12).
+  KC_PIPELINE_ENABLED: z.string().optional().default("0"),
+  // Modo simulación: probar el flujo entero sin estar en stream ni capturar
+  // pantalla (M8 genera resúmenes sintéticos, M12 arma el lote con Gemini).
+  KC_SIMULATION: z.string().optional().default("0"),
+  KC_DIR: z.string().optional().default(""),
+  KICK_CONTEXT_DATA_DIR: z.string().optional().default(""),
+  // Ingesta: KCU lee los lote_<ts>.json que deja el Módulo 12 y los carga solo.
+  KC_INGEST_ENABLED: z.string().optional().default("1"),
+  KC_LOTES_DIR: z.string().optional().default(""),
+  KC_INGEST_POLL_SEG: z.coerce.number().int().positive().optional().default(300),
+  // Envío server-side: KCU manda las líneas del lote al chat, espaciadas.
+  KC_SEND_ENABLED: z.string().optional().default("1"),
+  KC_SEND_CHANNEL: z.string().optional().default(""),
+  KC_SEND_INTERVAL_SEG: z.coerce.number().int().positive().optional().default(10),
+  // Slug del canal del pipeline Python (se pasa a kick-context/ y lo usa el envío).
+  KICK_CANAL_SLUG: z.string().optional().default(""),
+  // Modo de captura del pipeline Python: "local" (esta PC) | "remote" (HLS del canal).
+  KICK_CAPTURE_MODE: z.string().optional().default("local"),
 });
 
 const parsed = schema.safeParse(process.env);
