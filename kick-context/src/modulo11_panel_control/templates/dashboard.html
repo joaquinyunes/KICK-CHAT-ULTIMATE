@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="refresh" content="30">
+  <title>Panel de Control — Estado</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 24px;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: #0f1115; color: #e7e9ee;
+    }
+    .wrap { max-width: 900px; margin: 0 auto; }
+    header {
+      display: flex; align-items: baseline; justify-content: space-between;
+      margin-bottom: 20px; gap: 12px; flex-wrap: wrap;
+    }
+    h1 { margin: 0; font-size: 18px; }
+    .muted { color: #8b93a3; font-size: 13px; }
+    a.logout { color: #8b93a3; font-size: 13px; text-decoration: none; }
+    a.logout:hover { color: #e7e9ee; }
+    section {
+      background: #171a21; border: 1px solid #262b36; border-radius: 12px;
+      padding: 16px 18px; margin-bottom: 16px;
+    }
+    section h2 { margin: 0 0 12px; font-size: 14px; color: #b7bdca; font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; }
+    td, th { padding: 8px 6px; text-align: left; font-size: 14px; border-bottom: 1px solid #22262f; }
+    th { font-size: 12px; color: #8b93a3; font-weight: 600; }
+    tr:last-child td { border-bottom: 0; }
+    .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; vertical-align: middle; }
+    .on { background: #2fbf6b; } .off { background: #5b6270; } .down { background: #e0603d; }
+    .badge { font-size: 12px; padding: 2px 7px; border-radius: 999px; }
+    .badge.on { background: #16351f; color: #7fe0a3; }
+    .badge.off { background: #2a2e38; color: #9aa2b1; }
+    button {
+      padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
+      border: 1px solid #2d3340; border-radius: 7px; background: #0f1115; color: #e7e9ee;
+    }
+    button.encender { border-color: #2f6f45; color: #7fe0a3; }
+    button.apagar { border-color: #6b2b32; color: #f2b8bd; }
+    button:hover { filter: brightness(1.25); }
+    dl { margin: 0; display: grid; grid-template-columns: 130px 1fr; gap: 6px 12px; font-size: 14px; }
+    dt { color: #8b93a3; }
+    .empty { color: #8b93a3; font-size: 13px; }
+
+    /* Feed de contexto acumulado */
+    .feed { display: flex; flex-direction: column; gap: 0; }
+    .item { padding: 14px 0; border-bottom: 1px solid #22262f; }
+    .item:first-child { padding-top: 0; }
+    .item:last-child { border-bottom: 0; padding-bottom: 0; }
+    .item.nuevo .ahora { color: #7fe0a3; }
+    .item .hora { font-size: 12px; color: #8b93a3; font-family: ui-monospace, monospace; }
+    .item .ahora { font-size: 15px; line-height: 1.5; margin: 4px 0 6px; }
+    .item .sub { font-size: 13px; color: #b7bdca; line-height: 1.5; }
+    .item .sub b { color: #8b93a3; font-weight: 600; }
+    .evento { font-size: 13px; padding: 5px 0; border-bottom: 1px solid #22262f; color: #cdd2db; }
+    .evento:last-child { border-bottom: 0; }
+    .evento .ts { color: #8b93a3; margin-right: 8px; font-family: ui-monospace, monospace; font-size: 12px; }
+
+    .estado {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 18px; border-radius: 12px; margin-bottom: 16px;
+      font-size: 15px; font-weight: 600; border: 1px solid;
+    }
+    .estado .luz { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+    .estado.ok { background: #12331f; border-color: #2f6f45; color: #b6f0cd; }
+    .estado.ok .luz { background: #2fbf6b; box-shadow: 0 0 8px #2fbf6b; }
+    .estado.arrancando { background: #33290f; border-color: #7a5c1e; color: #f0dcae; }
+    .estado.arrancando .luz { background: #e0a63d; }
+    .estado.caido { background: #3a1d21; border-color: #6b2b32; color: #f2b8bd; }
+    .estado.caido .luz { background: #e0603d; box-shadow: 0 0 8px #e0603d; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Contexto de tu stream</h1>
+      <div class="muted">
+        Sesión: {{ usuario }} · la página se refresca sola cada 30 s ·
+        {% if estado_canal and estado_canal.en_vivo %}🔴 EN VIVO{% else %}⚫ offline{% endif %}
+      </div>
+    </div>
+    <a class="logout" href="{{ url_for('logout') }}">Cerrar sesión</a>
+  </header>
+
+  <div class="estado {{ sistema_nivel }}">
+    <span class="luz"></span>
+    <span>{{ sistema_texto }}</span>
+  </div>
+
+  {% if estado_canal %}
+  <section>
+    <h2>Canal</h2>
+    <dl>
+      <dt>Título</dt><dd>{{ estado_canal.titulo or '—' }}</dd>
+      <dt>Categoría</dt><dd>{{ estado_canal.categoria or '—' }}</dd>
+      <dt>Viewers</dt><dd>{{ estado_canal.viewers if estado_canal.viewers is not none else '—' }}</dd>
+    </dl>
+  </section>
+  {% endif %}
+
+  <section>
+    <h2>Tu indicación para el resumen</h2>
+    <p class="muted" style="margin:0 0 10px">
+      Lo que escribas acá el asistente lo tiene en cuenta en cada resumen
+      (ej: "estoy probando martingala en ruleta, avisame si pierdo 3 seguidas"
+      o "estoy programando el bot de Discord"). También podés dejar una
+      <b>nota de voz</b>: copiá un audio (.mp3/.wav/.m4a/.ogg) en la carpeta
+      <code>nota_usuario</code> dentro de tu carpeta de datos y se transcribe solo.
+    </p>
+    <form method="post" action="{{ url_for('guardar_nota') }}">
+      <textarea name="nota" rows="4" style="width:100%;background:#0f1115;color:#e7e9ee;border:1px solid #2d3340;border-radius:8px;padding:10px;font-size:14px;font-family:inherit;resize:vertical">{{ nota }}</textarea>
+      <button type="submit" style="margin-top:8px">Guardar indicación</button>
+    </form>
+  </section>
+
+  <section>
+    <h2>Comentarista IA — prompt maestro del chat</h2>
+    <p class="muted" style="margin:0 0 10px">
+      Prompt que simula el chat (Módulo 12). El módulo le rellena los
+      <code>{{ '{{' }}TEMA{{ '}}' }}</code>, <code>{{ '{{' }}CONTEXTO{{ '}}' }}</code>,
+      <code>{{ '{{' }}EVENTO{{ '}}' }}</code>, <code>{{ '{{' }}HISTORIAL{{ '}}' }}</code>…
+      con el contexto real del stream y pide un lote de mensajes en 1 sola llamada.
+      {% if comentario_postear %}
+        <b style="color:#f2b8bd">Posteo al chat de Kick: ACTIVO.</b>
+      {% else %}
+        Posteo al chat: <b>modo ensayo</b> (genera y guarda, no publica).
+        Para publicar: <code>KICK_COMENTARIO_POSTEAR=1</code> en el .env.
+      {% endif %}
+      · <b>{{ cola_pendiente }}</b> mensajes en cola.
+      <br>TXT que se va actualizando (para otro proyecto): <code>{{ comentario_txt_out }}</code>
+    </p>
+    <form method="post" action="{{ url_for('guardar_prompt_chat') }}">
+      <textarea name="prompt_chat" rows="10" style="width:100%;background:#0f1115;color:#e7e9ee;border:1px solid #2d3340;border-radius:8px;padding:10px;font-size:12px;font-family:ui-monospace,monospace;resize:vertical">{{ prompt_chat }}</textarea>
+      <button type="submit" style="margin-top:8px">Guardar prompt</button>
+    </form>
+  </section>
+
+  <section>
+    <h2>Mensajes generados (últimos 25)</h2>
+    {% if comentarios %}
+    <div class="feed">
+      {% for c in comentarios %}
+      <div class="item {% if loop.first %}nuevo{% endif %}">
+        <div class="hora">
+          {{ c.hora }}
+          {% if c.publicado %}<span class="badge on" style="margin-left:8px">posteado</span>
+          {% elif c.modo_ensayo %}<span class="badge off" style="margin-left:8px">ensayo</span>
+          {% else %}<span class="badge off" style="margin-left:8px;color:#f2b8bd">no posteado</span>{% endif %}
+        </div>
+        <div class="ahora">{{ c.comentario }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">Todavía no hay mensajes. Necesita prompt_chat.txt cargado, el canal en vivo y al menos un resumen del Módulo 8.</div>
+    {% endif %}
+  </section>
+
+  <section>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <h2 style="margin:0">Contexto acumulado (un resumen cada ~2 min, no se borra)</h2>
+      <form method="post" action="{{ url_for('analizar_ahora') }}">
+        <button type="submit" class="encender">⚡ Analizar ahora</button>
+      </form>
+    </div>
+    <div style="height:12px"></div>
+    {% if resumenes %}
+    <div class="feed">
+      {% for r in resumenes %}
+      <div class="item {% if loop.first %}nuevo{% endif %}">
+        <div class="hora">
+          {{ r.hora }}{% if loop.first %} · más reciente{% endif %}
+          {% if r.fase %}<span class="badge on" style="margin-left:8px">{{ r.fase }}</span>{% endif %}
+        </div>
+        <div class="ahora">{{ r.resumen_actual or '—' }}</div>
+        {% if r.contexto_previo %}<div class="sub"><b>Antes:</b> {{ r.contexto_previo }}</div>{% endif %}
+        {% if r.tendencia_detectada %}<div class="sub"><b>Tendencia:</b> {{ r.tendencia_detectada }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">Todavía no hay resúmenes. El primero tarda ~2-3 min (más si los servidores de Gemini están saturados). Probá el botón "Analizar ahora".</div>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>Módulos</h2>
+    <table>
+      <tr><th>Estado</th><th>Módulo</th><th>Deseado</th><th></th></tr>
+      {% for m in modulos %}
+      <tr>
+        <td>
+          {% if not m.deseado %}<span class="dot off"></span>Apagado
+          {% elif m.vivo %}<span class="dot on"></span>Vivo
+          {% else %}<span class="dot down"></span>Sin señal{% endif %}
+        </td>
+        <td>{{ m.etiqueta }}<div class="muted">{{ m.nombre }}</div></td>
+        <td><span class="badge {{ 'on' if m.deseado else 'off' }}">{{ 'Activo' if m.deseado else 'Apagado' }}</span></td>
+        <td>
+          <form method="post" action="{{ url_for('toggle_modulo', nombre_modulo=m.nombre) }}">
+            <button type="submit" class="{{ 'apagar' if m.deseado else 'encender' }}">
+              {{ 'Apagar' if m.deseado else 'Encender' }}
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </section>
+</div>
+</body>
+</html>

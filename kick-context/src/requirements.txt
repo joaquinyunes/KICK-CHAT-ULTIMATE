@@ -1,0 +1,25 @@
+# Instalar con: pip install -r requirements.txt --break-system-packages
+#
+# Nota: agrupado por módulo para que sepas qué puedes omitir si un
+# módulo en particular no lo vas a usar todavía.
+
+# Módulo 4 - Transcripción de audio
+faster-whisper
+
+# Módulo 5 - Análisis visual (OCR)
+pytesseract
+pillow
+# También requiere instalar el binario del sistema:
+#   Ubuntu/Debian: sudo apt install tesseract-ocr tesseract-ocr-spa
+#   Mac:           brew install tesseract tesseract-lang
+#   Windows:       instalador desde https://github.com/UB-Mannheim/tesseract/wiki
+
+# Módulo 6 y 8 - llamadas HTTP (API de Kick y Ollama)
+requests
+
+# Módulo 11 - Panel de Control web (login + prender/apagar módulos)
+flask
+# (werkzeug viene incluido con flask y aporta el hasheo de contraseñas)
+
+# Nota: el archivo .env de esta carpeta se carga automáticamente
+# (lo hace common/config.py), no hace falta ninguna librería para eso.
