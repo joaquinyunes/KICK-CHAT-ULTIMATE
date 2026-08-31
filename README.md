@@ -77,6 +77,77 @@ todos los errores juntos.
 - `GET /ready` — readiness (verifica DB); úsalo en el orquestador
 - `GET /metrics` — requiere header con `ADMIN_SECRET`
 
+## Contexto del stream (`kick-context/`)
+
+El pipeline de contexto (ex `proyecto-kick-context`, ahora **dentro de este
+repo** en `kick-context/`) captura audio/video del stream, resume con Gemini y
+el Módulo 12 genera un lote de ~30 líneas de chat cada 5 min. Todo lo maneja el
+servidor Node — **un solo comando arranca todo**.
+
+**Reparto claro:** KC solo *genera* el contexto y las líneas. KCU *envía* al
+chat de Kick con su pool de bearers (`kc-sender.service`), espaciado, sin
+depender del navegador. KC nunca postea (el supervisor le fuerza
+`KICK_COMENTARIO_POSTEAR=0`).
+
+### Cómo funciona
+
+```
+kick-context/ (Python)                     servidor/ (Node)
+  orquestador (M10)                          kc-supervisor.service  ── spawnea y reinicia el orquestador
+    ├── M1/M2  captura A/V          ┐
+    ├── M6     metadata Kick        │ escriben en
+    ├── M8     resumen Gemini       ├─────────────►  kick-context-data/
+    ├── M9     memoria histórica    │                  comentarios/lotes/lote_<ts>.json
+    └── M12    genera 30 líneas     ┘                       │
+                                                            ▼
+                                         kc-ingest.service ── cada 300 s toma el lote nuevo
+                                                            │
+                                         kc-sender.service ── manda cada línea al chat de
+                                              Kick (pool de bearers, 1 cada ~10 s)
+```
+
+Estado y control: `GET /api/chat/kc-context` (pipeline + ingesta + envío),
+`POST /api/chat/kc-pipeline/start|stop`.
+
+### Puesta en marcha
+
+1. **Deps Python** (una vez): `cd servidor && npm run kc:install`
+   (necesita Python 3.11 y `ffmpeg` en el PATH).
+2. En `servidor/.env`:
+   ```
+   KC_PIPELINE_ENABLED=1
+   KICK_GEMINI_API_KEY=...            # aistudio.google.com/apikey
+   KICK_CANAL_SLUG=tu-canal
+   KICK_CAPTURE_MODE=remote           # remote = lee el HLS; local = captura esta PC
+   KICK_COMENTARIO_POSTEAR=0          # 1 = postea en el chat de Kick de verdad
+   ```
+3. `npm start` (o `iniciar.bat`). El server levanta el pipeline, lo supervisa,
+   absorbe cada lote y lo va enviando al chat. No hay que tocar el panel.
+
+Config fina del pipeline: `kick-context/src/.env.example` (todas las `KICK_*` se
+pueden poner en `servidor/.env`, se pasan tal cual). Los datos y logs van a
+`kick-context-data/` (git-ignored).
+
+Para dejar el pipeline apagado y solo consumir lotes generados por fuera:
+`KC_PIPELINE_ENABLED=0` y seteá `KC_LOTES_DIR`. Para apagar también la ingesta:
+`KC_INGEST_ENABLED=0`.
+
+### Probar sin estar en stream (modo simulación)
+
+```
+KC_PIPELINE_ENABLED=1
+KC_SIMULATION=1
+KICK_GEMINI_API_KEY=...        # el M12 igual usa Gemini de verdad
+KC_SEND_ENABLED=1
+KC_SEND_CHANNEL=tu-canal       # o un canal de prueba
+```
+
+Con `KC_SIMULATION=1` el orquestador corre **solo M8 + M9 + M12**, sin captura
+ni HLS: M8 inventa un resumen del stream cada ~20 s (rotando escenarios de
+casino/apuestas/IRL, opcionalmente variados por Gemini), M12 arma el lote de
+30 líneas con Gemini cada ~60 s, y KCU lo absorbe y lo envía. Sirve para ver el
+flujo entero — contexto → 30 líneas → envío — sin transmitir.
+
 ## Arquitectura
 
 Ver [`ARCHITECTURE.md`](ARCHITECTURE.md).
@@ -97,5 +168,7 @@ servidor/            API Express + TS (código principal)
   scripts/           Utilidades CLI
   *.py               Workers Python (VOD viewer, senders)
 streamchat-client/   Cliente Electron (opcional)
-stream-context/      Extractor de contexto de stream (audio/video → texto) — Python
+kick-context/        Pipeline de contexto (12 módulos Python) — lo supervisa el server
+kick-context-data/   Datos y logs del pipeline (git-ignored, se crea solo)
+stream-context/      (obsoleto — reemplazado por kick-context/; se puede borrar)
 ```
