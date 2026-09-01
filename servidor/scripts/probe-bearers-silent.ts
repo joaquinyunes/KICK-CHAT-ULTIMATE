@@ -1,40 +1,35 @@
-// scripts/probe-bearers-silent.ts — Prueba cada bearer enviando un mensaje y borrándolo al instante.
-// No queda nada visible en el chatroom.
+// scripts/probe-bearers-silent.ts — Prueba cada bearer de la DB enviando un mensaje y
+// borrándolo al instante. No queda nada visible en el chatroom.
 // USO: npm run probe-silent -- [chatroom_id]  (default 20548413)
-import fs from "fs";
-import path from "path";
 import dotenv from "dotenv";
 import { initDatabase, stmts } from "../src/models/database";
-import { decrypt, decryptFromHex } from "../src/services/security";
+import { decryptFromHex } from "../src/services/security";
 
 dotenv.config();
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
-
-function getPlainBearers(): string[] {
-  const enc = fs.readFileSync(path.resolve(process.cwd(), "bearers.enc"));
-  return JSON.parse(decrypt(enc));
-}
 
 async function main() {
   const chatroomId = parseInt(process.argv[2] || "20548413", 10);
   if (!Number.isFinite(chatroomId)) { console.error("chatroomId inválido"); process.exit(1); }
 
   await initDatabase();
-  const bearers = getPlainBearers();
-  const bots = stmts.listAllBots.all() as any[];
-  console.log(`Probe silencioso: ${bearers.length} bearer(s) → chatroom ${chatroomId}\n`);
+  const bots = (stmts.listAllBots.all() as any[]).filter((b) => b.is_active);
+  const targets = bots
+    .map((bot) => { try { return { bot, bearer: decryptFromHex(bot.encrypted_bearer) }; } catch { return null; } })
+    .filter((x): x is { bot: any; bearer: string } => !!x && !!x.bearer);
+
+  console.log(`Probe silencioso: ${targets.length} bearer(s) → chatroom ${chatroomId}\n`);
 
   let vivos = 0;
   let muertos = 0;
 
-  for (let i = 0; i < bearers.length; i++) {
-    const b = bearers[i];
+  for (let i = 0; i < targets.length; i++) {
+    const { bot, bearer: b } = targets[i];
     const ref = String(Date.now() + i);
     const payload = { content: `test-${ref}`, type: "message", message_ref: ref };
 
     try {
-      // 1) Enviar mensaje de prueba
       const sendRes = await fetch(`https://kick.com/api/v2/messages/send/${chatroomId}`, {
         method: "POST",
         headers: {
@@ -59,7 +54,7 @@ async function main() {
         } catch {}
       }
 
-      // 2) Si se envió, borrarlo de inmediato
+      // Si se envió, borrarlo de inmediato
       let deleted = false;
       if (messageId && sendRes.status === 200) {
         try {
@@ -79,28 +74,22 @@ async function main() {
         } catch {}
       }
 
-      // 3) Guardar username si lo tenemos
-      if (sender) {
-        const row = bots.find((bot: any) => {
-          try { return decryptFromHex(bot.encrypted_bearer) === b; } catch { return false; }
-        });
-        if (row) stmts.updateBotKickUsername.run([sender, row.id]);
-      }
+      if (sender) stmts.updateBotKickUsername.run([sender, bot.id]);
 
       const mark = sendRes.status === 200 ? "✓ VIVO" : "✗ MUERTO";
       const delInfo = sendRes.status === 200 ? (deleted ? " [borrado]" : " [no se pudo borrar]") : "";
-      console.log(`#${String(i + 1).padStart(2, "0")} ${mark} status=${sendRes.status} user=${(sender || "?").padEnd(22)}${delInfo}`);
+      console.log(`#${String(i + 1).padStart(2, "0")} ${bot.bot_name.padEnd(8)} ${mark} status=${sendRes.status} user=${(sender || "?").padEnd(22)}${delInfo}`);
       if (sendRes.status === 200) vivos++; else muertos++;
     } catch (e: any) {
-      console.log(`#${String(i + 1).padStart(2, "0")} ✗ MUERTO ERROR ${e.message}`);
+      console.log(`#${String(i + 1).padStart(2, "0")} ${bot.bot_name.padEnd(8)} ✗ MUERTO ERROR ${e.message}`);
       muertos++;
     }
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise((r) => setTimeout(r, 300));
   }
 
   console.log(`\n═══ RESUMEN ═══`);
-  console.log(`Vivos: ${vivos} | Muertos: ${muertos} | Total: ${bearers.length}`);
+  console.log(`Vivos: ${vivos} | Muertos: ${muertos} | Total: ${targets.length}`);
   console.log(`Usernames guardados en kick_username.`);
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+main().catch((e) => { console.error(e); process.exit(1); });

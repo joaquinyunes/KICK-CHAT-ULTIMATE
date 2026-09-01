@@ -1,11 +1,13 @@
-// scripts/renew-tokens.ts — Renueva los bearer tokens usando credenciales de login
+// scripts/renew-tokens.ts — Renueva los bearer tokens usando credenciales de login.
 // USO: npm run renew-tokens
-// Lee accounts.json, hace login a cada cuenta, obtiene nuevos tokens, actualiza bearers.enc
+// Lee accounts.json, hace login a cada cuenta y actualiza el bearer del bot
+// correspondiente en la tabla `bots` (matcheando por kick_username). Si la cuenta
+// no tiene un bot asociado todavía, crea uno nuevo. No toca bots de otras cuentas.
 import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
-import { initDatabase, getDb, stmts } from "../src/models/database";
-import { encryptToHex, encrypt, decrypt } from "../src/services/security";
+import { initDatabase, stmts } from "../src/models/database";
+import { encryptToHex } from "../src/services/security";
 
 dotenv.config();
 
@@ -19,7 +21,6 @@ interface Account {
 
 async function loginToKick(account: Account): Promise<string | null> {
   try {
-    // Intentar login con session-based auth
     const res = await fetch("https://kick.com/api/v2/login", {
       method: "POST",
       headers: {
@@ -41,7 +42,6 @@ async function loginToKick(account: Account): Promise<string | null> {
     }
 
     const data: any = await res.json();
-    // Kick devuelve el token en diferentes campos según la versión
     const token = data?.token || data?.data?.token || data?.access_token || null;
     if (!token) {
       console.log(`  ✗ Login OK pero sin token: ${JSON.stringify(data).substring(0, 100)}`);
@@ -66,58 +66,45 @@ async function main() {
   console.log(`Renovando tokens: ${accounts.length} cuentas\n`);
 
   await initDatabase();
-  const db = getDb();
+  let bots = stmts.listAllBots.all() as any[];
 
-  // Leer tokens actuales
-  const encPath = path.resolve(process.cwd(), "bearers.enc");
-  const existing: string[] = fs.existsSync(encPath)
-    ? JSON.parse(decrypt(fs.readFileSync(encPath)))
-    : [];
-
-  const newTokens: string[] = [];
-  const newUsers: string[] = [];
   let vivos = 0;
   let muertos = 0;
+  let actualizados = 0;
+  let creados = 0;
 
   for (const account of accounts) {
     process.stdout.write(`${account.username}: `);
     const token = await loginToKick(account);
 
-    if (token) {
-      newTokens.push(token);
-      newUsers.push(account.username);
-      vivos++;
-      console.log("✓");
-    } else {
+    if (!token) {
       muertos++;
       console.log("✗");
+      await new Promise((r) => setTimeout(r, 1000));
+      continue;
+    }
+    vivos++;
+    console.log("✓");
+
+    const encrypted = encryptToHex(token);
+    const existing = bots.find((b) => b.kick_username === account.username);
+    if (existing) {
+      stmts.updateBotBearer.run([encrypted, existing.id]);
+      actualizados++;
+    } else {
+      const botName = `bot${bots.length + 1}`;
+      const result = stmts.insertBot.run({ bot_name: botName, encrypted_bearer: encrypted });
+      const newBot = { id: Number(result.lastInsertRowid), bot_name: botName, kick_username: account.username };
+      stmts.updateBotKickUsername.run([account.username, newBot.id]);
+      bots.push(newBot);
+      creados++;
     }
 
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 1000));
   }
 
-  if (newTokens.length === 0) {
-    console.error("\nNo se obtuvo ningún token nuevo. Verificá las credenciales.");
-    process.exit(1);
-  }
-
-  // Guardar tokens nuevos
-  fs.writeFileSync(encPath, encrypt(JSON.stringify(newTokens)));
-  console.log(`\nbearers.enc actualizado: ${newTokens.length} tokens`);
-
-  // Actualizar DB
-  db.run("PRAGMA foreign_keys = OFF");
-  db.run("DELETE FROM bots");
-  db.run("PRAGMA foreign_keys = ON");
-
-  for (let i = 0; i < newTokens.length; i++) {
-    const botName = `bot${i + 1}`;
-    stmts.insertBot.run({ bot_name: botName, encrypted_bearer: encryptToHex(newTokens[i]) });
-    stmts.updateBotKickUsername.run([newUsers[i], i + 1]);
-  }
-
-  console.log(`DB actualizada: ${newTokens.length} bots`);
-  console.log(`\nVivos: ${vivos} | Muertos: ${muertos} | Total: ${accounts.length}`);
+  console.log(`\nDB actualizada: ${actualizados} bot(s) renovados, ${creados} bot(s) nuevos`);
+  console.log(`Vivos: ${vivos} | Muertos: ${muertos} | Total: ${accounts.length}`);
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+main().catch((e) => { console.error(e); process.exit(1); });
