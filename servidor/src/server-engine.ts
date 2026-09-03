@@ -17,6 +17,8 @@ const TAG = "server";
 import authRoutes from "./routes/auth.routes";
 import chatRoutes from "./routes/chat.routes";
 import oauthRoutes from "./routes/oauth.routes";
+import kick20Routes from "./routes/kick20.routes";
+import { startAutoRefresh as startKick20AutoRefresh } from "./services/kick20.service";
 import adminDashboardRoutes from "./routes/admin-dashboard.routes";
 import adminBotsRoutes from "./routes/admin-bots.routes";
 import adminClientesRoutes from "./routes/admin-clientes.routes";
@@ -70,6 +72,9 @@ app.get("/admin/dashboard", (_req: Request, res: Response) => {
 app.get("/admin/bots", (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "..", "public", "admin", "bots.html"));
 });
+app.get("/admin/kick20", (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, "..", "public", "admin", "kick20.html"));
+});
 app.get("/vods.html", (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "..", "public", "vods.html"));
 });
@@ -84,6 +89,9 @@ app.get("/chat", (_req: Request, res: Response) => {
 });
 app.get("/kc", (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "..", "public", "kc.html"));
+});
+app.get("/kick20", (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, "..", "public", "kick20.html"));
 });
 
 app.get("/admin/clientes", (_req: Request, res: Response) => {
@@ -112,6 +120,7 @@ app.use("/api/admin", adminLimiter);
 // ─── Routers ─────────────────────────────────────────────────────
 app.use("/auth", authRoutes);
 app.use(chatRoutes);
+app.use(kick20Routes);
 app.use(oauthRoutes);
 app.use(adminDashboardRoutes);
 app.use(adminBotsRoutes);
@@ -193,6 +202,7 @@ async function bootstrap(): Promise<void> {
   });
   try { startKcPipeline(); } catch (e: any) { logger.warn(TAG, "kc-pipeline no arrancó: " + e.message); }
   try { startKcIngest(); } catch (e: any) { logger.warn(TAG, "kc-ingest no arrancó: " + e.message); }
+  try { startKick20AutoRefresh(); } catch (e: any) { logger.warn(TAG, "kick20 auto-refresh no arrancó: " + e.message); }
 }
 
 bootstrap().catch((err: any) => {

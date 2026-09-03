@@ -1,22 +1,27 @@
 import bcrypt from "bcryptjs";
-import { initDatabase, getDb, flushDb } from "../src/models/database";
+import { initDatabase, getDb, flushDb, stmts } from "../src/models/database";
+
+const NEW_PASS = process.argv[2] || "admin123";
 
 async function main() {
-  const pass = process.argv[2] || "admin1234";
   await initDatabase();
   const db = getDb();
-  const hash = bcrypt.hashSync(pass, 12);
-  const r = db.exec("SELECT id FROM users WHERE username = 'admin' LIMIT 1");
-  if (r.length === 0) {
-    db.run("INSERT INTO users (username, password_hash, role) VALUES ('admin', ?, 'admin')", [hash]);
-    console.log(`admin creado — contraseña: ${pass}`);
+  const hash = bcrypt.hashSync(NEW_PASS, 12);
+
+  const existing = stmts.findUserByUsername.get("admin");
+  if (existing) {
+    db.run("UPDATE users SET password_hash = ?, role = 'admin', is_active = 1 WHERE username = 'admin'", [hash]);
+    console.log(`✅  Contraseña de "admin" actualizada a: ${NEW_PASS}`);
   } else {
-    db.run("UPDATE users SET password_hash = ? WHERE username = 'admin'", [hash]);
-    console.log(`admin actualizado — contraseña: ${pass}`);
+    db.run("INSERT INTO users (username, password_hash, role) VALUES ('admin', ?, 'admin')", [hash]);
+    console.log(`✅  Usuario "admin" creado con contraseña: ${NEW_PASS}`);
   }
+
   flushDb();
-  await new Promise((res) => setTimeout(res, 300));
-  process.exit(0);
+  console.log("💾  DB persistida en data/streamchat.db");
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((err) => {
+  console.error("❌  Error:", err);
+  process.exit(1);
+});

@@ -7,6 +7,7 @@ import { sendViaPlaywright } from "./playwright-sender.service";
 import { findPython } from "../utils/python";
 import { mapKickError } from "../utils/kick";
 import { sendWithBearer, resolveChatroomId } from "./bearer-sender.service";
+import { getStatus as getKick20Status, sendAsUser as kick20Send } from "./kick20.service";
 
 const TAG = "proxy-controller";
 
@@ -50,6 +51,30 @@ export async function sendToKick(req: ProxyRequest): Promise<ProxyResult> {
 
   const triedBots: string[] = [];
   let lastError = "No hay tokens disponibles para enviar mensajes";
+
+  // ── Estrategia 0: token OAuth oficial (kick20) ──
+  // Si hay una cuenta conectada en /kick20, se usa EXCLUSIVAMENTE la API oficial
+  // (api.kick.com/public/v1/chat, type:user). No se cae a los bearers scrapeados.
+  try {
+    const k20 = getKick20Status();
+    if (k20.connected) {
+      const r = await kick20Send(req.channel, req.message);
+      logMessage(null, req.userId, req.channel, req.message, r.ok, r.ok ? undefined : (r.error || "kick20 " + r.status));
+      if (r.ok) {
+        logger.info(TAG, "kick20 OAuth OK", "channel=" + req.channel);
+        return { success: true, sentAt, username: k20.username || undefined };
+      }
+      logger.warn(TAG, "kick20 OAuth fallo", "status=" + r.status, r.error || "");
+      return {
+        success: false,
+        reason: "kick20 (API oficial): " + (r.error || ("status " + r.status)) + (r.body ? " — " + r.body.slice(0, 200) : ""),
+        sentAt,
+      };
+    }
+  } catch (err: any) {
+    logger.error(TAG, "kick20 excepcion", err.message);
+    return { success: false, reason: "kick20 (API oficial): " + (err.message || "error"), sentAt };
+  }
 
   // ── Estrategia 1: Node directo con bearer (no requiere Python) ──
   try {

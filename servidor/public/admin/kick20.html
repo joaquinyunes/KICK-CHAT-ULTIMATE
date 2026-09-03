@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SCB – Cuentas Kick</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .k20-acc-grid { display:grid; gap:10px; grid-template-columns:1fr; }
+    .k20-acc { background:var(--bg-panel); border:1px solid var(--line); border-radius:10px; padding:12px 16px; display:flex; align-items:center; gap:12px; }
+    .k20-acc .name { font-weight:700; font-size:15px; color:var(--text-primary); }
+    .k20-acc .meta { font-size:11px; color:var(--text-secondary); }
+    .k20-acc .spacer { margin-left:auto; }
+    .k20-dot { width:9px; height:9px; border-radius:50%; background:var(--signal); flex-shrink:0; }
+    .k20-dot.warn { background:var(--alert,#e2a03f); }
+    .k20-field { display:flex; flex-direction:column; gap:4px; margin-bottom:10px; }
+    .k20-field label { font-size:11px; color:var(--text-secondary); }
+    .k20-field input { padding:7px 10px; border-radius:6px; border:1px solid var(--line); background:var(--bg-base); color:var(--text-primary); font-family:var(--font-mono); font-size:13px; }
+    .k20-mono { font-family:var(--font-mono); font-size:12px; color:var(--text-secondary); word-break:break-all; }
+  </style>
+</head>
+<body>
+  <div class="pl-scene" aria-hidden="true"></div>
+  <div class="pl-grid" aria-hidden="true"></div>
+  <div class="pl-orbs" aria-hidden="true"><div class="pl-orb"></div><div class="pl-orb"></div><div class="pl-orb"></div></div>
+  <div class="pl-grain" aria-hidden="true"></div>
+
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="logo-mark">
+          <svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="26" cy="26" r="25" stroke="#2A9D6F" stroke-width="1.2" opacity="0.4"/>
+            <circle cx="14" cy="26" r="5.5" fill="#11151B" stroke="#3DDC97" stroke-width="2"/>
+            <circle cx="38" cy="26" r="5.5" fill="#11151B" stroke="#3DDC97" stroke-width="2"/>
+            <path d="M19.5 26H32.5" stroke="#3DDC97" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="26" cy="26" r="2" fill="#6FF0B8"/>
+          </svg>
+        </div>
+        <span>StreamChat</span>
+      </div>
+
+      <nav class="nav-group">
+        <div class="nav-eyebrow">General</div>
+        <a href="/admin/dashboard" class="nav-link">📊 Dashboard</a>
+        <a href="/admin/bots" class="nav-link">🤖 Bots</a>
+        <a href="/admin/kick20" class="nav-link active">🔗 Cuentas Kick</a>
+        <a href="/admin/clientes" class="nav-link">👥 Clientes</a>
+        <a href="/admin/proxies" class="nav-link">🌐 Proxies</a>
+      </nav>
+
+      <div style="margin-top:auto;padding-top:16px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px">
+        <span class="status-pill" style="align-self:flex-start">
+          <span id="status-badge" class="status-dot"></span>
+          <span id="status-label">Verificando…</span>
+        </span>
+        <button id="logout-btn" class="btn btn-primary" style="width:100%;font-size:11px;padding:9px 12px;background:transparent;color:var(--text-secondary);border:1px solid var(--line)">Cerrar sesión</button>
+      </div>
+    </aside>
+
+    <main class="main-panel">
+      <header class="page-header">
+        <h2>Cuentas Kick (API oficial)</h2>
+        <p>OAuth 2.1 · envío vía api.kick.com/public/v1/chat como usuario</p>
+      </header>
+
+      <p id="msg" style="margin-bottom:12px;font-size:12px;color:var(--text-secondary)" hidden></p>
+
+      <div class="card pl-bounce" style="margin-bottom:16px">
+        <h3 style="font-family:var(--font-display);font-size:14px;font-weight:600;color:var(--text-primary);margin:0 0 8px">App</h3>
+        <p id="app-state" class="k20-mono" style="margin:0 0 4px">Cargando…</p>
+        <p id="app-redirect" class="k20-mono" style="margin:0"></p>
+      </div>
+
+      <div class="card pl-bounce" style="animation-delay:0.06s;margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <h3 style="font-family:var(--font-display);font-size:14px;font-weight:600;color:var(--text-primary);margin:0">Cuentas conectadas <span id="acc-count" style="color:var(--text-secondary)">(0)</span></h3>
+          <div style="display:flex;gap:8px">
+            <button id="btn-connect" class="btn btn-primary">🔗 Generar URL de conexión</button>
+            <button id="btn-refresh-all" class="btn btn-primary" style="background:transparent;color:var(--text-secondary);border:1px solid var(--line)">Refrescar tokens</button>
+          </div>
+        </div>
+        <div id="connect-url-box" hidden style="margin-bottom:14px">
+          <p class="k20-mono" style="margin:0 0 6px">Copiá esta URL y abrila en tu navegador para autorizar la cuenta. Al aprobar, aparece sola en la lista.</p>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="connect-url" readonly class="k20-mono" style="flex:1;padding:7px 10px;border-radius:6px;border:1px solid var(--line);background:var(--bg-base);color:var(--text-primary)">
+            <button id="btn-copy-url" class="btn btn-small">Copiar</button>
+          </div>
+        </div>
+        <div id="acc-list" class="k20-acc-grid"></div>
+      </div>
+
+      <details class="card pl-bounce" style="animation-delay:0.1s">
+        <summary style="cursor:pointer;font-family:var(--font-display);font-size:14px;font-weight:600;color:var(--text-primary)">Credenciales de la app (configurar / reemplazar)</summary>
+        <p class="k20-mono" style="margin:10px 0">Kick App en <a href="https://kick.com/settings/developer" target="_blank" rel="noopener">kick.com/settings/developer</a>. Redirect URL = valor de abajo. Scopes: user:read channel:read chat:write</p>
+        <div class="k20-field"><label>Client ID</label><input id="cfg-id" autocomplete="off" spellcheck="false" placeholder="guardado — dejá vacío para mantener"></div>
+        <div class="k20-field"><label>Client Secret</label><input id="cfg-secret" type="password" autocomplete="off" spellcheck="false" placeholder="guardado — dejá vacío para mantener"></div>
+        <div class="k20-field"><label>Redirect URI</label><input id="cfg-redirect" autocomplete="off" spellcheck="false"></div>
+        <button id="btn-save" class="btn btn-primary">Guardar credenciales</button>
+      </details>
+    </main>
+  </div>
+
+  <script src="/js/pl-mascot.js"></script>
+  <script type="module" src="/js/admin-kick20.js"></script>
+</body>
+</html>

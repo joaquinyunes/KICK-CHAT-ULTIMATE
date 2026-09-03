@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { id: 'chat',      label: 'Chat',      ico: '💬', url: '/chat' },
   { id: 'kc',        label: 'Contexto',  ico: '🎥', url: '/kc' },
   { id: 'simulador', label: 'Simulador', ico: '🤖', url: '/simulador' },
+  { id: 'kick20',    label: 'Cuentas Kick', ico: '🔗', url: '/kick20' },
   { id: 'ajustes',   label: 'Ajustes',    ico: '⚙️', url: '/ajustes' },
   { id: 'vods',      label: 'VODs',       ico: '🎬', url: '/vods' },
 ];
@@ -112,6 +113,8 @@ export function currentPage() {
   if (clean === 'simulador' || clean === 'stream-simulator') return 'simulador';
   if (clean === 'ajustes') return 'ajustes';
   if (clean === 'vods') return 'vods';
+  if (clean === 'kick20') return 'kick20';
+  if (clean === 'kc') return 'kc';
   return 'chat';
 }
 
