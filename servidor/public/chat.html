@@ -19,235 +19,141 @@
 
   <main class="chat-shell">
 
-    <!-- ═══ TIEMPO UNIFICADO ═══ -->
-    <div class="unified-bar">
-      <label class="unified-toggle"><input type="checkbox" id="unified-mode"> ⏱ Tiempo unificado</label>
-      <div id="unified-interval" class="unified-interval" style="display:none">
-        <div class="interval-box"><span class="interval-label">MIN</span><input id="unified-min" type="number" min="1" max="300" value="4" class="interval-input"><span class="interval-unit">seg</span></div>
-        <div class="interval-box"><span class="interval-label">MAX</span><input id="unified-max" type="number" min="1" max="300" value="10" class="interval-input"><span class="interval-unit">seg</span></div>
-        <span class="unified-hint">Colas incluidas:</span>
-        <label class="unified-cola-check"><input type="checkbox" id="unified-a" checked> A</label>
-        <label class="unified-cola-check"><input type="checkbox" id="unified-b" checked> B</label>
-        <label class="unified-cola-check"><input type="checkbox" id="unified-c" checked> C</label>
-        <label class="unified-cola-check"><input type="checkbox" id="unified-d" checked> D</label>
-        <label class="unified-cola-check"><input type="checkbox" id="unified-e" checked> E</label>
-        <label class="unified-cola-check"><input type="checkbox" id="unified-f" checked> F</label>
-        <label class="unified-cola-check"><input type="checkbox" id="unified-g" checked> G</label>
-        <label class="unified-cola-check"><input type="checkbox" id="unified-h" checked> H</label>
-      </div>
-    </div>
-
-    <!-- ═══ COLAS A-H ═══ -->
-    <section class="quad-colas">
-      <!-- COLA A -->
-      <div class="cola-card cola-a">
-        <div class="cola-header">
-          <span class="cola-label">🟢 COLA A</span>
-          <div class="cola-top-row">
-            <select id="file-a-select" class="cola-file-select"><option value="">— Elegí archivo —</option></select>
-          </div>
-          <div class="cola-interval-row">
-            <div class="interval-box"><span class="interval-label">MIN</span><input id="interval-a-min" type="number" min="1" max="300" value="15" class="interval-input"><span class="interval-unit">seg</span></div>
-            <div class="interval-box"><span class="interval-label">MAX</span><input id="interval-a-max" type="number" min="1" max="300" value="20" class="interval-input"><span class="interval-unit">seg</span></div>
-          </div>
-          <div class="cola-actions">
-            <select id="order-a" class="cola-order-select" title="Modo de envío"><option value="random">🔀 Aleatorio</option><option value="sequential">➡️ Ordenado</option></select>
-            <button id="start-a" class="btn btn-primary">▶ Iniciar</button>
-            <button id="stop-a" class="btn btn-danger" disabled>■ Parar</button>
-            <button id="reset-a" class="btn btn-ghost btn-sm">↻ Reset</button>
-            <label class="spam-toggle"><input type="checkbox" id="spam-a"> ⚡ Spam</label>
-          </div>
-          <span id="status-a" class="cola-status"></span>
-          <div class="cola-progress"><div id="bar-a" class="cola-bar" style="width:0%"></div></div>
-          <span id="count-a" class="cola-count">0/0 bloques</span>
+    <!-- ═══ PANEL DE ENVÍO ═══ -->
+    <section class="send-panel">
+      <div class="sp-line sp-line-main">
+        <div class="sp-target">
+          <span class="sp-k">Canal destino</span>
+          <a id="sp-channel" class="sp-channel" href="/ajustes">sin configurar</a>
+        </div>
+        <div class="sp-metrics">
+          <div class="sp-metric"><span id="sp-kick-dot" class="status-dot status-disconnected"></span><span class="sp-k">Kick</span></div>
+          <div class="sp-metric"><b id="sp-bots">0</b><span class="sp-k">bots</span></div>
+          <div class="sp-metric"><b id="sp-active">0 / 9</b><span class="sp-k">colas enviando</span></div>
+          <div class="sp-metric"><b id="sp-rate">—</b><span class="sp-k">ritmo</span></div>
+          <div class="sp-metric"><b id="sp-sent">0</b><span class="sp-k">enviados</span></div>
+          <div class="sp-metric sp-metric-fail"><b id="sp-failed">0</b><span class="sp-k">fallidos</span></div>
+        </div>
+        <div class="sp-master">
+          <button id="start-all" class="btn btn-primary">▶ Iniciar todo</button>
+          <button id="stop-all" class="btn btn-danger">■ Parar todo</button>
         </div>
       </div>
 
-      <!-- COLA B -->
-      <div class="cola-card cola-b">
-        <div class="cola-header">
-          <span class="cola-label">🟣 COLA B</span>
-          <div class="cola-top-row">
-            <select id="file-b-select" class="cola-file-select"><option value="">— Elegí archivo —</option></select>
-          </div>
-          <div class="cola-interval-row">
-            <div class="interval-box"><span class="interval-label">MIN</span><input id="interval-b-min" type="number" min="1" max="300" value="1" class="interval-input"><span class="interval-unit">seg</span></div>
-            <div class="interval-box"><span class="interval-label">MAX</span><input id="interval-b-max" type="number" min="1" max="300" value="3" class="interval-input"><span class="interval-unit">seg</span></div>
-          </div>
-          <div class="cola-actions">
-            <select id="order-b" class="cola-order-select" title="Modo de envío"><option value="random">🔀 Aleatorio</option><option value="sequential">➡️ Ordenado</option></select>
-            <button id="start-b" class="btn btn-primary">▶ Iniciar</button>
-            <button id="stop-b" class="btn btn-danger" disabled>■ Parar</button>
-            <button id="reset-b" class="btn btn-ghost btn-sm">↻ Reset</button>
-            <label class="spam-toggle"><input type="checkbox" id="spam-b"> ⚡ Spam</label>
-          </div>
-          <span id="status-b" class="cola-status"></span>
-          <div class="cola-progress"><div id="bar-b" class="cola-bar" style="width:0%"></div></div>
-          <span id="count-b" class="cola-count">0/0 bloques</span>
+      <div class="sp-line sp-line-sub">
+        <label class="sp-switch">
+          <input type="checkbox" id="unified-mode">
+          <span><b>Tiempo unificado</b> — las colas marcadas se mezclan en un solo envío con un ritmo común</span>
+        </label>
+        <div id="unified-interval" class="sp-unified" hidden>
+          <span class="sp-sec">enviar cada</span>
+          <input id="unified-min" type="number" min="1" max="600" value="4" class="sp-num">
+          <span class="sp-sec">a</span>
+          <input id="unified-max" type="number" min="1" max="600" value="10" class="sp-num">
+          <span class="sp-sec">segundos · colas:</span>
+          <label class="sp-chip"><input type="checkbox" id="unified-a" checked>A</label>
+          <label class="sp-chip"><input type="checkbox" id="unified-b" checked>B</label>
+          <label class="sp-chip"><input type="checkbox" id="unified-c" checked>C</label>
+          <label class="sp-chip"><input type="checkbox" id="unified-d" checked>D</label>
+          <label class="sp-chip"><input type="checkbox" id="unified-e" checked>E</label>
+          <label class="sp-chip"><input type="checkbox" id="unified-f" checked>F</label>
+          <label class="sp-chip"><input type="checkbox" id="unified-g" checked>G</label>
+          <label class="sp-chip"><input type="checkbox" id="unified-h" checked>H</label>
+          <label class="sp-chip"><input type="checkbox" id="unified-live" checked>EN&nbsp;VIVO</label>
+          <button id="unified-start" class="btn btn-secondary btn-sm">▶ Iniciar marcadas</button>
         </div>
+        <details class="sp-tokens">
+          <summary>Tokens de los bots</summary>
+          <div class="sp-tokens-body">
+            <button id="probe-tokens-btn" class="btn btn-secondary btn-sm">🔎 Probar tokens ahora</button>
+            <label class="sp-switch sp-switch-sm"><input type="checkbox" id="probe-before-start"> Probar antes de cada inicio</label>
+            <span id="probe-status" class="sp-hint"></span>
+          </div>
+        </details>
       </div>
+    </section>
 
-      <!-- COLA C -->
-      <div class="cola-card cola-c">
-        <div class="cola-header">
-          <span class="cola-label">🟠 COLA C</span>
-          <div class="cola-top-row">
-            <select id="file-c-select" class="cola-file-select"><option value="">— Elegí archivo —</option></select>
+    <!-- ═══ COLA EN VIVO ═══ -->
+    <section class="live-panel">
+      <div class="lp-head">
+        <span class="cc-dot dot-live"></span>
+        <span class="cc-name">Cola EN VIVO</span>
+        <span id="badge-live" class="cc-badge">detenida</span>
+        <span class="lp-note">pegás líneas a mano, sin archivo .txt</span>
+      </div>
+      <div class="lp-body">
+        <div class="lp-paste">
+          <textarea id="live-input" class="live-input" rows="4" placeholder="Pegá acá tus mensajes, uno por línea…"></textarea>
+          <div class="lp-paste-actions">
+            <button id="live-replace" class="btn btn-secondary btn-sm">Reemplazar la cola</button>
+            <button id="live-append" class="btn btn-secondary btn-sm">Agregar al final</button>
+            <button id="live-clear" class="btn btn-ghost btn-sm">Vaciar</button>
           </div>
-          <div class="cola-interval-row">
-            <div class="interval-box"><span class="interval-label">MIN</span><input id="interval-c-min" type="number" min="1" max="300" value="1" class="interval-input"><span class="interval-unit">seg</span></div>
-            <div class="interval-box"><span class="interval-label">MAX</span><input id="interval-c-max" type="number" min="1" max="300" value="3" class="interval-input"><span class="interval-unit">seg</span></div>
-          </div>
-          <div class="cola-actions">
-            <select id="order-c" class="cola-order-select" title="Modo de envío"><option value="random">🔀 Aleatorio</option><option value="sequential">➡️ Ordenado</option></select>
-            <button id="start-c" class="btn btn-primary">▶ Iniciar</button>
-            <button id="stop-c" class="btn btn-danger" disabled>■ Parar</button>
-            <button id="reset-c" class="btn btn-ghost btn-sm">↻ Reset</button>
-            <label class="spam-toggle"><input type="checkbox" id="spam-c"> ⚡ Spam</label>
-          </div>
-          <span id="status-c" class="cola-status"></span>
-          <div class="cola-progress"><div id="bar-c" class="cola-bar" style="width:0%"></div></div>
-          <span id="count-c" class="cola-count">0/0 bloques</span>
         </div>
-      </div>
-
-      <!-- COLA D -->
-      <div class="cola-card cola-d">
-        <div class="cola-header">
-          <span class="cola-label">🔴 COLA D</span>
-          <div class="cola-top-row">
-            <select id="file-d-select" class="cola-file-select"><option value="">— Elegí archivo —</option></select>
+        <div class="lp-controls">
+          <div class="cc-field">
+            <span class="cc-lbl">Enviar cada</span>
+            <div class="cc-rate">
+              <input id="interval-live-min" type="number" min="1" max="600" value="2" class="cc-num">
+              <span>a</span>
+              <input id="interval-live-max" type="number" min="1" max="600" value="6" class="cc-num">
+              <span>s</span>
+            </div>
           </div>
-          <div class="cola-interval-row">
-            <div class="interval-box"><span class="interval-label">MIN</span><input id="interval-d-min" type="number" min="1" max="300" value="1" class="interval-input"><span class="interval-unit">seg</span></div>
-            <div class="interval-box"><span class="interval-label">MAX</span><input id="interval-d-max" type="number" min="1" max="300" value="3" class="interval-input"><span class="interval-unit">seg</span></div>
+          <div class="cc-field">
+            <span class="cc-lbl">Orden</span>
+            <select id="order-live" class="cc-select">
+              <option value="random">Aleatorio</option>
+              <option value="sequential">De arriba a abajo</option>
+            </select>
           </div>
-          <div class="cola-actions">
-            <select id="order-d" class="cola-order-select" title="Modo de envío"><option value="random">🔀 Aleatorio</option><option value="sequential">➡️ Ordenado</option></select>
-            <button id="start-d" class="btn btn-primary">▶ Iniciar</button>
-            <button id="stop-d" class="btn btn-danger" disabled>■ Parar</button>
-            <button id="reset-d" class="btn btn-ghost btn-sm">↻ Reset</button>
-            <label class="spam-toggle"><input type="checkbox" id="spam-d"> ⚡ Spam</label>
+          <div class="cc-buttons">
+            <button id="start-live" class="btn btn-primary btn-sm">▶ Iniciar cola</button>
+            <button id="stop-live" class="btn btn-danger btn-sm" disabled>■ Parar</button>
+            <button id="reset-live" class="btn btn-ghost btn-sm" title="Volver al principio">↻ Reset</button>
+            <button id="live-send" class="btn btn-secondary btn-sm" title="Manda todo lo pegado una sola vez, ahora">📤 Enviar todo ya</button>
+            <button id="live-send-stop" class="btn btn-danger btn-sm" disabled>■</button>
           </div>
-          <span id="status-d" class="cola-status"></span>
-          <div class="cola-progress"><div id="bar-d" class="cola-bar" style="width:0%"></div></div>
-          <span id="count-d" class="cola-count">0/0 bloques</span>
-        </div>
-      </div>
-
-      <!-- COLA E -->
-      <div class="cola-card cola-e">
-        <div class="cola-header">
-          <span class="cola-label">🔵 COLA E</span>
-          <div class="cola-top-row">
-            <select id="file-e-select" class="cola-file-select"><option value="">— Elegí archivo —</option></select>
-          </div>
-          <div class="cola-interval-row">
-            <div class="interval-box"><span class="interval-label">MIN</span><input id="interval-e-min" type="number" min="1" max="300" value="1" class="interval-input"><span class="interval-unit">seg</span></div>
-            <div class="interval-box"><span class="interval-label">MAX</span><input id="interval-e-max" type="number" min="1" max="300" value="3" class="interval-input"><span class="interval-unit">seg</span></div>
-          </div>
-          <div class="cola-actions">
-            <select id="order-e" class="cola-order-select" title="Modo de envío"><option value="random">🔀 Aleatorio</option><option value="sequential">➡️ Ordenado</option></select>
-            <button id="start-e" class="btn btn-primary">▶ Iniciar</button>
-            <button id="stop-e" class="btn btn-danger" disabled>■ Parar</button>
-            <button id="reset-e" class="btn btn-ghost btn-sm">↻ Reset</button>
-            <label class="spam-toggle"><input type="checkbox" id="spam-e"> ⚡ Spam</label>
-          </div>
-          <span id="status-e" class="cola-status"></span>
-          <div class="cola-progress"><div id="bar-e" class="cola-bar" style="width:0%"></div></div>
-          <span id="count-e" class="cola-count">0/0 bloques</span>
-        </div>
-      </div>
-
-      <!-- COLA F -->
-      <div class="cola-card cola-f">
-        <div class="cola-header">
-          <span class="cola-label">🩷 COLA F</span>
-          <div class="cola-top-row">
-            <select id="file-f-select" class="cola-file-select"><option value="">— Elegí archivo —</option></select>
-          </div>
-          <div class="cola-interval-row">
-            <div class="interval-box"><span class="interval-label">MIN</span><input id="interval-f-min" type="number" min="1" max="300" value="1" class="interval-input"><span class="interval-unit">seg</span></div>
-            <div class="interval-box"><span class="interval-label">MAX</span><input id="interval-f-max" type="number" min="1" max="300" value="3" class="interval-input"><span class="interval-unit">seg</span></div>
-          </div>
-          <div class="cola-actions">
-            <select id="order-f" class="cola-order-select" title="Modo de envío"><option value="random">🔀 Aleatorio</option><option value="sequential">➡️ Ordenado</option></select>
-            <button id="start-f" class="btn btn-primary">▶ Iniciar</button>
-            <button id="stop-f" class="btn btn-danger" disabled>■ Parar</button>
-            <button id="reset-f" class="btn btn-ghost btn-sm">↻ Reset</button>
-            <label class="spam-toggle"><input type="checkbox" id="spam-f"> ⚡ Spam</label>
-          </div>
-          <span id="status-f" class="cola-status"></span>
-          <div class="cola-progress"><div id="bar-f" class="cola-bar" style="width:0%"></div></div>
-          <span id="count-f" class="cola-count">0/0 bloques</span>
-        </div>
-      </div>
-
-      <!-- COLA G -->
-      <div class="cola-card cola-g">
-        <div class="cola-header">
-          <span class="cola-label">🟤 COLA G</span>
-          <div class="cola-top-row">
-            <select id="file-g-select" class="cola-file-select"><option value="">— Elegí archivo —</option></select>
-          </div>
-          <div class="cola-interval-row">
-            <div class="interval-box"><span class="interval-label">MIN</span><input id="interval-g-min" type="number" min="1" max="300" value="1" class="interval-input"><span class="interval-unit">seg</span></div>
-            <div class="interval-box"><span class="interval-label">MAX</span><input id="interval-g-max" type="number" min="1" max="300" value="3" class="interval-input"><span class="interval-unit">seg</span></div>
-          </div>
-          <div class="cola-actions">
-            <select id="order-g" class="cola-order-select" title="Modo de envío"><option value="random">🔀 Aleatorio</option><option value="sequential">➡️ Ordenado</option></select>
-            <button id="start-g" class="btn btn-primary">▶ Iniciar</button>
-            <button id="stop-g" class="btn btn-danger" disabled>■ Parar</button>
-            <button id="reset-g" class="btn btn-ghost btn-sm">↻ Reset</button>
-            <label class="spam-toggle"><input type="checkbox" id="spam-g"> ⚡ Spam</label>
-          </div>
-          <span id="status-g" class="cola-status"></span>
-          <div class="cola-progress"><div id="bar-g" class="cola-bar" style="width:0%"></div></div>
-          <span id="count-g" class="cola-count">0/0 bloques</span>
-        </div>
-      </div>
-
-      <!-- COLA H -->
-      <div class="cola-card cola-h">
-        <div class="cola-header">
-          <span class="cola-label">⚪ COLA H</span>
-          <div class="cola-top-row">
-            <select id="file-h-select" class="cola-file-select"><option value="">— Elegí archivo —</option></select>
-          </div>
-          <div class="cola-interval-row">
-            <div class="interval-box"><span class="interval-label">MIN</span><input id="interval-h-min" type="number" min="1" max="300" value="1" class="interval-input"><span class="interval-unit">seg</span></div>
-            <div class="interval-box"><span class="interval-label">MAX</span><input id="interval-h-max" type="number" min="1" max="300" value="3" class="interval-input"><span class="interval-unit">seg</span></div>
-          </div>
-          <div class="cola-actions">
-            <select id="order-h" class="cola-order-select" title="Modo de envío"><option value="random">🔀 Aleatorio</option><option value="sequential">➡️ Ordenado</option></select>
-            <button id="start-h" class="btn btn-primary">▶ Iniciar</button>
-            <button id="stop-h" class="btn btn-danger" disabled>■ Parar</button>
-            <button id="reset-h" class="btn btn-ghost btn-sm">↻ Reset</button>
-            <label class="spam-toggle"><input type="checkbox" id="spam-h"> ⚡ Spam</label>
-          </div>
-          <span id="status-h" class="cola-status"></span>
-          <div class="cola-progress"><div id="bar-h" class="cola-bar" style="width:0%"></div></div>
-          <span id="count-h" class="cola-count">0/0 bloques</span>
+          <div id="status-live" class="cc-status">Detenida</div>
+          <div class="cola-progress"><div id="bar-live" class="cola-bar"></div></div>
+          <div id="count-live" class="cc-count">0 líneas</div>
         </div>
       </div>
     </section>
 
-    <!-- ═══ ARCHIVOS + ESTADÍSTICAS ═══ -->
+    <!-- ═══ COLAS A–H (generadas por JS) ═══ -->
+    <section id="colas" class="colas-grid"></section>
+
+    <!-- ═══ ARCHIVOS · REGISTRO · BOTS ═══ -->
     <section class="chat-bottom">
-      <div class="half-left">
-        <div class="pair-top-header">
-          <span class="pair-title">Archivos (.txt)</span>
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">Archivos .txt</span>
           <button id="load-file-btn" class="btn btn-secondary btn-sm">+ Agregar</button>
         </div>
+        <p class="panel-note">Arrastrá un archivo a una cola para asignarlo. 1 bloque = 5 líneas.</p>
         <div id="file-grid" class="file-grid">
           <div class="empty-state full">Sin archivos. Agregá tus .txt.</div>
         </div>
       </div>
-      <div class="half-right">
-        <div class="pair-title">
-          Bots — mensajes enviados
+
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">Registro de envíos</span>
+          <button id="clear-log-btn" class="btn btn-ghost btn-xs">Limpiar</button>
+        </div>
+        <p class="panel-note">Cada mensaje que sale al chat, en vivo.</p>
+        <div id="send-log" class="send-log">
+          <div class="empty-state">Todavía no se envió nada.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">Mensajes por bot</span>
           <button id="reset-stats-btn" class="btn btn-ghost btn-xs">Reset</button>
         </div>
+        <p class="panel-note">Cuántos mensajes mandó cada bot en esta sesión.</p>
         <div id="bots-stats" class="bots-stats">
           <div class="empty-state">Aún no se enviaron mensajes.</div>
         </div>
