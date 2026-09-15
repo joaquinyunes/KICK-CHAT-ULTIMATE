@@ -105,6 +105,29 @@
   {% endif %}
 
   <section>
+    <h2>Qué pantalla analizar</h2>
+    <p class="muted" style="margin:0 0 10px">
+      Fuente de video que mira el asistente. Elegí una ventana concreta (ej. el
+      navegador con el partido) o un monitor, y dale <b>Aplicar</b>. El cambio es
+      al vuelo, no hay que reiniciar nada.
+      {% if captura_actual %}<br>Ahora mismo captura: <b>{{ captura_actual }}</b>{% endif %}
+    </p>
+    {% if captura_opciones %}
+    <form method="post" action="{{ url_for('elegir_captura') }}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <select name="fuente" style="flex:1;min-width:260px;background:#0f1115;color:#e7e9ee;border:1px solid #2d3340;border-radius:8px;padding:9px 10px;font-size:14px;font-family:inherit">
+        <option value="env|" {% if captura_valor_actual == 'env|' %}selected{% endif %}>— Usar lo del .env —</option>
+        {% for o in captura_opciones %}
+        <option value="{{ o.tipo }}|{{ o.valor }}" {% if captura_valor_actual == o.tipo ~ '|' ~ o.valor %}selected{% endif %}>{{ o.label }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="encender">Aplicar</button>
+    </form>
+    {% else %}
+    <div class="empty">Todavía no llegó la lista de pantallas/ventanas (el Módulo 1 la publica cada pocos segundos mientras corre).</div>
+    {% endif %}
+  </section>
+
+  <section>
     <h2>Tu indicación para el resumen</h2>
     <p class="muted" style="margin:0 0 10px">
       Lo que escribas acá el asistente lo tiene en cuenta en cada resumen
@@ -117,6 +140,41 @@
       <textarea name="nota" rows="4" style="width:100%;background:#0f1115;color:#e7e9ee;border:1px solid #2d3340;border-radius:8px;padding:10px;font-size:14px;font-family:inherit;resize:vertical">{{ nota }}</textarea>
       <button type="submit" style="margin-top:8px">Guardar indicación</button>
     </form>
+  </section>
+
+  <section>
+    <h2>Cada cuánto mandar mensajes al chat</h2>
+    <p class="muted" style="margin:0 0 10px">
+      Config global del Comentarista (Módulo 12). Se aplica en caliente
+      (cambiar de modo reinicia solo ese módulo).
+    </p>
+    <form method="post" action="{{ url_for('comentarista_cadencia') }}"
+          style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
+      <label style="font-size:13px;color:#b7bdca">Modo<br>
+        <select name="modo" style="margin-top:4px;background:#0f1115;color:#e7e9ee;border:1px solid #2d3340;border-radius:8px;padding:8px 10px;font-size:14px">
+          <option value="goteo"  {% if cadencia.modo == 'goteo' %}selected{% endif %}>Goteo — de a uno</option>
+          <option value="bloque" {% if cadencia.modo == 'bloque' %}selected{% endif %}>Bloque — todos juntos</option>
+        </select>
+      </label>
+      <label style="font-size:13px;color:#b7bdca">Mínimo (seg)<br>
+        <input type="number" name="min_seg" min="3" value="{{ cadencia.min_seg }}"
+               style="margin-top:4px;width:90px;background:#0f1115;color:#e7e9ee;border:1px solid #2d3340;border-radius:8px;padding:8px 10px;font-size:14px">
+      </label>
+      <label style="font-size:13px;color:#b7bdca">Máximo (seg)<br>
+        <input type="number" name="max_seg" min="3" value="{{ cadencia.max_seg }}"
+               style="margin-top:4px;width:90px;background:#0f1115;color:#e7e9ee;border:1px solid #2d3340;border-radius:8px;padding:8px 10px;font-size:14px">
+      </label>
+      <label style="font-size:13px;color:#b7bdca">Bloque: cada (seg)<br>
+        <input type="number" name="bloque_seg" min="30" value="{{ cadencia.bloque_seg }}"
+               style="margin-top:4px;width:100px;background:#0f1115;color:#e7e9ee;border:1px solid #2d3340;border-radius:8px;padding:8px 10px;font-size:14px">
+      </label>
+      <button type="submit" class="encender">Guardar</button>
+    </form>
+    <p class="muted" style="margin:10px 0 0">
+      <b>Goteo</b>: suelta un mensaje cada X segundos, X al azar entre mínimo y
+      máximo. <b>Bloque</b>: genera y vuelca todo el lote junto cada N segundos
+      (ahí solo cuenta "Bloque: cada").
+    </p>
   </section>
 
   <section>
@@ -134,6 +192,30 @@
       {% endif %}
       · <b>{{ cola_pendiente }}</b> mensajes en cola.
       <br>TXT que se va actualizando (para otro proyecto): <code>{{ comentario_txt_out }}</code>
+    </p>
+
+    <p class="muted" style="margin:0 0 6px">
+      <b>Categoría (elección manual):</b> combina automáticamente las reglas
+      comunes (formato, comunidad, anti-invención de hechos) con las reglas
+      específicas de la categoría elegida. Solo aplica si el textarea de
+      abajo está <b>vacío</b> — si hay un prompt manual pegado, ese manda.
+    </p>
+    <form method="post" action="{{ url_for('comentarista_categoria') }}"
+          style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">
+      <label style="font-size:13px;color:#b7bdca">Categoría<br>
+        <select name="categoria" style="margin-top:4px;background:#0f1115;color:#e7e9ee;border:1px solid #2d3340;border-radius:8px;padding:8px 10px;font-size:14px;min-width:320px">
+          {% for valor, etiqueta in categoria_opciones.items() %}
+          <option value="{{ valor }}" {% if categoria_actual == valor %}selected{% endif %}>{{ etiqueta }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button type="submit" class="encender">Guardar categoría</button>
+    </form>
+
+    <p class="muted" style="margin:0 0 6px">
+      Override manual completo (opcional): si pegás un prompt acá, se usa
+      tal cual y se ignora la categoría de arriba. Dejalo vacío para que
+      mande el selector de categoría.
     </p>
     <form method="post" action="{{ url_for('guardar_prompt_chat') }}">
       <textarea name="prompt_chat" rows="10" style="width:100%;background:#0f1115;color:#e7e9ee;border:1px solid #2d3340;border-radius:8px;padding:10px;font-size:12px;font-family:ui-monospace,monospace;resize:vertical">{{ prompt_chat }}</textarea>

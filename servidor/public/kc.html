@@ -103,28 +103,26 @@
       <div id="kc-set-body" class="kc-set" hidden>
 
         <div class="kc-sec">
-          <div class="kc-sec-t">Contexto</div>
-          <div class="kc-radio">
-            <label><input type="radio" name="kc-modo" value="auto" checked> Automático (Gemini lee la pantalla)</label>
-            <label><input type="radio" name="kc-modo" value="manual"> Manual</label>
-          </div>
-          <label>Contexto manual (se usa EN VEZ de la pantalla)</label>
-          <textarea id="kc-ctx-manual" rows="4" placeholder="Ej: Estoy jugando Gates of Olympus, vengo perdiendo, el chat me tira slots. En un rato paso a mirar el partido de Boca."></textarea>
-          <label>Contexto extra (se SUMA a lo que analiza solo)</label>
-          <textarea id="kc-ctx-extra" rows="3" placeholder="Ej: avisá que en 10 min hago sorteo. No hablen de política."></textarea>
+          <div class="kc-sec-t">Categoría del prompt</div>
+          <label>Qué tipo de mensajes generar</label>
+          <select id="kc-categoria">
+            <option value="mixto">Mixto (slots + esports + fútbol + comunidad)</option>
+            <option value="slots">Solo slots / casino</option>
+            <option value="deportes">Solo deportes / e-sports + apuestas</option>
+            <option value="comunidad">Solo comunidad / charla general + noticias</option>
+          </select>
         </div>
 
         <div class="kc-sec">
-          <div class="kc-sec-t">Generación</div>
-          <label>Cantidad de mensajes por lote</label>
-          <input type="number" id="kc-cantidad" min="4" max="200" step="1" value="30">
-          <label style="margin-top:12px">Mezcla de tipos (% aprox.)</label>
-          <div class="kc-mix" id="kc-mix">
-            <div><span>Opiniones</span><input type="number" data-k="opiniones" min="0" max="100" value="35"> %</div>
-            <div><span>Preguntas</span><input type="number" data-k="preguntas" min="0" max="100" value="25"> %</div>
-            <div><span>Críticas</span><input type="number" data-k="criticas" min="0" max="100" value="15"> %</div>
-            <div><span>Reacciones</span><input type="number" data-k="reacciones" min="0" max="100" value="15"> %</div>
-            <div><span>Bromas</span><input type="number" data-k="bromas" min="0" max="100" value="10"> %</div>
+          <div class="kc-sec-t">Generación (Módulo 12)</div>
+          <div class="kc-radio">
+            <label><input type="radio" name="kc-cad-modo" value="goteo" checked> Goteo (1 mensaje cada X seg, al azar)</label>
+            <label><input type="radio" name="kc-cad-modo" value="bloque"> Bloque (1 lote entero cada X seg)</label>
+          </div>
+          <div class="kc-row">
+            <div><label>Goteo: mínimo (seg)</label><input type="number" id="kc-cad-min" min="3" max="600" value="25"></div>
+            <div><label>Goteo: máximo (seg)</label><input type="number" id="kc-cad-max" min="3" max="600" value="70"></div>
+            <div><label>Bloque: cada (seg)</label><input type="number" id="kc-cad-bloque" min="30" max="3600" value="300"></div>
           </div>
         </div>
 

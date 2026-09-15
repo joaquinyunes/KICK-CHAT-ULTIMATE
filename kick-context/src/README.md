@@ -50,7 +50,18 @@ Variables clave (ver `.env.example` para la lista completa con comentarios):
   obligatoria** (sin ella se usa `%USERPROFILE%\kick-context-data`).
 - `KICK_VIDEO_SO` / `KICK_AUDIO_SO` — `linux` | `windows` | `mac`.
 - `KICK_AUDIO_DEVICE` (+ `KICK_AUDIO_DEVICE_2` opcional para mezclar micrófono).
-- `KICK_VIDEO_WINDOW_TITLE` — capturar una sola ventana en vez del escritorio.
+- `KICK_VIDEO_MODO` — qué se captura en local (Windows): `ventana` (default,
+  recorta una sola ventana y la sigue; cuál se elige con `KICK_VIDEO_WINDOW_TITLE`
+  —parte del título— o vacío = la más grande que no esté ignorada), `activa`
+  (la ventana en primer plano, salta al cambiar de foco), `monitor`
+  (`KICK_VIDEO_MONITOR`), `escritorio`, `dshow` (`KICK_VIDEO_DSHOW`).
+  `KICK_VIDEO_IGNORAR` = títulos que nunca se capturan (StreamChat, OBS, panel…).
+  Ver los títulos disponibles:
+  `python modulo01_captura_video/captura_video.py --listar`
+  **En caliente:** el `.env` es solo el default. Con el Panel corriendo, la
+  sección *"Qué pantalla analizar"* lista monitores + ventanas abiertas y con
+  *Aplicar* cambiás la fuente al vuelo (el Módulo 1 la relee de
+  `<data>/control/captura_video.json`, sin reiniciar).
 - `KICK_WHISPER_MODEL` / `KICK_WHISPER_DEVICE` / `KICK_WHISPER_VAD`.
 
 ### Cómo encontrar el nombre de tu dispositivo de audio

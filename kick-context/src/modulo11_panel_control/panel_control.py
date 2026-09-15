@@ -186,12 +186,80 @@ def guardar_prompt_chat():
     return redirect(url_for("dashboard"))
 
 
+@app.route("/comentarista-categoria", methods=["POST"])
+@requiere_login
+def comentarista_categoria():
+    """Categoría de prompt elegida a mano para el Comentarista (Módulo 12):
+    compone prompts/base.txt + prompts/categorias/<categoria>.txt."""
+    categoria = request.form.get("categoria", config.CATEGORIA_PROMPT_DEFAULT).lower()
+    if categoria not in config.CATEGORIAS_PROMPT:
+        categoria = config.CATEGORIA_PROMPT_DEFAULT
+    config.CONTROL_DIR.mkdir(parents=True, exist_ok=True)
+    config.escribir_json(config.CATEGORIA_PROMPT_PATH, {"categoria": categoria})
+    config.log(MODULO, f"'{session.get('usuario')}' eligió la categoría de prompt: {categoria}")
+    return redirect(url_for("dashboard"))
+
+
 @app.route("/analizar", methods=["POST"])
 @requiere_login
 def analizar_ahora():
     config.CONTROL_DIR.mkdir(parents=True, exist_ok=True)
     config.ANALIZAR_AHORA_PATH.write_text(str(int(time.time())))
     config.log(MODULO, f"'{session.get('usuario')}' pidió un resumen inmediato.")
+    return redirect(url_for("dashboard"))
+
+
+# Tipos válidos para la fuente de captura de video (Módulo 1).
+_CAPTURA_TIPOS = {"ventana", "activa", "monitor", "escritorio", "env"}
+
+
+@app.route("/captura", methods=["POST"])
+@requiere_login
+def elegir_captura():
+    """Guarda qué debe capturar el Módulo 1. El valor viene del <select> como
+    'tipo|valor' (ej. 'monitor|2', 'ventana|Stake', 'ventana|' = auto,
+    'env|' = volver a lo que dice el .env)."""
+    crudo = request.form.get("fuente", "")
+    tipo, _, valor = crudo.partition("|")
+    tipo = tipo.strip().lower()
+    if tipo not in _CAPTURA_TIPOS:
+        return redirect(url_for("dashboard"))
+    config.CONTROL_DIR.mkdir(parents=True, exist_ok=True)
+    if tipo == "env":
+        try:
+            config.CAPTURA_VIDEO_PATH.unlink()
+        except OSError:
+            pass
+    else:
+        config.escribir_json(config.CAPTURA_VIDEO_PATH,
+                             {"tipo": tipo, "valor": valor.strip()})
+    config.log(MODULO, f"'{session.get('usuario')}' eligió fuente de captura: {crudo}")
+    return redirect(url_for("dashboard"))
+
+
+@app.route("/comentarista-cadencia", methods=["POST"])
+@requiere_login
+def comentarista_cadencia():
+    """Config global de cada cuánto el Comentarista (Módulo 12) manda mensajes."""
+    def _int(nombre, defecto):
+        try:
+            return int(request.form.get(nombre, defecto))
+        except (TypeError, ValueError):
+            return defecto
+
+    modo = request.form.get("modo", "goteo")
+    if modo not in ("goteo", "bloque"):
+        modo = "goteo"
+    min_seg = max(3, _int("min_seg", config.COMENTARIO_MIN_SEG))
+    max_seg = max(min_seg, _int("max_seg", config.COMENTARIO_MAX_SEG))
+    bloque_seg = max(30, _int("bloque_seg", config.COMENTARIO_BLOQUE_SEG))
+
+    config.CONTROL_DIR.mkdir(parents=True, exist_ok=True)
+    config.escribir_json(config.COMENTARISTA_CFG_PATH, {
+        "modo": modo, "min_seg": min_seg, "max_seg": max_seg, "bloque_seg": bloque_seg,
+    })
+    config.log(MODULO, f"'{session.get('usuario')}' cambió la cadencia del comentarista: "
+                       f"modo={modo}, {min_seg}-{max_seg}s, bloque={bloque_seg}s")
     return redirect(url_for("dashboard"))
 
 
@@ -231,7 +299,9 @@ def dashboard():
     except (FileNotFoundError, OSError):
         nota = ""
 
-    prompt_chat = config.leer_prompt_chat()
+    prompt_chat = config.leer_prompt_chat_manual()
+    categoria_actual = config.leer_categoria_prompt()
+    categoria_opciones = config.CATEGORIAS_PROMPT
 
     comentarios = []
     if config.COMENTARIOS_DIR.exists():
@@ -249,12 +319,24 @@ def dashboard():
 
     sistema_nivel, sistema_texto = _estado_sistema()
 
+    captura = config.leer_json_seguro(config.CAPTURA_OPCIONES_PATH) or {}
+    captura_seleccion = config.leer_json_seguro(config.CAPTURA_VIDEO_PATH) or {}
+    captura_valor_actual = (f"{captura_seleccion.get('tipo')}|{captura_seleccion.get('valor', '')}"
+                            if captura_seleccion else "env|")
+
     return render_template(
         "dashboard.html",
         modulos=modulos,
+        captura_opciones=captura.get("opciones", []),
+        captura_actual=captura.get("actual"),
+        captura_actualizado=captura.get("actualizado"),
+        captura_valor_actual=captura_valor_actual,
+        cadencia=config.leer_comentarista_cfg(),
         resumenes=resumenes,
         nota=nota,
         prompt_chat=prompt_chat,
+        categoria_actual=categoria_actual,
+        categoria_opciones=categoria_opciones,
         comentarios=comentarios,
         cola_pendiente=cola_pendiente,
         comentario_txt_out=comentario_txt_out,

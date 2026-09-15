@@ -141,31 +141,26 @@ async function loadConfig() {
   try { d = await (await fetch('/api/chat/kc-config')).json(); } catch { return; }
   const g = d.gen || {};
   const s = d.send || {};
-  const modo = g.modo === 'manual' ? 'manual' : 'auto';
-  const r = document.querySelector(`input[name="kc-modo"][value="${modo}"]`);
+  document.getElementById('kc-categoria').value = g.categoria || 'mixto';
+  const cadModo = g.modo === 'bloque' ? 'bloque' : 'goteo';
+  const r = document.querySelector(`input[name="kc-cad-modo"][value="${cadModo}"]`);
   if (r) r.checked = true;
-  document.getElementById('kc-ctx-manual').value = g.contexto_manual || '';
-  document.getElementById('kc-ctx-extra').value = g.contexto_extra || '';
-  document.getElementById('kc-cantidad').value = g.cantidad || 30;
-  const mix = g.mezcla || {};
-  document.querySelectorAll('#kc-mix input').forEach((i) => {
-    if (mix[i.dataset.k] !== undefined) i.value = mix[i.dataset.k];
-  });
+  document.getElementById('kc-cad-min').value = g.min_seg ?? 25;
+  document.getElementById('kc-cad-max').value = g.max_seg ?? 70;
+  document.getElementById('kc-cad-bloque').value = g.bloque_seg ?? 300;
   document.getElementById('kc-min-seg').value = s.minSeg ?? 7;
   document.getElementById('kc-max-seg').value = s.maxSeg ?? 18;
   document.getElementById('kc-bearer-random').checked = s.bearerRandom !== false;
 }
 
 function collectConfig() {
-  const mezcla = {};
-  document.querySelectorAll('#kc-mix input').forEach((i) => { mezcla[i.dataset.k] = Number(i.value) || 0; });
   return {
     gen: {
-      modo: document.querySelector('input[name="kc-modo"]:checked')?.value || 'auto',
-      contexto_manual: document.getElementById('kc-ctx-manual').value,
-      contexto_extra: document.getElementById('kc-ctx-extra').value,
-      cantidad: Number(document.getElementById('kc-cantidad').value) || 30,
-      mezcla,
+      categoria: document.getElementById('kc-categoria').value || 'mixto',
+      modo: document.querySelector('input[name="kc-cad-modo"]:checked')?.value || 'goteo',
+      min_seg: Number(document.getElementById('kc-cad-min').value) || 25,
+      max_seg: Number(document.getElementById('kc-cad-max').value) || 70,
+      bloque_seg: Number(document.getElementById('kc-cad-bloque').value) || 300,
     },
     send: {
       minSeg: Number(document.getElementById('kc-min-seg').value) || 7,

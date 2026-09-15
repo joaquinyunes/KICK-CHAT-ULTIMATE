@@ -1174,51 +1174,59 @@ function touchControl(name: string): void {
   fs.writeFileSync(path.join(dir, name), String(Date.now()), "utf-8");
 }
 
-const GEN_CONFIG_FILE = () => path.join(kcControlDir(), "gen_config.json");
+// Reemplaza al viejo gen_config.json (contexto manual + mezcla), que
+// comentarista.py ya no lee. Ahora el Módulo 12 usa dos archivos propios:
+// categoria_prompt.json (qué prompt componer) y comentarista.json (cadencia).
+const CATEGORIA_FILE = () => path.join(kcControlDir(), "categoria_prompt.json");
+const CADENCIA_FILE = () => path.join(kcControlDir(), "comentarista.json");
+const CATEGORIAS_VALIDAS = ["mixto", "slots", "deportes", "comunidad"] as const;
 
 interface GenConfig {
-  modo: "auto" | "manual";
-  contexto_manual: string;
-  contexto_extra: string;
-  cantidad: number;
-  mezcla: Record<string, number>;
+  categoria: string;
+  modo: "goteo" | "bloque";
+  min_seg: number;
+  max_seg: number;
+  bloque_seg: number;
 }
 
 function readGenConfig(): GenConfig {
-  const def: GenConfig = {
-    modo: "auto",
-    contexto_manual: "",
-    contexto_extra: "",
-    cantidad: 30,
-    mezcla: { opiniones: 35, preguntas: 25, criticas: 15, reacciones: 15, bromas: 10 },
-  };
+  const def: GenConfig = { categoria: "mixto", modo: "goteo", min_seg: 25, max_seg: 70, bloque_seg: 300 };
+  let categoria = def.categoria;
   try {
-    const d = JSON.parse(fs.readFileSync(GEN_CONFIG_FILE(), "utf-8"));
-    return {
-      modo: d.modo === "manual" ? "manual" : "auto",
-      contexto_manual: String(d.contexto_manual || ""),
-      contexto_extra: String(d.contexto_extra || ""),
-      cantidad: Math.min(200, Math.max(4, Number(d.cantidad) || def.cantidad)),
-      mezcla: d.mezcla && typeof d.mezcla === "object" ? d.mezcla : def.mezcla,
-    };
-  } catch {
-    return def;
-  }
+    const d = JSON.parse(fs.readFileSync(CATEGORIA_FILE(), "utf-8"));
+    if (CATEGORIAS_VALIDAS.includes(d.categoria)) categoria = d.categoria;
+  } catch { /* usa el default */ }
+
+  let modo: GenConfig["modo"] = def.modo;
+  let min_seg = def.min_seg;
+  let max_seg = def.max_seg;
+  let bloque_seg = def.bloque_seg;
+  try {
+    const d = JSON.parse(fs.readFileSync(CADENCIA_FILE(), "utf-8"));
+    if (d.modo === "bloque" || d.modo === "goteo") modo = d.modo;
+    if (Number.isFinite(Number(d.min_seg))) min_seg = Number(d.min_seg);
+    if (Number.isFinite(Number(d.max_seg))) max_seg = Number(d.max_seg);
+    if (Number.isFinite(Number(d.bloque_seg))) bloque_seg = Number(d.bloque_seg);
+  } catch { /* usa el default */ }
+
+  return { categoria, modo, min_seg, max_seg, bloque_seg };
 }
 
 function writeGenConfig(patch: Partial<GenConfig>): GenConfig {
   const cur = readGenConfig();
+  const min_seg = patch.min_seg !== undefined ? Math.max(3, Math.round(Number(patch.min_seg))) : cur.min_seg;
   const next: GenConfig = {
-    modo: patch.modo === "manual" || patch.modo === "auto" ? patch.modo : cur.modo,
-    contexto_manual: patch.contexto_manual !== undefined ? String(patch.contexto_manual).slice(0, 4000) : cur.contexto_manual,
-    contexto_extra: patch.contexto_extra !== undefined ? String(patch.contexto_extra).slice(0, 2000) : cur.contexto_extra,
-    cantidad: patch.cantidad !== undefined ? Math.min(200, Math.max(4, Math.round(Number(patch.cantidad)))) : cur.cantidad,
-    mezcla: patch.mezcla !== undefined && patch.mezcla && typeof patch.mezcla === "object"
-      ? Object.fromEntries(Object.entries(patch.mezcla).map(([k, v]) => [k.slice(0, 20), Math.max(0, Math.round(Number(v) || 0))]))
-      : cur.mezcla,
+    categoria: patch.categoria && CATEGORIAS_VALIDAS.includes(patch.categoria as any) ? patch.categoria : cur.categoria,
+    modo: patch.modo === "bloque" || patch.modo === "goteo" ? patch.modo : cur.modo,
+    min_seg,
+    max_seg: patch.max_seg !== undefined ? Math.max(min_seg, Math.round(Number(patch.max_seg))) : Math.max(min_seg, cur.max_seg),
+    bloque_seg: patch.bloque_seg !== undefined ? Math.max(30, Math.round(Number(patch.bloque_seg))) : cur.bloque_seg,
   };
   fs.mkdirSync(kcControlDir(), { recursive: true });
-  fs.writeFileSync(GEN_CONFIG_FILE(), JSON.stringify(next, null, 2), "utf-8");
+  fs.writeFileSync(CATEGORIA_FILE(), JSON.stringify({ categoria: next.categoria }, null, 2), "utf-8");
+  fs.writeFileSync(CADENCIA_FILE(), JSON.stringify(
+    { modo: next.modo, min_seg: next.min_seg, max_seg: next.max_seg, bloque_seg: next.bloque_seg }, null, 2,
+  ), "utf-8");
   return next;
 }
 

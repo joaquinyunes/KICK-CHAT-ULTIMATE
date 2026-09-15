@@ -6,11 +6,13 @@ del stream (los resúmenes del Módulo 8 + metadata del canal) rellenando sus
 marcadores {{TEMA}}, {{CONTEXTO}}, {{EVENTO}}, {{CANTIDAD}}, {{HISTORIAL}}, …
 y le pide a Gemini un LOTE de N mensajes de chat EN UNA SOLA LLAMADA.
 
-Dos modos (KICK_COMENTARIO_MODO):
-- "bloque" (default): 1 llamada cada KICK_COMENTARIO_BLOQUE_SEG (300 = 5 min)
-  y vuelca el lote entero al TXT de una. Ideal si otro proyecto consume el TXT.
-- "goteo": los mensajes se encolan y se sueltan de a uno cada
-  KICK_COMENTARIO_INTERVALO_SEG; se pide otro lote cuando la cola baja del umbral.
+Dos modos (config global, editable en caliente desde el Panel →
+<data>/control/comentarista.json; el .env es solo el default):
+- "bloque": 1 llamada cada `bloque_seg` y vuelca el lote entero al TXT de una.
+  Ideal si otro proyecto consume el TXT.
+- "goteo" (default): los mensajes se encolan y se sueltan de a uno cada X seg,
+  con X al azar entre `min_seg` y `max_seg`; se pide otro lote cuando la cola
+  baja del umbral. Cambiar de modo relanza este módulo solo.
 
 - Cada mensaje se guarda en <data>/comentarios/comentario_<ts>.json y se ve
   en el Panel.
@@ -27,9 +29,10 @@ Uso:
 
 Variables de entorno (ver .env.example):
     KICK_COMENTARIO_LOTE            mensajes por llamada al LLM (default 30)
-    KICK_COMENTARIO_MODO            "bloque" (default) | "goteo"
+    KICK_COMENTARIO_MODO            "goteo" (default) | "bloque"  (default; Panel manda)
     KICK_COMENTARIO_BLOQUE_SEG      (bloque) cada cuánto se genera (default 300)
-    KICK_COMENTARIO_INTERVALO_SEG   (goteo) segundos entre mensaje y mensaje (default 30)
+    KICK_COMENTARIO_MIN_SEG/MAX_SEG (goteo) rango aleatorio entre mensajes (default 25/70)
+    KICK_COMENTARIO_INTERVALO_SEG   (compat) usado como MIN_SEG si no se define
     KICK_COMENTARIO_REGEN_UMBRAL    (goteo) re-generar cuando quedan <= N en cola (default 4)
     KICK_COMENTARIO_POSTEAR         "1" postea en el chat, "0" solo guarda
     KICK_COMENTARIO_MAX_CHARS       recorte duro por mensaje (default 240)
@@ -58,10 +61,10 @@ from memoria_historica import obtener_ultimos_resumenes  # noqa: E402
 
 MODULO = "modulo12_comentarista"
 LOTE = config.COMENTARIO_LOTE
-SEG_ENTRE_MSGS = config.COMENTARIO_SEG_ENTRE_MSGS
 REGEN_UMBRAL = config.COMENTARIO_REGEN_UMBRAL
 BACKOFF_MAX_SEG = 300
 GEMINI_TIMEOUT = int(os.environ.get("KICK_GEMINI_TIMEOUT", 90))
+IGNORAR_OFFLINE = os.environ.get("KICK_COMENTARIO_IGNORAR_OFFLINE", "0") == "1"
 TOKEN_ENDPOINT = "https://id.kick.com/oauth/token"
 SEPARADOR = "KICKCHAT"  # el prompt separa cada 4 mensajes con KICKCHAT123456
 
@@ -179,65 +182,41 @@ def _postear_chat(requests, texto):
 
 # --- Relleno del prompt maestro + LLM --------------------------------
 
-def _fmt_mezcla(mezcla: dict) -> str:
-    if not mezcla:
-        return "(sin preferencia — mezcla natural de opiniones, preguntas, reacciones, bromas y críticas)"
-    total = sum(v for v in mezcla.values() if v > 0) or 1
-    partes = [f"{k}: ~{round(v * 100 / total)}%" for k, v in mezcla.items() if v > 0]
-    return ("Repartí APROXIMADAMENTE los mensajes así (es una guía, no una cuota exacta): "
-            + ", ".join(partes))
-
-
 def _vars_contexto(resumenes, estado_canal, historial):
     ec = estado_canal or {}
+    ctx = " | ".join(r["resumen_actual"] for r in resumenes if r.get("resumen_actual"))
     ult = resumenes[-1] if resumenes else {}
     cat = ec.get("categoria") or ""
     titulo = ec.get("titulo") or ""
-    gen = config.leer_gen_config()
-
     try:
         nota = config.NOTA_USUARIO_TXT.read_text(encoding="utf-8").strip()
     except (FileNotFoundError, OSError):
         nota = ""
 
-    if gen["modo"] == "manual" and gen["contexto_manual"]:
-        # El streamer escribió el contexto a mano: es la única fuente de verdad.
-        contexto = gen["contexto_manual"]
-        tema = "Contexto puesto por el streamer"
-        fase = "(manual)"
-        evento = gen["contexto_manual"].splitlines()[0][:200]
-        tendencia = "(según el contexto manual)"
-    else:
-        # CONTEXTO = línea de tiempo de los resúmenes del Módulo 8 (Gemini lee la
-        # pantalla), del más viejo al más nuevo, + lo que el streamer sume a mano.
-        lineas = [f"- {r['resumen_actual']}" for r in resumenes if r.get("resumen_actual")]
-        contexto = "\n".join(lineas) or "(todavía sin datos del stream)"
-        if gen["contexto_extra"]:
-            contexto += f"\n\nEl streamer aclara además: {gen['contexto_extra']}"
-        tema = titulo or ult.get("fase") or cat or "Stream en vivo"
-        fase = ult.get("fase") or "(sin determinar)"
-        evento = ult.get("resumen_actual") or "(sin evento puntual ahora)"
-        tendencia = ult.get("tendencia_detectada") or "(sin tendencia clara)"
-
-    cantidad = int(gen["cantidad"] or LOTE)
-    # Momento muerto (el M8 no ve actividad): pocos mensajes y genéricos,
-    # nada de inventar apuestas/slots/partidas.
-    if str(fase).lower() == "pausa":
-        cantidad = min(cantidad, 6)
-
     return {
-        "TEMA": tema,
-        "CANTIDAD": str(cantidad),
-        "CONTEXTO": contexto,
-        "FASE": fase,
-        "EVENTO": evento,
-        "TENDENCIA": tendencia,
-        "MEZCLA": _fmt_mezcla(gen["mezcla"]),
+        "TEMA": titulo or cat or "Stream en vivo",
+        "CANTIDAD": str(LOTE),
+        "CONTEXTO": ctx or "(todavía sin datos del stream)",
         "MOMENTO": "EN_VIVO",
         "ENERGIA": "NORMAL",
-        "CATEGORIA": cat or fase or "(sin categoría)",
+        "CATEGORIA": cat or "(sin categoría)",
+        "EVENTO": ult.get("resumen_actual") or "(sin evento puntual ahora)",
         "HISTORIAL": "\n".join(historial) or "(sin mensajes previos)",
-        "NOTA_STREAMER": nota or gen["contexto_extra"] or "(sin indicación del streamer)",
+        "MEMORIA_USUARIOS": "(sin memoria de usuarios)",
+        "SLOTS_PROBABLES": "(las del ranking de arriba)",
+        "ESTADO_SLOT": "NINGUNO",
+        "DEPORTE_PRINCIPAL": "",
+        "COMPETENCIA_ESPORTS": "",
+        "EVENTO_ESPORTS": "",
+        "PARTICIPANTES_ESPORTS": "",
+        "MARCADOR_ESPORTS": "",
+        "ESTADO_ESPORTS": "",
+        "PARTIDOS_FUTBOL": "",
+        "NOTICIAS_DEPORTIVAS": "",
+        "CUOTAS_DISPONIBLES": "",
+        "MERCADOS_DISPONIBLES": "",
+        "RANKING_SLOTS_ICONICAS": "(ver la lista TOP 30 incluida en este prompt)",
+        "PROYECTO_ACTUAL": nota or "(sin datos del proyecto)",
     }
 
 
@@ -350,26 +329,17 @@ def _heartbeat_dormir(segundos):
         restante -= 5
 
 
-def _hay_pedido_regenerar():
-    """True si el Panel pidió regenerar el lote YA (y consume el pedido)."""
-    try:
-        if config.REGENERAR_LOTE_PATH.exists():
-            config.REGENERAR_LOTE_PATH.unlink()
-            return True
-    except OSError:
-        pass
-    return False
+_MODO_INICIAL = None  # se fija en main()
 
 
-def _dormir_hasta_regenerar(segundos):
-    """Duerme, pero se corta apenas el Panel pide regenerar el lote."""
-    restante = segundos
-    while restante > 0:
-        config.heartbeat(MODULO)
-        if config.REGENERAR_LOTE_PATH.exists():
-            return
-        time.sleep(min(5, restante))
-        restante -= 5
+def _reiniciar_si_cambio_modo():
+    """El modo (goteo/bloque) no se puede cambiar en caliente dentro del mismo
+    loop; si el Panel lo cambió, salimos limpio y el Orquestador (Módulo 10)
+    relanza el módulo con el modo nuevo. El min/max sí se aplica sin reiniciar."""
+    if _MODO_INICIAL and config.leer_comentarista_cfg()["modo"] != _MODO_INICIAL:
+        config.log(MODULO, "El Panel cambió el modo de cadencia. Salgo para que "
+                           "el Orquestador me relance con el modo nuevo.")
+        sys.exit(0)
 
 
 def _contexto_listo():
@@ -378,17 +348,13 @@ def _contexto_listo():
     if not base:
         config.log(MODULO, "prompt_chat.txt vacío: sin prompt no comento.", "WARN")
         return None
-    _ignorar_offline = os.environ.get("KICK_COMENTARIO_IGNORAR_OFFLINE", "0") == "1"
-    if _canal_en_vivo() is False and not config.SIMULACION and not _ignorar_offline:
+    if _canal_en_vivo() is False and not IGNORAR_OFFLINE:
         config.log(MODULO, "Canal offline. No comento. "
                            "(KICK_COMENTARIO_IGNORAR_OFFLINE=1 para generar igual)")
         return None
-    gen = config.leer_gen_config()
     resumenes = obtener_ultimos_resumenes(6)
-    manual = gen["modo"] == "manual" and gen["contexto_manual"]
-    if not resumenes and not manual:
-        config.log(MODULO, "Todavía no hay resúmenes del Módulo 8 "
-                           "(o poné contexto manual desde el panel /kc).", "WARN")
+    if not resumenes:
+        config.log(MODULO, "Todavía no hay resúmenes del Módulo 8.", "WARN")
         return None
     estado_canal = config.leer_json_seguro(config.METADATA_DIR / "estado_canal.json")
     return base, resumenes, estado_canal
@@ -407,46 +373,56 @@ def _soltar_mensaje(requests, texto):
 
 
 def _loop_bloque(requests):
-    """1 llamada cada COMENTARIO_BLOQUE_SEG; vuelca el lote entero al TXT."""
-    espera = config.COMENTARIO_BLOQUE_SEG
+    """1 llamada cada N seg (config global, releída en caliente); vuelca el
+    lote entero al TXT."""
+    espera = config.leer_comentarista_cfg()["bloque_seg"]
     while True:
         try:
+            _reiniciar_si_cambio_modo()
             config.heartbeat(MODULO)
-            if _hay_pedido_regenerar():
-                config.log(MODULO, "Regeneración pedida desde el panel.")
+            bloque_seg = config.leer_comentarista_cfg()["bloque_seg"]
             listo = _contexto_listo()
             if not listo:
-                _dormir_hasta_regenerar(min(60, config.COMENTARIO_BLOQUE_SEG))
+                _heartbeat_dormir(min(60, bloque_seg))
                 continue
             base, resumenes, estado_canal = listo
             nuevos = _generar_lote(requests, base, resumenes, estado_canal)
             if not nuevos:
                 config.log(MODULO, f"Lote vacío. Reintento en {espera}s.", "WARN")
-                _dormir_hasta_regenerar(espera)
+                _heartbeat_dormir(espera)
                 espera = min(int(espera * 1.7), BACKOFF_MAX_SEG)
                 continue
-            espera = config.COMENTARIO_BLOQUE_SEG
+            espera = bloque_seg
             _volcar_lote(requests, nuevos)
             for m in nuevos:
                 _soltar_mensaje(requests, m)
             config.log(MODULO, f"Bloque de {len(nuevos)} mensajes volcado al TXT. "
                                f"Próximo en {espera}s.")
-            _dormir_hasta_regenerar(espera)
+            _heartbeat_dormir(espera)
         except Exception as e:
             config.log(MODULO, f"Ciclo con error: {e}. Reintento en {espera}s.", "WARN")
             _heartbeat_dormir(espera)
             espera = min(int(espera * 1.7), BACKOFF_MAX_SEG)
 
 
+def _espera_goteo():
+    """Segundos hasta el próximo mensaje: un valor al azar dentro del rango
+    [min, max] que se configura globalmente desde el Panel."""
+    cfg = config.leer_comentarista_cfg()
+    return random.randint(cfg["min_seg"], cfg["max_seg"])
+
+
 def _loop_goteo(requests):
-    """1 llamada por lote, pero suelta los mensajes de a uno cada SEG_ENTRE_MSGS."""
-    backoff = SEG_ENTRE_MSGS
+    """1 llamada por lote, pero suelta los mensajes de a uno cada
+    random(min, max) segundos (config global, releída en caliente)."""
+    backoff = _espera_goteo()
     while True:
         try:
+            _reiniciar_si_cambio_modo()
             config.heartbeat(MODULO)
             listo = _contexto_listo()
             if not listo:
-                _heartbeat_dormir(SEG_ENTRE_MSGS)
+                _heartbeat_dormir(_espera_goteo())
                 continue
             base, resumenes, estado_canal = listo
 
@@ -464,7 +440,7 @@ def _loop_goteo(requests):
                 backoff = min(int(backoff * 1.7), BACKOFF_MAX_SEG)
                 continue
 
-            backoff = SEG_ENTRE_MSGS
+            backoff = _espera_goteo()
             texto = cola.pop(0)
             _guardar_cola(cola)
 
@@ -475,7 +451,7 @@ def _loop_goteo(requests):
                 marca = "posteado" if publicado else ("ensayo" if not config.COMENTARIO_POSTEAR else "NO posteado")
                 config.log(MODULO, f"[{marca}] ({len(cola)} en cola) {texto}")
 
-            _heartbeat_dormir(SEG_ENTRE_MSGS + random.randint(-5, 8))
+            _heartbeat_dormir(_espera_goteo())
 
         except Exception as e:
             config.log(MODULO, f"Ciclo con error: {e}. Reintento en {backoff}s.", "WARN")
@@ -526,11 +502,14 @@ def _volcar_lote(requests, mensajes):
 
 
 def main():
+    global _MODO_INICIAL
     config.ensure_dirs()
     base = config.leer_prompt_chat()
-    modo = config.COMENTARIO_MODO if config.COMENTARIO_MODO in ("bloque", "goteo") else "bloque"
-    cadencia = (f"1 llamada cada {config.COMENTARIO_BLOQUE_SEG}s" if modo == "bloque"
-                else f"goteo 1 msg cada {SEG_ENTRE_MSGS}s")
+    cfg = config.leer_comentarista_cfg()
+    modo = cfg["modo"]
+    _MODO_INICIAL = modo
+    cadencia = (f"1 lote cada {cfg['bloque_seg']}s" if modo == "bloque"
+                else f"goteo 1 msg cada {cfg['min_seg']}-{cfg['max_seg']}s (al azar)")
     config.log(MODULO, f"Módulo 12 (Comentarista) iniciado. modo={modo}, lote={LOTE}, "
                        f"{cadencia}, postear={'SÍ' if config.COMENTARIO_POSTEAR else 'no (modo ensayo)'}, "
                        f"TXT={config.COMENTARIO_TXT_OUT}, "

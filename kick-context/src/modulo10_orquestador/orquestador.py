@@ -200,16 +200,6 @@ def main():
     config.ensure_dirs()
     config.log(MODULO, "Orquestador iniciado. Lanzando módulos activos...")
 
-    # Modo simulación: sin captura ni stream. Solo M8 (resumen sintético) +
-    # M9 (memoria) + M12 (genera el lote con Gemini). Sirve para probar el
-    # flujo completo contexto -> 30 líneas -> lote sin transmitir.
-    if config.SIMULACION:
-        _sim_activos = {"modulo08_resumen_llm", "modulo09_memoria_historica",
-                        "modulo12_comentarista"}
-        for d in MODULOS:
-            d["activo"] = d["nombre"] in _sim_activos
-        config.log(MODULO, "MODO SIMULACIÓN activo: solo M8 + M9 + M12 (sin captura).")
-
     # En cada arranque, el estado deseado se resetea a lo que dice esta lista
     # MODULOS ("activo"). Los toggles del Panel valen mientras el Orquestador
     # sigue corriendo; al reiniciarlo, vuelve a mandar la config de acá.

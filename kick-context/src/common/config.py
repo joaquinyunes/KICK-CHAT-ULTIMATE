@@ -65,11 +65,19 @@ CONTROL_DIR = BASE_DATA_DIR / "control"
 CONTROL_ESTADO_PATH = CONTROL_DIR / "estado_deseado.json"
 # El Panel toca este archivo para pedirle al Módulo 8 un resumen inmediato.
 ANALIZAR_AHORA_PATH = CONTROL_DIR / "analizar_ahora"
-# El Panel toca este archivo para que el Módulo 12 regenere el lote YA.
-REGENERAR_LOTE_PATH = CONTROL_DIR / "regenerar_lote"
-# Ajustes de generación del Módulo 12 que se editan desde el panel /kc:
-# {modo, contexto_manual, contexto_extra, cantidad, mezcla:{...}}
-GEN_CONFIG_PATH = CONTROL_DIR / "gen_config.json"
+# Fuente de captura de video elegida desde el Panel (Módulo 11). El Módulo 1
+# la relee sola: {"tipo": "ventana"|"monitor"|"activa"|"escritorio", "valor": "..."}.
+CAPTURA_VIDEO_PATH = CONTROL_DIR / "captura_video.json"
+# El Módulo 1 publica acá las fuentes disponibles (monitores + ventanas) para
+# que el Panel arme el desplegable.
+CAPTURA_OPCIONES_PATH = CONTROL_DIR / "captura_opciones.json"
+# Config global de cadencia del Comentarista (Módulo 12), editable desde el
+# Panel y releída en caliente: {"modo": "goteo"|"bloque",
+#   "min_seg": N, "max_seg": M, "bloque_seg": K}.
+COMENTARISTA_CFG_PATH = CONTROL_DIR / "comentarista.json"
+# Categoría de prompt elegida a mano desde el Panel (Módulo 11) para el
+# Comentarista: {"categoria": "mixto"|"slots"|"deportes"|"comunidad"}.
+CATEGORIA_PROMPT_PATH = CONTROL_DIR / "categoria_prompt.json"
 
 # Carpeta con los .traineddata de Tesseract (Módulo 5). Se usa si existe;
 # si no, Tesseract usa su tessdata por defecto.
@@ -95,6 +103,24 @@ NOTA_USUARIO_PROCESADOS = NOTA_USUARIO_DIR / "procesados"
 PROMPT_CHAT_DIR = BASE_DATA_DIR / "prompt_chat"
 PROMPT_CHAT_TXT = PROMPT_CHAT_DIR / "prompt_chat.txt"
 PROMPT_CHAT_FILE_REPO = Path(__file__).resolve().parent.parent / "modulo12_comentarista" / "prompt_chat.txt"
+
+# --- Prompt modular por categoría (base + categoría elegida a mano) ---
+# prompts/base.txt: reglas comunes (formato, anti-invención, comunidad).
+# prompts/categorias/<categoria>.txt: reglas + datos específicos de esa
+# categoría. El Panel elige la categoría (CATEGORIA_PROMPT_PATH) y el
+# Módulo 12 compone base + categoría en cada llamada.
+PROMPTS_DIR = Path(__file__).resolve().parent.parent / "modulo12_comentarista" / "prompts"
+PROMPTS_BASE_TXT = PROMPTS_DIR / "base.txt"
+PROMPTS_CATEGORIAS_DIR = PROMPTS_DIR / "categorias"
+# value -> etiqueta legible para el <select> del Panel.
+CATEGORIAS_PROMPT = {
+    "mixto": "Mixto (slots + esports + fútbol + comunidad)",
+    "slots": "Solo slots / casino",
+    "deportes": "Solo deportes / e-sports + apuestas",
+    "comunidad": "Solo comunidad / charla general + noticias",
+}
+CATEGORIA_PROMPT_DEFAULT = "mixto"
+
 COMENTARIOS_DIR = BASE_DATA_DIR / "comentarios"
 COMENTARIO_COLA_PATH = COMENTARIOS_DIR / "cola.json"
 # Cada lote generado se deja también acá como lote_<ts>.txt + lote_<ts>.json,
@@ -110,21 +136,62 @@ ALL_DIRS = [
 ]
 
 
+def leer_categoria_prompt() -> str:
+    """Categoría de prompt elegida a mano desde el Panel. Default: 'mixto'.
+    Siempre devuelve una clave válida de CATEGORIAS_PROMPT."""
+    d = leer_json_seguro(CATEGORIA_PROMPT_PATH) or {}
+    cat = str(d.get("categoria") or CATEGORIA_PROMPT_DEFAULT).lower()
+    return cat if cat in CATEGORIAS_PROMPT else CATEGORIA_PROMPT_DEFAULT
+
+
+def _leer_texto(path: Path) -> str:
+    try:
+        if path.is_file():
+            return path.read_text(encoding="utf-8").strip()
+    except OSError:
+        pass
+    return ""
+
+
+def leer_prompt_chat_manual() -> str:
+    """Solo el override manual pegado en el Panel (vacío si no hay ninguno).
+    Se usa para mostrar el textarea del Panel tal cual está guardado, sin
+    mezclarlo con el prompt compuesto (base + categoría)."""
+    return _leer_texto(PROMPT_CHAT_TXT)
+
+
 def leer_prompt_chat() -> str:
     """Prompt maestro para el Módulo 12 (con marcadores {{...}} sin rellenar).
-    Prioridad: KICK_PROMPT_CHAT_FILE > copia activa del Panel > archivo del repo."""
+
+    Prioridad:
+    1. KICK_PROMPT_CHAT_FILE (archivo externo, si se define).
+    2. Override manual completo pegado en el Panel (PROMPT_CHAT_TXT) —
+       si tiene contenido, se usa tal cual (por compatibilidad con
+       prompts totalmente a medida).
+    3. Compuesto automático: prompts/base.txt + prompts/categorias/<categoria
+       elegida a mano en el Panel>.txt.
+    4. Archivo viejo del repo (prompt_chat.txt), por compatibilidad si
+       todavía no existe la carpeta prompts/.
+    """
     override = os.environ.get("KICK_PROMPT_CHAT_FILE", "")
-    candidatos = [Path(override)] if override else []
-    candidatos += [PROMPT_CHAT_TXT, PROMPT_CHAT_FILE_REPO]
-    for p in candidatos:
-        try:
-            if p.is_file():
-                txt = p.read_text(encoding="utf-8").strip()
-                if txt:
-                    return txt
-        except OSError:
-            continue
-    return ""
+    if override:
+        txt = _leer_texto(Path(override))
+        if txt:
+            return txt
+
+    manual = _leer_texto(PROMPT_CHAT_TXT)
+    if manual:
+        return manual
+
+    base = _leer_texto(PROMPTS_BASE_TXT)
+    if base:
+        categoria = leer_categoria_prompt()
+        categoria_txt = _leer_texto(PROMPTS_CATEGORIAS_DIR / f"{categoria}.txt")
+        if categoria_txt:
+            return f"{base}\n\n{categoria_txt}"
+        return base
+
+    return _leer_texto(PROMPT_CHAT_FILE_REPO)
 
 # --- Ventana de contexto ------------------------------------------------
 VENTANA_SEGUNDOS = int(os.environ.get("KICK_CONTEXT_VENTANA_SEGUNDOS", 180))  # 3 min
@@ -150,8 +217,13 @@ COMENTARIO_LOTE = int(os.environ.get("KICK_COMENTARIO_LOTE", 30))
 # "goteo"   = 1 llamada por lote, pero suelta los mensajes de a uno.
 COMENTARIO_MODO = os.environ.get("KICK_COMENTARIO_MODO", "bloque").lower()
 COMENTARIO_BLOQUE_SEG = int(os.environ.get("KICK_COMENTARIO_BLOQUE_SEG", 300))
-# (modo goteo) Segundos entre cada mensaje que se suelta.
+# (modo goteo) Segundos entre cada mensaje que se suelta. Ahora es un rango
+# aleatorio [min, max]; KICK_COMENTARIO_INTERVALO_SEG sigue siendo el default
+# del mínimo por compatibilidad.
 COMENTARIO_SEG_ENTRE_MSGS = int(os.environ.get("KICK_COMENTARIO_INTERVALO_SEG", 30))
+COMENTARIO_MIN_SEG = int(os.environ.get("KICK_COMENTARIO_MIN_SEG", COMENTARIO_SEG_ENTRE_MSGS))
+COMENTARIO_MAX_SEG = int(os.environ.get("KICK_COMENTARIO_MAX_SEG",
+                                        max(COMENTARIO_MIN_SEG + 20, COMENTARIO_MIN_SEG * 2)))
 # (modo goteo) Cuando quedan <= estos mensajes en la cola, se pide otro lote.
 COMENTARIO_REGEN_UMBRAL = int(os.environ.get("KICK_COMENTARIO_REGEN_UMBRAL", 4))
 # "1" publica en el chat de Kick de verdad; "0" (default) modo ensayo:
@@ -175,13 +247,6 @@ COMENTARIO_HOOK_CMD = os.environ.get("KICK_COMENTARIO_HOOK_CMD", "")
 # Endpoint oficial de Kick para enviar mensajes de chat.
 KICK_CHAT_ENDPOINT = os.environ.get("KICK_CHAT_ENDPOINT", "https://api.kick.com/public/v1/chat")
 KICK_TOKEN_STATE_PATH = METADATA_DIR / "kick_token_state.json"
-
-# --- Modo simulación (probar sin estar en stream) ---------------------
-# "1" = el Orquestador corre SOLO M8+M9+M12: el M8 genera resúmenes
-# sintéticos (sin captura de pantalla ni stream) y el M12 arma el lote
-# de mensajes con Gemini a partir de esos. Sirve para probar el flujo
-# completo (contexto -> 30 líneas -> lote) sin transmitir.
-SIMULACION = os.environ.get("KICK_SIMULACION", "0").lower() in ("1", "true", "yes", "si")
 
 # --- Captura (Módulos 1 y 2) ------------------------------------------
 # "local"  = ffmpeg captura la pantalla/ventana y el audio del sistema.
@@ -243,20 +308,6 @@ def leer_json_seguro(path: Path):
         return None
 
 
-def leer_gen_config() -> dict:
-    """Ajustes de generación editados desde el panel /kc. Devuelve defaults
-    razonables si el archivo no existe."""
-    d = leer_json_seguro(GEN_CONFIG_PATH) or {}
-    mezcla = d.get("mezcla") or {}
-    return {
-        "modo": d.get("modo") if d.get("modo") in ("auto", "manual") else "auto",
-        "contexto_manual": str(d.get("contexto_manual") or "").strip(),
-        "contexto_extra": str(d.get("contexto_extra") or "").strip(),
-        "cantidad": int(d["cantidad"]) if str(d.get("cantidad") or "").isdigit() else COMENTARIO_LOTE,
-        "mezcla": {k: int(v) for k, v in mezcla.items() if str(v).lstrip("-").isdigit()},
-    }
-
-
 def _consultar_canal_kick(slug: str = ""):
     """GET público a la API de Kick para el canal. Devuelve el dict o None."""
     slug = slug or CANAL_SLUG
@@ -284,8 +335,6 @@ def _consultar_canal_kick(slug: str = ""):
 
 def canal_en_vivo(slug: str = ""):
     """True/False si el canal está transmitiendo ahora. None si no se pudo saber."""
-    if SIMULACION:
-        return True
     datos = _consultar_canal_kick(slug)
     if datos is None:
         return None
@@ -333,6 +382,28 @@ def leer_estado_deseado() -> dict:
     (Módulo 11). Si el archivo no existe todavía, devuelve {} y el
     Orquestador asume que todos los módulos deben estar activos."""
     return leer_json_seguro(CONTROL_ESTADO_PATH) or {}
+
+
+def leer_comentarista_cfg() -> dict:
+    """Cadencia del Comentarista (Módulo 12). Override del Panel > .env.
+    Siempre devuelve valores válidos: modo in {goteo,bloque}, 3 <= min <= max,
+    bloque_seg >= 30. El Módulo 12 la relee en caliente."""
+    d = leer_json_seguro(COMENTARISTA_CFG_PATH) or {}
+
+    modo = str(d.get("modo") or COMENTARIO_MODO).lower()
+    if modo not in ("goteo", "bloque"):
+        modo = "bloque"
+
+    def _entero(valor, defecto):
+        try:
+            return int(valor)
+        except (TypeError, ValueError):
+            return defecto
+
+    mn = max(3, _entero(d.get("min_seg"), COMENTARIO_MIN_SEG))
+    mx = max(mn, _entero(d.get("max_seg"), max(COMENTARIO_MAX_SEG, mn)))
+    bloque_seg = max(30, _entero(d.get("bloque_seg"), COMENTARIO_BLOQUE_SEG))
+    return {"modo": modo, "min_seg": mn, "max_seg": mx, "bloque_seg": bloque_seg}
 
 
 def timestamp_desde_nombre(path: Path):

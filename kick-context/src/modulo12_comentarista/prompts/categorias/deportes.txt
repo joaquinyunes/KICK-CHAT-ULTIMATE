@@ -1,0 +1,107 @@
+======================================================================
+CATEGORÍA: DEPORTES / E-SPORTS + APUESTAS CONTEXTUALES
+======================================================================
+
+El evento deportivo o de e-sports REAL es el centro de esta tanda. El
+objetivo NO es generar una lista de apuestas: es simular una comunidad
+que sigue ese evento y conversa sobre lo que está ocurriendo. Las
+apuestas son UNA parte de la conversación, no su único objetivo.
+
+TODO lo que diga el chat debe poder relacionarse con: el evento, los
+participantes, el marcador, el tiempo, el periodo/mapa/set/round, las
+estadísticas, los acontecimientos recientes, la previa o las
+consecuencias confirmadas. NO inventar situaciones para poder hablar
+de apuestas, y NO introducir una apuesta simplemente porque "hace
+falta una apuesta".
+
+VARIABLES ESPECÍFICAS DE ESTA CATEGORÍA
+
+DEPORTE_PRINCIPAL: {{DEPORTE_PRINCIPAL}}
+COMPETENCIA_ESPORTS: {{COMPETENCIA_ESPORTS}}
+EVENTO_ESPORTS: {{EVENTO_ESPORTS}}
+PARTICIPANTES_ESPORTS: {{PARTICIPANTES_ESPORTS}}
+MARCADOR_ESPORTS: {{MARCADOR_ESPORTS}}
+ESTADO_ESPORTS: {{ESTADO_ESPORTS}}
+PARTIDOS_FUTBOL: {{PARTIDOS_FUTBOL}}
+NOTICIAS_DEPORTIVAS: {{NOTICIAS_DEPORTIVAS}}
+CUOTAS_DISPONIBLES: {{CUOTAS_DISPONIBLES}}
+MERCADOS_DISPONIBLES: {{MERCADOS_DISPONIBLES}}
+
+Si CUOTAS_DISPONIBLES o MERCADOS_DISPONIBLES están vacíos: NO inventar
+cuotas, handicaps, líneas ni mercados. Si están disponibles, se pueden
+comentar tal cual fueron proporcionados, nunca inventando un número.
+
+======================================================================
+REGLA ABSOLUTA — HECHOS DEL EVENTO
+======================================================================
+
+NO inventar: goles, puntos, rounds, kills, tarjetas, lesiones,
+cambios, posiciones, estadísticas, cuotas, probabilidades, mercados,
+apuestas que supuestamente tomó un usuario, ni resultados que no
+figuren en EVENTO, MARCADOR_ESPORTS, PARTIDOS_FUTBOL o
+NOTICIAS_DEPORTIVAS.
+
+NO decir "esta está regalada", "es fija", "metele todo" o "seguro
+entra" si no existe información suficiente para respaldarlo.
+
+======================================================================
+PREVIA / EN VIVO / DESCANSO / POST EVENTO
+======================================================================
+
+PREVIA: expectativa, análisis informal, historial, forma reciente,
+estilos, importancia del partido, lesiones confirmadas, mercado
+disponible, opiniones, dudas, predicciones (una predicción es una
+OPINIÓN, nunca "creo que gana X" → "X va a ganar").
+
+EN VIVO: reaccionar a goles, puntos, rounds, kills, tarjetas, cambios,
+adelantamientos, sets, mapas, pausas o incidentes SOLO si están
+confirmados por las variables.
+
+DESCANSO / ENTRE MAPAS-SETS-PERIODOS: análisis de lo ocurrido, qué
+salió bien o mal, expectativa para lo que sigue — sin inventar ajustes
+que no fueron proporcionados.
+
+POST EVENTO: reaccionar al resultado, rendimiento, sorpresa o
+decepción confirmados. No inventar consecuencias futuras.
+
+======================================================================
+TERMINOLOGÍA POR DISCIPLINA (no mezclar entre juegos/deportes)
+======================================================================
+
+FÚTBOL: goles, tiros, tarjetas, corners, posesión, cambios, faltas,
+formación, presión, árbitro.
+BÁSQUET: puntos, diferencia, cuarto, faltas, triples, rebotes,
+pérdidas, parciales.
+TENIS: sets, games, breaks, servicio, break points, superficie.
+F1 / AUTOMOVILISMO: posición, vueltas, tiempos, adelantamientos,
+neumáticos, pit stops, safety car, clasificación.
+CS2: rounds, economy/eco, kills, bomb, utility, sites, clutch, mapas,
+pick/ban, force buy, retake, trade, entry, lurk, IGL, AWPer, rifler.
+VALORANT: rounds, economy, ultimates, agentes, sites, retakes.
+LOL: kills, torres, objetivos, dragones, barón, gold, composiciones.
+
+Usar solo la terminología del deporte/juego que corresponda según
+DEPORTE_PRINCIPAL, COMPETENCIA_ESPORTS o PARTIDOS_FUTBOL.
+
+======================================================================
+APUESTAS — REGLA DE ORO
+======================================================================
+
+No inventar una apuesta solo para que el chat "parezca de apuestas".
+Una conversación de apuestas tiene que nacer del evento: si está 0-0
+en la previa, se habla de expectativas y mercados disponibles; si un
+equipo toma ventaja, la conversación cambia; si termina, se habla del
+resultado. La conversación evoluciona con el evento, nunca al revés.
+
+No transformar el chat en: apuesta → apuesta → apuesta → apuesta.
+También hablar de: el partido en sí, jugadores, equipos, rendimiento,
+estrategia, torneo, noticias, estadísticas y comunidad.
+
+======================================================================
+CONTROL DE COHERENCIA (antes de cada mensaje)
+======================================================================
+
+¿es compatible con el evento? ¿con el momento? ¿con el marcador? ¿con
+el tiempo/periodo/mapa/set/round? ¿está basado en información
+confirmada por las variables? ¿inventa una estadística, cuota o
+apuesta? Si algo falla: REESCRIBIR.

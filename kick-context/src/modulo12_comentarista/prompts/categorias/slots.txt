@@ -1,0 +1,136 @@
+======================================================================
+CATEGORÍA: SLOTS / CASINO
+======================================================================
+
+El casino y las slots son el EJE PRINCIPAL de esta tanda. La comunidad
+es el universo que vive alrededor de ese eje (ver reglas de "no
+retorno automático" del bloque base): los desvíos sociales son
+orgánicos y temporales, no una obligación.
+
+VARIABLES ESPECÍFICAS DE ESTA CATEGORÍA
+
+SLOTS_PROBABLES: {{SLOTS_PROBABLES}}
+ESTADO_SLOT: {{ESTADO_SLOT}}
+RANKING_SLOTS_ICONICAS: {{RANKING_SLOTS_ICONICAS}}
+
+SLOTS_PROBABLES: slots mencionadas en el ranking de abajo u otras
+disponibles — son posibilidades de conversación, NO significa que ya
+se hayan jugado, que hayan pagado o que hayan perdido.
+ESTADO_SLOT: NINGUNO | INICIO | PAGA | NO_PAGA.
+RANKING_SLOTS_ICONICAS: referencia fija de slots conocidas (ver lista
+completa más abajo) — se puede mencionar cuando tenga sentido, no es
+obligatorio cubrirla ni usar un número mínimo de slots por tanda.
+
+======================================================================
+QUÉ DEBE APARECER
+======================================================================
+
+Debe aparecer regularmente (sin convertir el chat en un catálogo):
+elección de slots, bonus y spins, banca y stake, estrategia,
+superstición, experiencias personales, predicciones, reacciones.
+
+Las slots del ranking pueden aparecer como: recomendación, preferencia,
+experiencia personal, comparación, discusión, broma, superstición,
+curiosidad, pregunta o crítica.
+
+Ejemplos de menciones naturales:
+"alguien probó la Book of Ra?"
+"Starburst es la que nunca falla"
+"yo soy más de Gates la verdad"
+"Mega Moolah nunca me pagó"
+"la Cleopatra paga poco pero seguido"
+"¿alguien juega Bonanza Megaways?"
+
+NO convertir cada mención en una reseña — el chat habla como chat, no
+como periodista.
+
+======================================================================
+REGLA DE ORO — NO INVENTAR RESULTADOS
+======================================================================
+
+NO inventar: resultados de slots, ganancias, pérdidas, banca, saldo,
+spins realizados, bonus activados, multiplicadores, jackpots, ni
+decisiones del streamer que no fueron proporcionadas por CONTEXTO o
+EVENTO.
+
+======================================================================
+LÍMITE DE RECOMENDACIONES DE SLOT
+======================================================================
+
+No más del 10-15% de los mensajes de la tanda deben tener como
+intención principal "recomendar/pedir/comparar una slot" — aunque
+cambien las palabras, todas esas frases cuentan como la misma
+categoría semántica de intención (recomendación de slot), sujeta al
+cooldown dinámico del bloque base.
+
+Después de una recomendación de slot, intentar que los siguientes
+mensajes NO sean otra recomendación: puede seguir un comentario
+casual, una interacción entre chaters, una pregunta distinta, una
+broma, una respuesta tardía — y recién después otra conversación de
+slots.
+
+======================================================================
+ENTRADA DE STREAM (si MOMENTO es COMIENZO_DEL_STREAM)
+======================================================================
+
+Durante los primeros mensajes de una sesión, no asumir que la mayoría
+de los usuarios ya están decidiendo qué slot jugar. Priorizar saludos,
+conversaciones casuales, comentarios sobre audio/video, y dejar que
+las slots aparezcan de forma progresiva, no desde el mensaje 1.
+
+======================================================================
+RANKING COMPLETO — TOP 30 SLOTS MÁS POPULARES DE LA HISTORIA
+======================================================================
+
+STAR RANKING — LAS LEYENDAS DEL CASINO:
+
+1. Megabucks (IGT) — La reina de los casinos físicos. Jackpot progresivo de área amplia desde 1986. Récord del mayor premio en Las Vegas ($39.7 millones).
+2. Wheel of Fortune (IGT) — Basada en el programa de TV. La máquina física más reconocible del mundo con su rueda de bonificación giratoria.
+3. Starburst (NetEnt) — El gigante del casino online. Baja volatilidad, temática espacial y joyas que se expanden. El juego más ofrecido para giros gratis en la historia.
+4. Mega Moolah (Microgaming) — "Creadora de millonarios". Safari africano. Múltiples récords Guinness por los mayores jackpots pagados en internet.
+5. Cleopatra (IGT) — El estándar dorado para juegos con temática egipcia. Nacida en casinos físicos, su versión online sigue siendo de las más jugadas.
+6. Gonzo's Quest (NetEnt) — Revolucionó los slots online con la mecánica de "Avalancha" y multiplicadores crecientes.
+7. Book of Ra (Novomatic) — El clásico de clásicos en Europa y América Latina. Introdujo el símbolo especial expansivo durante giros gratis.
+8. Sweet Bonanza (Pragmatic Play) — Fenómeno moderno. Sin líneas de pago tradicionales. Paga por grupos de símbolos con multiplicadores de hasta 100x.
+9. Book of Dead (Play'n GO) — Sucesor espiritual de Book of Ra. Rich Wilde como protagonista. El juego de alta volatilidad más popular en Europa.
+10. Gates of Olympus (Pragmatic Play) — El juego estrella actual. Zeus lanza multiplicadores masivos de hasta 500x. Potencial de 5,000x la apuesta.
+
+CLÁSICOS MODERNOS (11-20):
+
+11. Big Bass Bonanza (Pragmatic Play / Reel Kingdom) — Inició la locura por juegos de pesca donde el pescador "recolecta" valores en efectivo.
+12. Buffalo (Aristocrat) — Una de las máquinas físicas más jugadas y ruidosas de cualquier piso de casino.
+13. Mega Fortune (NetEnt) — El gran rival de Mega Moolah en jackpots online. Temática de yates, champán y lujo.
+14. Immortal Romance (Microgaming) — Tragamonedas de vampiros con narrativa profunda y cuatro rondas de bonificación.
+15. 88 Fortunes (SG Gaming) — El juego asiático por excelencia. Pionero en "243 formas de ganar".
+16. Dead or Alive 2 (NetEnt) — Extrema volatilidad en el lejano oeste. Puede pagar hasta 111,111 veces la apuesta.
+17. Thunderstruck II (Microgaming) — Clásico de mitología nórdica. Desbloquea mejores bonificaciones cuanto más juegas.
+18. The Dog House (Pragmatic Play) — Divertida y volátil. Famosa por sus comodines multiplicadores pegajosos.
+19. Quick Hit (Bally) — Franquicia legendaria en casinos físicos. Objetivo: conseguir símbolos "Quick Hit" para ganar botes fijos.
+20. Wolf Gold (Pragmatic Play) — Consolidó la popular mecánica "Hold & Win" que hoy usan cientos de juegos.
+
+INNOVADORES Y PIONEROS (21-30):
+
+21. Bonanza Megaways (Big Time Gaming) — Patentó y popularizó el motor "Megaways" con hasta 117,649 formas de ganar.
+22. Reactoonz (Play'n GO) — Juego de cuadrícula 7x7 con alienígenas adorables y reacciones en cadena.
+23. Twin Spin (NetEnt) — Combina símbolos clásicos con sincronización de dos o más carretes.
+24. Sizzling Hot Deluxe (Novomatic) — La máquina de frutas perfecta. Sin giros gratis ni complicaciones.
+25. Blood Suckers (NetEnt) — Famoso por tener uno de los RTP más altos de la historia (98%).
+26. Sugar Rush (Pragmatic Play) — Cuadrícula 7x7 con multiplicadores que se duplican hasta 128x.
+27. Jammin' Jars (Push Gaming) — Juego de discoteca altamente volátil con tarros de mermelada como comodines.
+28. Danger High Voltage (Big Time Gaming) — Basada en la canción de 2002. Locas rondas de bonos y volatilidad brutal.
+29. Avalon II (Microgaming) — Gran presupuesto de producción. Gráficos 3D y aventura en busca del Santo Grial.
+30. Liberty Bell (Charles Fey) — La invención original de 1895. Primera máquina tragamonedas mecánica de la historia.
+
+SLOTS ADICIONALES DISPONIBLES (pueden aparecer mencionadas):
+
+Starlight Princess (Pragmatic Play), Wanted Dead or a Wild (Hacksaw
+Gaming), Fire Joker (Play'n GO), Legacy of Dead (Play'n GO), Rise of
+Olympus (Play'n GO), Money Train 2 (Relax Gaming), Money Train 3
+(Relax Gaming), The Dog House Megaways (Pragmatic Play), Fruit Party
+(Pragmatic Play), Fruit Party 2 (Pragmatic Play), Madame Destiny
+Megaways (Pragmatic Play), The Hand of Midas (Pragmatic Play), Mustang
+Gold (Pragmatic Play), John Hunter and the Tomb of the Scarab Queen
+(Pragmatic Play), Great Rhino Megaways (Pragmatic Play), Buffalo King
+Megaways (Pragmatic Play), Empty the Bank (Pragmatic Play), Aztec Gems
+(Pragmatic Play), Joker's Jewels (Pragmatic Play), Release the Kraken
+(Pragmatic Play).

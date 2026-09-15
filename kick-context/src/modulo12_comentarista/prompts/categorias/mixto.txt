@@ -1,0 +1,140 @@
+======================================================================
+CATEGORÍA: MIXTO — SLOTS + ESPORTS + FÚTBOL + COMUNIDAD
+======================================================================
+
+Esta categoría combina varios ejes a la vez: el chat NO debe parecer
+una lista de apuestas, un noticiero ni un catálogo de slots — debe
+parecer una comunidad viva que mira un stream donde se mezclan casino,
+deportes, apuestas y charla general, sin que ninguno "gane" siempre.
+
+VARIABLES ESPECÍFICAS DE ESTA CATEGORÍA
+
+SLOTS_PROBABLES: {{SLOTS_PROBABLES}}
+ESTADO_SLOT: {{ESTADO_SLOT}}
+RANKING_SLOTS_ICONICAS: {{RANKING_SLOTS_ICONICAS}}
+DEPORTE_PRINCIPAL: {{DEPORTE_PRINCIPAL}}
+COMPETENCIA_ESPORTS: {{COMPETENCIA_ESPORTS}}
+EVENTO_ESPORTS: {{EVENTO_ESPORTS}}
+PARTICIPANTES_ESPORTS: {{PARTICIPANTES_ESPORTS}}
+MARCADOR_ESPORTS: {{MARCADOR_ESPORTS}}
+ESTADO_ESPORTS: {{ESTADO_ESPORTS}}
+PARTIDOS_FUTBOL: {{PARTIDOS_FUTBOL}}
+NOTICIAS_DEPORTIVAS: {{NOTICIAS_DEPORTIVAS}}
+CUOTAS_DISPONIBLES: {{CUOTAS_DISPONIBLES}}
+MERCADOS_DISPONIBLES: {{MERCADOS_DISPONIBLES}}
+
+Todas siguen la misma regla: si no hay dato en la variable (vacía),
+no se inventa (sin cuotas, sin mercados, sin marcador, sin resultados
+de slots).
+
+======================================================================
+NO HAY UN EJE ÚNICO
+======================================================================
+
+Pensar el chat como conversaciones simultáneas de distintos temas:
+qué slot jugar, el partido/serie de e-sports en curso, un partido de
+fútbol con su mercado, una charla social, una broma entre chaters,
+una mención al PROYECTO_ACTUAL si el streamer dejó una nota. Se
+mezclan, no se presentan por separado.
+
+Después de una conversación de un eje (casino, esports o fútbol) NO
+volver automáticamente a otro — puede seguir, morir, desviarse o
+reaparecer, igual que cualquier otro hilo (ver regla base).
+
+======================================================================
+DISTRIBUCIÓN APROXIMADA (objetivo, no fórmula exacta)
+======================================================================
+
+SLOTS/CASINO: 30-35%
+ESPORTS: 15-20%
+FÚTBOL/APUESTAS: 15-20%
+COMUNIDAD (vida cotidiana, bromas): 25-30%
+
+No repartir matemáticamente ni crear bloques temáticos consecutivos
+del mismo eje — la distribución debe sentirse orgánica, con tramos que
+acumulan más de un tema y otros de otro.
+
+======================================================================
+CASINO — SLOTS (ver reglas completas de no-invención en el bloque base)
+======================================================================
+
+Debe aparecer regularmente: elección de slots, bonus y spins, banca,
+estrategia, superstición, experiencias, predicciones. NO convertir el
+chat en un catálogo — las slots aparecen cuando tienen sentido.
+
+======================================================================
+ESPORTS Y FÚTBOL — APUESTAS CONTEXTUALES
+======================================================================
+
+El esports y el fútbol pueden aparecer como conversación en vivo,
+análisis de previa, reacción a hechos confirmados, discusión de una
+apuesta ya planteada por CUOTAS_DISPONIBLES/MERCADOS_DISPONIBLES,
+comparación entre equipos o noticias (NOTICIAS_DEPORTIVAS). Adaptar la
+terminología al juego/deporte que corresponda (fútbol, CS2, Valorant,
+LoL, básquet, tenis, F1, etc.) sin mezclarla entre disciplinas.
+
+NO inventar goles, rounds, kills, cuotas, mercados ni resultados que
+no estén en las variables. Una predicción siempre es una opinión
+("creo que gana X"), nunca un hecho ("X va a ganar").
+
+======================================================================
+PROYECTO_ACTUAL (si el streamer dejó una nota)
+======================================================================
+
+Puede surgir como tema cuando alguien menciona que está probando algo,
+desarrollando un proyecto, o compara herramientas — pero no conviertas
+cada bloque en una charla técnica: aparece de forma orgánica y
+desaparece, y el chat puede volver a cualquier otro eje después.
+
+======================================================================
+MEZCLA IDEAL — EJEMPLO CONCEPTUAL (no copiar literalmente)
+======================================================================
+
+Bloque: apertura sobre qué se juega hoy → alguien menciona el
+resultado parcial de e-sports → otro pregunta por el partido de fútbol
+de la tarde → cierre con un comentario casual.
+Bloque siguiente: alguien pide ver una slot puntual → otro pregunta
+cuál es → tercero la describe → cuarto opina distinto.
+Bloque siguiente: charla social/PROYECTO_ACTUAL sin relación con el
+resto → puede morir ahí sin volver al casino.
+
+======================================================================
+RANKING COMPLETO — TOP 30 SLOTS MÁS POPULARES DE LA HISTORIA
+======================================================================
+
+1. Megabucks (IGT) — Jackpot progresivo de área amplia desde 1986.
+2. Wheel of Fortune (IGT) — La máquina física más reconocible del mundo.
+3. Starburst (NetEnt) — Baja volatilidad, temática espacial.
+4. Mega Moolah (Microgaming) — "Creadora de millonarios", safari africano.
+5. Cleopatra (IGT) — Estándar dorado con temática egipcia.
+6. Gonzo's Quest (NetEnt) — Mecánica de "Avalancha".
+7. Book of Ra (Novomatic) — Clásico en Europa y Latinoamérica.
+8. Sweet Bonanza (Pragmatic Play) — Paga por grupos de símbolos, hasta 100x.
+9. Book of Dead (Play'n GO) — Alta volatilidad, Rich Wilde.
+10. Gates of Olympus (Pragmatic Play) — Multiplicadores hasta 500x.
+11. Big Bass Bonanza (Pragmatic Play) — Temática de pesca.
+12. Buffalo (Aristocrat) — Clásica de piso de casino físico.
+13. Mega Fortune (NetEnt) — Jackpots online, temática de lujo.
+14. Immortal Romance (Microgaming) — Vampiros, 4 rondas de bonificación.
+15. 88 Fortunes (SG Gaming) — Pionera en "243 formas de ganar".
+16. Dead or Alive 2 (NetEnt) — Extrema volatilidad, lejano oeste.
+17. Thunderstruck II (Microgaming) — Mitología nórdica.
+18. The Dog House (Pragmatic Play) — Comodines multiplicadores pegajosos.
+19. Quick Hit (Bally) — Franquicia legendaria en casinos físicos.
+20. Wolf Gold (Pragmatic Play) — Popularizó "Hold & Win".
+21. Bonanza Megaways (Big Time Gaming) — Motor "Megaways".
+22. Reactoonz (Play'n GO) — Cuadrícula 7x7, alienígenas.
+23. Twin Spin (NetEnt) — Sincronización de carretes.
+24. Sizzling Hot Deluxe (Novomatic) — Máquina de frutas clásica.
+25. Blood Suckers (NetEnt) — RTP altísimo (98%).
+26. Sugar Rush (Pragmatic Play) — Cuadrícula 7x7, multiplicadores hasta 128x.
+27. Jammin' Jars (Push Gaming) — Temática de discoteca, muy volátil.
+28. Danger High Voltage (Big Time Gaming) — Basada en la canción de 2002.
+29. Avalon II (Microgaming) — Aventura del Santo Grial.
+30. Liberty Bell (Charles Fey) — La invención original de 1895.
+
+Otras slots que pueden mencionarse: Starlight Princess, Wanted Dead or
+a Wild, Fire Joker, Legacy of Dead, Rise of Olympus, Money Train 2/3,
+The Dog House Megaways, Fruit Party 1/2, Madame Destiny Megaways, The
+Hand of Midas, Mustang Gold, Great Rhino Megaways, Buffalo King
+Megaways, Aztec Gems, Joker's Jewels, Release the Kraken.

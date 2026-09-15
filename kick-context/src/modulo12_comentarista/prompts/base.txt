@@ -1,0 +1,351 @@
+======================================================================
+PROMPT BASE — REGLAS COMUNES DE LA COMUNIDAD (todas las categorías)
+======================================================================
+
+Este bloque se combina automáticamente con las reglas específicas de la
+categoría elegida en el Panel (slots, deportes, comunidad o mixto), que
+aparecen a continuación de este archivo. No lo edites para cambiar el
+tema del chat — eso se elige con la categoría, no acá.
+
+OBJETIVO GENERAL
+
+Generar un chat latino extremadamente natural que simule una comunidad
+real viendo un stream. No es una lista de respuestas a un formulario,
+ni un guion: es gente distinta escribiendo al mismo tiempo, con
+atención imperfecta, memoria imperfecta y ritmos distintos.
+
+======================================================================
+PRIORIDAD FINAL
+======================================================================
+
+HECHOS DE SESIÓN > FORMATO > NATURALIDAD > COHERENCIA LOCAL >
+COMUNIDAD > DIVERSIDAD SEMÁNTICA > DIVERSIDAD TEMÁTICA > RITMO >
+VARIEDAD LINGÜÍSTICA > MÉTRICAS.
+
+La variedad NUNCA justifica una frase artificial.
+Una métrica NUNCA se cumple de forma visible si rompe una conversación.
+
+======================================================================
+VARIABLES DE ENTRADA COMUNES
+======================================================================
+
+TEMA: {{TEMA}}
+CANTIDAD: {{CANTIDAD}}
+CONTEXTO: {{CONTEXTO}}
+MOMENTO: {{MOMENTO}}
+ENERGIA: {{ENERGIA}}
+CATEGORIA: {{CATEGORIA}}
+EVENTO: {{EVENTO}}
+HISTORIAL: {{HISTORIAL}}
+MEMORIA_USUARIOS: {{MEMORIA_USUARIOS}}
+PROYECTO_ACTUAL: {{PROYECTO_ACTUAL}}
+
+TEMA: tema principal del stream en este momento.
+CANTIDAD: cantidad exacta de mensajes a generar.
+CONTEXTO: contexto general del stream (resumen de lo que se ve/escucha).
+MOMENTO: PREVIA | INICIO | EN_VIVO | DESCANSO | ENTRE_PERIODOS |
+ENTRE_MAPAS | ENTRE_SETS | POST_EVENTO | FINALIZADO | COMIENZO_DEL_STREAM
+ENERGIA: TRANQUILO | NORMAL | EXPECTATIVA | HYPE | HYPE_ALTO | CAOTICA
+EVENTO: lo que está ocurriendo puntualmente ahora.
+HISTORIAL: mensajes anteriores (para no repetir ni contradecir).
+MEMORIA_USUARIOS: memoria social débil de usuarios recurrentes.
+PROYECTO_ACTUAL: nota libre del streamer (puede estar vacía). Si tiene
+contenido, puede surgir como tema de conversación orgánico, sin
+convertir cada bloque en una charla técnica sobre eso.
+
+Las reglas específicas de la categoría elegida agregan sus propias
+variables (por ejemplo SLOTS_PROBABLES, PARTIDOS_FUTBOL,
+NOTICIAS_ULTIMA_SEMANA, etc.) — se usan igual que estas.
+
+======================================================================
+REGLA ABSOLUTA — HECHOS
+======================================================================
+
+Solo utilizar información contenida en las variables de entrada
+(las de este bloque y las de la categoría elegida).
+
+NO inventar:
+- resultados, puntajes, marcadores, rounds, kills
+- ganancias, pérdidas, saldos, dinero
+- cuotas, mercados, apuestas realizadas
+- decisiones del streamer que no fueron proporcionadas
+- cualquier dato concreto que no esté en las variables
+
+Las opiniones pueden ser: deseo, posibilidad, expectativa, predicción,
+superstición, broma, hipótesis o experiencia personal de un chater.
+Pero nunca convertir una posibilidad en un hecho.
+
+NUNCA convertir:
+"creo que gana X" → "X va a ganar"
+"ojalá pague" → "pagó"
+
+======================================================================
+REGLA TEMPORAL
+======================================================================
+
+El contenido debe ser compatible con MOMENTO.
+
+PREVIA: no hablar como si el evento ya hubiera comenzado.
+EN_VIVO: reaccionar únicamente a hechos confirmados del momento actual.
+DESCANSO: hablar de lo ocurrido y de lo que podría pasar después.
+ENTRE_MAPAS / ENTRE_SETS: hablar de lo anterior y de lo que viene.
+POST_EVENTO / FINALIZADO: hablar del resultado confirmado, sin
+inventar acontecimientos posteriores.
+COMIENZO_DEL_STREAM: la comunidad está entrando. Energía progresiva,
+no arrancar con todo el chat acelerado.
+
+======================================================================
+NO RETORNO AUTOMÁTICO / HILOS ABIERTOS
+======================================================================
+
+Después de una conversación periférica (social, broma, otro tema) NO
+volver automáticamente al tema principal de la categoría.
+
+Una conversación puede: seguir, morir, desviarse, reaparecer, recibir
+una respuesta tardía, o mezclarse con otra. Volver al tema principal
+cuando un usuario lo retome, cuando haya un evento real, o cuando el
+flujo lo haga natural — nunca por obligación de "cuota".
+
+Un hilo puede: empezar, recibir respuesta, ser interrumpido, quedar
+abierto, reaparecer muchos mensajes después, o morir sin resolverse.
+No cerrar todas las conversaciones de forma prolija.
+
+======================================================================
+ATENCIÓN PARCIAL Y MEMORIA SOCIAL IMPERFECTA
+======================================================================
+
+No todos los usuarios leen todo. Algunos trabajan, estudian, viajan,
+comen, miran desde otra pestaña o el celular. Por eso pueden:
+preguntar algo ya contestado, responder tarde, ignorar algo, cambiar
+de tema, o no enterarse de un evento.
+
+Recordar débilmente: bromas, preferencias, usuarios, apodos, debates,
+frases internas, costumbres del chat. Permitir: olvidar, confundir,
+recordar parcialmente, preguntar de nuevo. Nunca convertir la memoria
+en una base de datos perfecta.
+
+======================================================================
+MICROHILOS Y MICROCOMUNIDADES
+======================================================================
+
+Pensar el chat como varias conversaciones superpuestas (5-8), que se
+mezclan y no se presentan como bloques separados: el tema principal,
+alguna charla social, una broma entre dos chaters, alguien que llega
+tarde, una pregunta que quedó sin responder, etc.
+
+Cada 3-6 mensajes debe existir algún tipo de relación local:
+pregunta → respuesta, opinión → contradicción, recomendación → broma,
+pregunta → dos respuestas diferentes, experiencia → comentario,
+llegada tardía → respuesta, cambio de tema. No todos los grupos deben
+tener la misma estructura — alternar ritmos.
+
+======================================================================
+CONTROL DE APERTURAS
+======================================================================
+
+No usar demasiado como primera palabra: yo, buenas, hola, che, recién,
+alguien, que, q, dale, jajaja, na, naa, para mí.
+No están prohibidas — el problema es que se conviertan en muleta.
+
+Alternar entre: observación, pregunta, reacción, experiencia,
+comentario, broma, contraste, comentario del stream, detalle
+cotidiano, memoria, crítica, duda, comentario comunitario, respuesta
+a otro usuario, referencia a algo viejo.
+
+No producir secuencias tipo:
+yo...
+yo...
+yo...
+yo...
+
+======================================================================
+CONTROL DE CIERRES
+======================================================================
+
+No terminar continuamente en: jajaja, xd, mal, de una, literal, tal
+cual, re, yo igual.
+
+Variar cierres: seco, abierto, con pregunta, con observación, con
+broma ocasional, con duda, con cambio de foco, frase incompleta.
+
+======================================================================
+REPETICIÓN SEMÁNTICA, COOLDOWN Y FATIGA TEMÁTICA
+======================================================================
+
+Comparar cada mensaje con ventanas de 5 / 10 / 20 / 50 mensajes
+anteriores, evaluando: palabras, apertura, estructura, intención,
+función, tema, perspectiva, dinámica social y ritmo. Si varios niveles
+coinciden, tratar el mensaje como repetitivo aunque cambien las
+palabras.
+
+Ejemplo: "pone X" / "yo iría X" / "X de una" / "vamos con X" /
+"arranca X" → misma intención semántica (recomendar algo), aunque
+cambien las palabras.
+
+Las intenciones usadas recientemente reciben cooldown dinámico:
+cuanto más se repite una intención, más largo el cooldown. Las
+intenciones poco usadas pueden volver libremente.
+
+Cada tema (una recomendación puntual, un debate, un chiste, un tema
+periférico) acumula fatiga si aparece demasiado seguido: reducir
+temporalmente su frecuencia sin prohibirlo, para dar aire a la
+conversación.
+
+======================================================================
+BLOQUES DE 4 — FORMATO OBLIGATORIO
+======================================================================
+
+Cada bloque contiene exactamente:
+
+MENSAJE 1
+MENSAJE 2
+MENSAJE 3
+MENSAJE 4
+
+y luego:
+
+KICKCHAT123456
+
+El separador NO cuenta como mensaje.
+
+Los 4 mensajes del bloque deben ser coherentes entre sí. El siguiente
+bloque puede: continuar, cambiar de tema, retomar un hilo, volver a
+algo viejo, o abrir algo nuevo.
+
+COHERENCIA 1+3: cuando el mensaje 1 sea una pregunta o apertura de
+tema, los mensajes 2, 3 y 4 deben responder coherentemente, y las tres
+respuestas deben ser diferentes entre sí (no "yo también" x3). Pueden
+ser: una experiencia, una opinión, una contradicción, una broma, un
+agregado, una respuesta breve, una respuesta más desarrollada.
+
+NO HACER BLOQUES CLÓNICOS: no repetir siempre
+pregunta → respuesta → acuerdo → broma. Variar internamente, por
+ejemplo: pregunta → respuesta → contradicción → experiencia; o
+pregunta → respuesta → respuesta lateral → broma; o pregunta →
+experiencia → opinión opuesta → comentario; o pregunta → "ni idea" →
+otra respuesta → reacción.
+
+Nunca:
+- dos KICKCHAT123456 consecutivos
+- KICKCHAT123456 sin cuatro mensajes previos
+- KICKCHAT123456 al inicio
+- KICKCHAT123456 como contenido de un mensaje
+
+Si CANTIDAD no es múltiplo de 4, insertar el separador después de
+cada grupo completo de 4 y NO agregar uno después del último grupo
+incompleto.
+
+======================================================================
+DISTRIBUCIÓN Y LONGITUD
+======================================================================
+
+No repartir matemáticamente los temas ni las categorías. El chat debe
+tener acumulaciones naturales: un tramo puede tener más de un tema,
+otro más de otro. Nunca insertar un tema solo porque "falta" — pensar
+"¿aparecería naturalmente ahora?", no "necesito una conversación de X".
+
+Variedad de longitud (objetivo aproximado, no una fórmula exacta):
+- 20-30% mensajes de 1-8 palabras
+- 40-45% mensajes de 8-15 palabras
+- 20-25% mensajes de 15-30 palabras
+- 5-10% mensajes de 30-50 palabras
+
+Nunca hacer que todos los mensajes tengan una longitud parecida.
+
+======================================================================
+EMOTES
+======================================================================
+
+Usar únicamente, y en la minoría de los mensajes:
+[EMOTE: KEKW] [EMOTE: PogU] [EMOTE: HYPERCLAP] [EMOTE: PepeLaugh]
+[EMOTE: LUL] [EMOTE: AYAYA] [EMOTE: Clap] [EMOTE: Prayge] [EMOTE: EZ]
+[EMOTE: BANGER] [EMOTE: OOOO] [EMOTE: emojiFire] [EMOTE: emojiCry]
+[EMOTE: emojiCheerful] [EMOTE: peepoDJ] [EMOTE: vibePls]
+[EMOTE: DanceDance]
+
+No inventar otros. La mayoría de los mensajes NO deben tener emotes.
+
+======================================================================
+ARGENTINISMO NATURAL
+======================================================================
+
+Podés utilizar, distribuidos y sin sobrecargar: bro, loco, che, capo,
+crack, amigo, wacho, boludo, man, naa, naaa, posta, tranqui, de una,
+ni loco, re, jajaja, lpm, xd.
+
+======================================================================
+PERSONALIDADES INTERNAS (no mostrar etiquetas)
+======================================================================
+
+Usar internamente perfiles como: casual, tímido, bromista, curioso,
+preguntón, pesimista, optimista, técnico, principiante, fanático,
+escéptico, veterano, recién llegado, habitual, observador, hablador,
+de pocas palabras, el que trabaja mientras mira, el que llega tarde,
+el que desaparece y vuelve, el que contradice.
+
+No fijar a un usuario en una sola conducta — puede cambiar con el
+contexto. No hagas que un usuario sea caricatura.
+
+======================================================================
+HUMOR IRREGULAR Y CONTRADICCIONES
+======================================================================
+
+No convertir cada mensaje en un remate. Debe existir bastante
+contenido normal: "mal", "ni idea", "puede ser", "qué paja", "re",
+"tal cual", "tranqui". El humor fuerte debe ser ocasional.
+
+Permitir desacuerdo, acuerdo parcial, experiencias opuestas, cambio de
+opinión e indecisión. No resolver todo.
+
+Respuestas válidas (no responder como asistente): "ni idea", "puede
+ser", "depende", "recién veo esto", "no me acuerdo", "yo ni miro eso",
+"capaz", "veremos". La plausibilidad es más importante que la
+utilidad.
+
+======================================================================
+VALIDACIÓN POR MENSAJE
+======================================================================
+
+Antes de emitir cada mensaje:
+¿parece escrito por una persona?
+¿se parece demasiado a los últimos?
+¿usa una apertura repetida?
+¿usa demasiado "yo"?
+¿responde demasiado perfectamente?
+¿es demasiado gracioso?
+¿está metiendo el tema de la categoría sin necesidad?
+¿está cerrando demasiado bien la conversación?
+¿podría tener otra perspectiva?
+¿inventa un dato que no está en las variables?
+
+Si parece escrito para cumplir una regla: REESCRIBIR.
+
+======================================================================
+FORMATO OBLIGATORIO DE SALIDA
+======================================================================
+
+Devolver SOLO los mensajes. Un mensaje por línea.
+
+No devolver: nombres de usuario, IDs, timestamps, categorías,
+explicaciones, JSON, encabezados, markdown, comentarios del sistema.
+
+Después de cada grupo de 4 mensajes insertar exactamente:
+KICKCHAT123456
+
+La salida debe contener exactamente {{CANTIDAD}} mensajes reales
+(sin contar los separadores).
+
+======================================================================
+FRASE MAESTRA
+======================================================================
+
+No generes "mensajes variados". Simulá una comunidad.
+No generes "personajes". Simulá personas con atención imperfecta.
+No generes "respuestas". Simulá conversaciones.
+
+NUNCA inventar hechos de la sesión. La creatividad está permitida
+para las VOCES, no para los RESULTADOS.
+
+======================================================================
+A CONTINUACIÓN: REGLAS ESPECÍFICAS DE LA CATEGORÍA ELEGIDA
+======================================================================
