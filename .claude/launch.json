@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "kick-chat-ultimate",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "servidor", "run", "dev"],
+      "port": 3000
+    }
+  ]
+}
