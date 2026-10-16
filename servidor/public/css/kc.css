@@ -1,0 +1,100 @@
+/* kc.css — panel "En vivo". Clases kcx-*; las kc-* viejas siguen viniendo de kd.css. */
+
+.kcx { gap: 16px; }
+.kcx-head { padding: 6px 2px 2px; }
+.kcx-h1 { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -.02em; }
+.kcx-lead { margin: 4px 0 0; font-size: 14px; color: var(--kd-muted); }
+
+/* ─── Encendido ──────────────────────────────────────────────────────────── */
+.kcx-hero {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 4px 16px;
+  padding: 18px 20px;
+}
+.kcx-hero-err { grid-column: 1 / -1; }
+.kcx-hero-err:empty { display: none; }
+.kcx-hero-err .kc-err { margin-top: 8px; }
+.kcx-led { width: 14px; height: 14px; border-radius: 50%; background: var(--kd-dim); }
+.kcx-state { font-size: 20px; font-weight: 800; letter-spacing: -.01em; }
+.kcx-state-sub { font-size: 13px; color: var(--kd-muted); margin-top: 2px; }
+.kcx-toggle { min-width: 150px; padding: 11px 20px; font-size: 14px; font-weight: 700; }
+.kcx-hero[data-state="on"] { border-color: var(--kd-green-line); box-shadow: 0 0 28px -12px var(--kd-green-glow); }
+.kcx-hero[data-state="on"] .kcx-led { background: var(--kd-green); box-shadow: 0 0 10px var(--kd-green); }
+.kcx-hero[data-state="on"] .kcx-state { color: var(--kd-green); }
+.kcx-hero[data-state="warn"] .kcx-led { background: var(--kd-amber); }
+.kcx-hero[data-state="warn"] .kcx-state { color: var(--kd-amber); }
+.kcx-hero[data-state="bad"] { border-color: rgba(229,48,45,.45); }
+.kcx-hero[data-state="bad"] .kcx-led { background: var(--kd-red); }
+.kcx-hero[data-state="bad"] .kcx-state { color: var(--kd-red); }
+
+/* ─── Preparación ────────────────────────────────────────────────────────── */
+.kcx-prep { border-color: rgba(242,177,52,.5); background: color-mix(in srgb, var(--kd-amber) 6%, var(--kd-card)); }
+.kcx-prep.flash { animation: kcx-flash .9s ease 2; }
+@keyframes kcx-flash { 50% { box-shadow: 0 0 0 3px rgba(242,177,52,.45); } }
+.kcx-prep-t { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+.kcx-checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.kcx-checks li { display: grid; grid-template-columns: 22px 1fr; gap: 2px 10px; font-size: 13px; }
+.kcx-checks .ico { font-weight: 800; }
+.kcx-checks li.ok .ico { color: var(--kd-green); }
+.kcx-checks li.ok { color: var(--kd-muted); }
+.kcx-checks li.bad .ico { color: var(--kd-red); }
+.kcx-checks .fix { grid-column: 2; font-size: 12.5px; color: var(--kd-muted); }
+.kcx-cmd { grid-column: 2; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.kcx-cmd code {
+  font-family: var(--kd-mono); font-size: 12px; padding: 5px 9px; border-radius: 7px;
+  background: var(--kd-card2); border: 1px solid var(--kd-line2); color: var(--kd-text);
+}
+
+/* ─── Layout ─────────────────────────────────────────────────────────────── */
+.kcx-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+.kcx-steps, .kcx-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.kcx-side { position: sticky; top: 70px; }
+
+/* ─── Pasos ──────────────────────────────────────────────────────────────── */
+.kcx-step { padding: 18px 20px; }
+.kcx-step-h { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 14px; }
+.kcx-step-h h2 { margin: 0; font-size: 16px; font-weight: 700; }
+.kcx-step-h p { margin: 2px 0 0; font-size: 12.5px; color: var(--kd-muted); }
+.kcx-num {
+  width: 30px; height: 30px; border-radius: 50%; flex: none; display: grid; place-items: center;
+  background: var(--kd-green); color: var(--kd-on-green); font-weight: 800; font-size: 14px;
+}
+.kcx-step-r { margin-left: auto; text-align: right; font-size: 11.5px; color: var(--kd-muted); display: flex; flex-direction: column; flex: none; }
+.kcx-scroll { overflow-y: auto; max-height: 340px; display: flex; flex-direction: column; gap: 8px; }
+
+.kcx-now { border-radius: 10px; padding: 14px 16px; background: var(--kd-green-soft); border: 1px solid var(--kd-green-line); }
+.kcx-now-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 11px; color: var(--kd-muted); }
+.kcx-now-top .kc-badge { font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.kcx-now-txt { margin: 0; font-size: 15px; line-height: 1.5; font-weight: 500; }
+.kcx-now .kc-evento { margin: 6px 0 0; color: var(--kd-green); font-weight: 600; font-size: 13px; }
+.kcx-sub { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--kd-dim); font-weight: 600; margin: 6px 2px 0; }
+.kcx-old { padding: 8px 2px; border-bottom: 1px solid var(--kd-line); font-size: 12.5px; color: var(--kd-muted); }
+.kcx-old time { color: var(--kd-dim); font-size: 11px; margin-right: 8px; }
+
+/* ─── Lateral ────────────────────────────────────────────────────────────── */
+.kcx-box { padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+.kcx-box-t { margin: 0 0 2px; font-size: 14px; font-weight: 700; }
+.kcx-act { width: 100%; justify-content: center; padding: 10px 12px; }
+.kcx-help { margin: 0 0 6px; font-size: 11.5px; color: var(--kd-muted); line-height: 1.45; }
+.kcx-inline { display: flex; gap: 8px; }
+.kcx-inline select { flex: 1; min-width: 0; }
+.kcx-group { border-top: 1px solid var(--kd-line); margin-top: 8px; padding-top: 10px; }
+.kcx-group-t { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--kd-dim); margin-bottom: 6px; }
+.kcx-radio { flex-direction: column; gap: 8px; }
+.kcx-radio label { align-items: flex-start; }
+.kcx-radio input { margin-top: 3px; }
+.kcx-group .kc-row.off { opacity: .4; pointer-events: none; }
+.kc-set.kcx-box label { margin: 6px 0 4px; }
+.kcx-box .kc-actions { margin-top: 10px; }
+.kcx-box .kc-actions .btn { flex: 1; justify-content: center; }
+#kc-save-state.dirty { color: var(--kd-amber); font-weight: 600; }
+#kc-save-state.saved { color: var(--kd-green); }
+
+@media (max-width: 960px) {
+  .kcx-grid { grid-template-columns: minmax(0, 1fr); }
+  .kcx-side { position: static; }
+}
+@media (max-width: 560px) {
+  .kcx-hero { grid-template-columns: auto 1fr; }
+  .kcx-toggle { grid-column: 1 / -1; width: 100%; }
+  .kcx-h1 { font-size: 22px; }
+}

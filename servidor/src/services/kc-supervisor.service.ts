@@ -108,6 +108,8 @@ function pipelineEnv(): Record<string, string> {
     KICK_LLM_PROVIDER: "gemini",
     // KCU absorbe los lotes por polling — el hook externo del M12 sobra.
     KICK_COMENTARIO_HOOK_CMD: "",
+    // M8 en modo rápido (< 15 s de atraso, ver ACTA-analizador-streamchat.md).
+    KICK_RESUMEN_MODO: process.env.KICK_RESUMEN_MODO || "rapido",
   };
   if (simulation()) {
     extra.KICK_SIMULACION = "1";
@@ -295,6 +297,61 @@ export function stopKcPipeline(): { ok: boolean; message: string } {
   return { ok: true, message: "Pipeline detenido" };
 }
 
+export interface KcCheck {
+  id: "python" | "requests" | "ffmpeg" | "gemini";
+  ok: boolean;
+  label: string;
+  fix: string;
+  /** Comando para pegar en una terminal, si el arreglo es uno solo. */
+  cmd?: string;
+}
+
+function probe(cmd: string, args: string[]): Promise<boolean> {
+  return new Promise((resolve) => {
+    execFile(cmd, args, { timeout: 5_000, windowsHide: true }, (err) => resolve(!err));
+  });
+}
+
+/** La clave puede estar en servidor/.env (hereda el hijo) o en kick-context/src/.env. */
+export function geminiKeyPresent(): boolean {
+  if ((process.env.KICK_GEMINI_API_KEY || "").trim()) return true;
+  try {
+    const txt = fs.readFileSync(path.join(kcDir(), "src", ".env"), "utf-8");
+    return /^[ \t]*KICK_GEMINI_API_KEY[ \t]*=[ \t]*["']?[^\s"']/m.test(txt);
+  } catch {
+    return false;
+  }
+}
+
+let checksCache: { at: number; checks: KcCheck[] } | null = null;
+
+/**
+ * Lo que el pipeline necesita para andar. Sin esto arranca, se cae en loop y
+ * termina "BLOQUEADO" sin decir por qué; mejor avisar antes. Cacheado 15 s
+ * porque el panel lo consulta cada pocos segundos.
+ */
+export async function getKcChecks(force = false): Promise<KcCheck[]> {
+  if (!force && checksCache && Date.now() - checksCache.at < 15_000) return checksCache.checks;
+
+  const py = findPython();
+  const [requests, ffmpeg] = await Promise.all([
+    py ? probe(py, ["-c", "import requests"]) : Promise.resolve(false),
+    probe("ffmpeg", ["-version"]),
+  ]);
+  const checks: KcCheck[] = [
+    { id: "python", ok: !!py, label: "Python",
+      fix: "Instalá Python 3.11 o más nuevo desde python.org (marcá «Add to PATH») y reiniciá el servidor." },
+    { id: "requests", ok: requests, label: "Librería de Python «requests»",
+      fix: "Instalala con este comando en una terminal.", cmd: "python -m pip install requests" },
+    { id: "ffmpeg", ok: ffmpeg, label: "ffmpeg (captura de pantalla y audio)",
+      fix: "Instalalo con este comando; después cerrá y volvé a abrir el servidor para que lo encuentre.", cmd: "winget install Gyan.FFmpeg" },
+    { id: "gemini", ok: geminiKeyPresent(), label: "Clave de Gemini",
+      fix: "Sacá una clave gratis en aistudio.google.com/apikey, pegala en servidor/.env como KICK_GEMINI_API_KEY=… y reiniciá el servidor." },
+  ];
+  checksCache = { at: Date.now(), checks };
+  return checks;
+}
+
 export interface KcPipelineStatus {
   enabled: boolean;
   simulation: boolean;
@@ -305,6 +362,8 @@ export interface KcPipelineStatus {
   restarts: number;
   lastExitCode: number | null;
   lastError: string;
+  /** Apagado a propósito (no es una caída esperando reinicio). */
+  stopping: boolean;
   kcDir: string;
   dataDir: string;
   captureMode: string;
@@ -323,6 +382,7 @@ export function getKcPipelineStatus(): KcPipelineStatus {
     restarts: state.restarts,
     lastExitCode: state.lastExitCode,
     lastError: state.lastError,
+    stopping,
     kcDir: kcDir(),
     dataDir: kcDataDir(),
     captureMode: (env.KICK_CAPTURE_MODE || "local").trim(),

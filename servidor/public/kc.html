@@ -3,185 +3,156 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StreamChat – Contexto en vivo</title>
+<title>StreamChat – En vivo</title>
 <link rel="stylesheet" href="css/main.css" />
-<link rel="stylesheet" href="css/client-nav.css" />
-<style>
-  .kc-wrap { flex:1; padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:14px; min-height:0; }
-  .kc-wrap > * { flex-shrink:0; }
-  .kc-topbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-  .kc-topbar h2 { font-size:15px; margin:0; color:var(--text); font-weight:700; }
-  .kc-pill { font-size:11px; padding:3px 10px; border-radius:20px; border:1px solid var(--border); color:var(--text-muted); background:var(--surface2); white-space:nowrap; }
-  .kc-pill.on { border-color:var(--success); color:var(--success); }
-  .kc-pill.off { border-color:var(--danger,#e5484d); color:var(--danger,#e5484d); }
-  .kc-pill.warn { border-color:#e2a03f; color:#e2a03f; }
-  .kc-statusbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:10px 14px; }
-  .kc-statusbar .big { font-size:13px; font-weight:700; }
-  .kc-statusbar .big.on { color:var(--success); }
-  .kc-statusbar .big.off { color:var(--danger,#e5484d); }
-  .kc-statusbar .big.warn { color:#e2a03f; }
-  .kc-controls { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-left:auto; }
-  .kc-controls select { background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:6px 8px; font-family:inherit; font-size:12px; }
-  .kc-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-  @media (max-width:900px){ .kc-grid { grid-template-columns:1fr; } }
-  .kc-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px; display:flex; flex-direction:column; gap:10px; min-height:0; }
-  .kc-card h3 { font-size:12px; margin:0; color:var(--text); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
-  .kc-card .sub { font-size:11px; color:var(--text-muted); text-transform:none; letter-spacing:0; }
-  .kc-scroll { overflow-y:auto; max-height:44vh; display:flex; flex-direction:column; gap:8px; }
-  .kc-sum { border:1px solid var(--border); border-radius:8px; padding:8px 10px; background:var(--surface2); }
-  .kc-sum-head { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
-  .kc-badge { font-size:10px; padding:2px 8px; border-radius:20px; background:rgba(109,90,252,.14); color:var(--accent); border:1px solid var(--accent); }
-  .kc-time { font-size:10px; color:var(--text-muted); margin-left:auto; }
-  .kc-sum p { margin:2px 0; font-size:12px; line-height:1.45; color:var(--text); }
-  .kc-sum .prev, .kc-sum .trend { color:var(--text-muted); font-size:11px; }
-  .kc-line { display:flex; gap:6px; padding:3px 4px; font-size:12.5px; line-height:1.4; border-bottom:1px solid rgba(255,255,255,.03); }
-  .kc-line .u { font-weight:700; color:var(--accent); flex-shrink:0; }
-  .kc-line .t { color:var(--text); word-break:break-word; }
-  .kc-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
-  .kc-stat { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:8px; text-align:center; }
-  .kc-stat b { display:block; font-size:18px; color:var(--text); }
-  .kc-stat span { font-size:10px; color:var(--text-muted); text-transform:uppercase; }
-  .kc-err { font-size:11px; color:var(--danger,#e5484d); background:rgba(229,72,77,.08); border:1px solid rgba(229,72,77,.25); border-radius:6px; padding:6px 8px; word-break:break-word; }
-  .kc-empty { color:var(--text-muted); font-size:12px; text-align:center; padding:24px 8px; }
-  .kc-meta { font-size:11px; color:var(--text-muted); display:flex; gap:14px; flex-wrap:wrap; }
-  .kc-toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:var(--surface); border:1px solid var(--accent); color:var(--text); font-size:12px; padding:10px 16px; border-radius:8px; z-index:80; box-shadow:0 8px 30px rgba(0,0,0,.4); }
-  .kc-toast[hidden] { display:none; }
-  .kc-set { margin-top:12px; }
-  .kc-set[hidden] { display:none; }
-  .kc-sec { border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:12px; }
-  .kc-sec-t { font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; }
-  .kc-set label { font-size:12px; color:var(--text); display:block; margin:8px 0 3px; }
-  .kc-set textarea, .kc-set input[type=number] { width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:7px 9px; font-family:inherit; font-size:12px; }
-  .kc-set textarea { resize:vertical; }
-  .kc-row { display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap; }
-  .kc-row > div { flex:1; min-width:90px; }
-  .kc-mix { display:flex; flex-direction:column; gap:6px; }
-  .kc-mix > div { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text); }
-  .kc-mix span { width:90px; }
-  .kc-mix input { width:64px; }
-  .kc-radio { display:flex; gap:14px; font-size:12px; margin:4px 0 8px; flex-wrap:wrap; }
-  .kc-radio label { display:inline-flex; gap:5px; align-items:center; margin:0; cursor:pointer; }
-  .kc-set-actions { display:flex; gap:8px; flex-wrap:wrap; }
-</style>
+<link rel="stylesheet" href="css/kd.css" />
+<link rel="stylesheet" href="css/kc.css?v=1" />
+<script>try{if(localStorage.getItem('kd_theme')==='light')document.documentElement.classList.add('kd-light')}catch(e){}</script>
 </head>
-<body class="chat-page">
-  <div class="pl-scene" aria-hidden="true"></div>
-  <div class="pl-grid" aria-hidden="true"></div>
-  <div class="pl-grain" aria-hidden="true"></div>
-  <header id="chat-header" class="app-header"></header>
-  <div id="client-nav"></div>
+<body class="kd">
+  <header id="chat-header" class="kd-top"></header>
 
-  <div class="kc-wrap">
-    <div class="kc-topbar">
-      <h2>🎥 Contexto del stream → Gemini → Chat</h2>
+  <main class="kd-main kcx">
+
+    <div class="kcx-head">
+      <h1 class="kcx-h1">En vivo</h1>
+      <p class="kcx-lead">La IA mira tu pantalla, entiende qué estás haciendo y escribe en tu chat de Kick.</p>
     </div>
 
-    <!-- ESTADO + CONTROLES -->
-    <div class="kc-statusbar">
-      <span id="kc-big" class="big off">■ PIPELINE APAGADO</span>
-      <span id="kc-cap-pill" class="kc-pill">captura: —</span>
-      <span id="kc-chan-pill" class="kc-pill">canal: —</span>
-      <div class="kc-controls">
-        <label style="font-size:11px;color:var(--text-muted)">pantalla:</label>
-        <select id="kc-monitor"><option value="">escritorio completo</option></select>
-        <button id="kc-apply-screen" class="btn btn-ghost btn-sm">Aplicar</button>
+    <!-- ═══ ENCENDIDO ═══ -->
+    <section class="kd-card kcx-hero" id="kc-hero" data-state="off">
+      <span class="kcx-led" aria-hidden="true"></span>
+      <div class="kcx-hero-t">
+        <div id="kc-big" class="kcx-state">Apagado</div>
+        <div id="kc-state-sub" class="kcx-state-sub">El analizador no está mirando tu pantalla.</div>
       </div>
-    </div>
+      <button id="kc-toggle" class="btn btn-primary kcx-toggle" type="button">▶ Encender</button>
+      <div id="kc-pipe-err" class="kcx-hero-err"></div>
+    </section>
 
-    <div class="kc-statusbar">
-      <button id="kc-start" class="btn btn-primary btn-sm">▶ Arrancar</button>
-      <button id="kc-stop" class="btn btn-danger btn-sm">■ Parar</button>
-      <span style="width:1px;height:20px;background:var(--border)"></span>
-      <button id="kc-analyze" class="btn btn-secondary btn-sm">⚡ Analizar contexto ahora</button>
-      <button id="kc-regen" class="btn btn-secondary btn-sm">🗑 Borrar y regenerar mensajes</button>
-      <button id="kc-refresh" class="btn btn-ghost btn-sm" style="margin-left:auto">↻ Refrescar lote</button>
-    </div>
-    <div id="kc-pipe-err"></div>
+    <!-- Solo aparece si falta algo para que ande -->
+    <section id="kc-prep" class="kd-card kcx-prep" hidden>
+      <div class="kcx-prep-t">Para que el analizador funcione falta preparar <b id="kc-prep-n">0</b> cosa(s) en esta PC</div>
+      <ul id="kc-checks" class="kcx-checks"></ul>
+    </section>
 
-    <div class="kc-card">
-      <h3 id="kc-set-toggle" style="cursor:pointer;user-select:none">⚙️ Ajustes de contexto, generación y envío <span id="kc-set-caret" style="color:var(--accent)">▸</span></h3>
-      <div id="kc-set-body" class="kc-set" hidden>
+    <div class="kcx-grid">
 
-        <div class="kc-sec">
-          <div class="kc-sec-t">Categoría del prompt</div>
-          <label>Qué tipo de mensajes generar</label>
+      <!-- ═══ COLUMNA PRINCIPAL: los 3 pasos ═══ -->
+      <div class="kcx-steps">
+
+        <section class="kd-card kcx-step">
+          <div class="kcx-step-h">
+            <span class="kcx-num">1</span>
+            <div>
+              <h2>Lo que ve la IA</h2>
+              <p>Gemini mira tu pantalla y escucha el audio cada pocos segundos.</p>
+            </div>
+          </div>
+          <div id="kc-sums" class="kcx-scroll"><p class="kc-empty">Todavía no hay ningún análisis. Encendé el analizador.</p></div>
+        </section>
+
+        <section class="kd-card kcx-step">
+          <div class="kcx-step-h">
+            <span class="kcx-num">2</span>
+            <div>
+              <h2>Lo que escribe</h2>
+              <p>Con ese contexto arma mensajes de chat.</p>
+            </div>
+            <div class="kcx-step-r"><span id="kc-lote-count">0 líneas</span><span id="kc-lote-when">sin lote</span></div>
+          </div>
+          <div id="kc-lines" class="kcx-scroll"><p class="kc-empty">Todavía no llegó ningún lote.</p></div>
+        </section>
+
+        <section class="kd-card kcx-step">
+          <div class="kcx-step-h">
+            <span class="kcx-num">3</span>
+            <div>
+              <h2>Lo que sale al chat de Kick</h2>
+              <p>Se envía por la API oficial, <span id="kc-send-int">cada 7-18s</span>.</p>
+            </div>
+          </div>
+          <div class="kc-stats">
+            <div class="kc-stat"><b id="kc-sent">0</b><span>enviados</span></div>
+            <div class="kc-stat"><b id="kc-queued">0</b><span>en cola</span></div>
+            <div class="kc-stat"><b id="kc-failed">0</b><span>fallidos</span></div>
+          </div>
+          <div class="kc-meta" style="margin-top:10px">
+            <span id="kc-send-chan">canal: —</span>
+            <span id="kc-send-last">último envío: —</span>
+          </div>
+          <div id="kc-send-err" style="margin-top:8px"></div>
+        </section>
+      </div>
+
+      <!-- ═══ COLUMNA LATERAL: controles ═══ -->
+      <aside class="kcx-side">
+
+        <section class="kd-card kcx-box">
+          <h3 class="kcx-box-t">Acciones</h3>
+          <button id="kc-analyze" class="btn btn-secondary kcx-act" type="button">⚡ Analizar ahora</button>
+          <p class="kcx-help">Hace que la IA mire la pantalla ya, sin esperar al próximo ciclo.</p>
+          <button id="kc-regen" class="btn btn-secondary kcx-act" type="button">🗑 Borrar y regenerar mensajes</button>
+          <p class="kcx-help">Vacía la cola y escribe mensajes nuevos con lo que ve ahora.</p>
+          <button id="kc-refresh" class="kd-link-btn" type="button">↻ Actualizar pantalla</button>
+        </section>
+
+        <section class="kd-card kcx-box">
+          <h3 class="kcx-box-t">Qué pantalla mira</h3>
+          <div class="kcx-inline">
+            <select id="kc-monitor" aria-label="Pantalla a capturar"><option value="">escritorio completo</option></select>
+            <button id="kc-apply-screen" class="btn btn-ghost btn-sm" type="button">Aplicar</button>
+          </div>
+          <p class="kcx-help">Si el analizador está encendido, al aplicar se reinicia unos segundos.</p>
+        </section>
+
+        <section class="kd-card kcx-box kc-set" id="ajustes">
+          <h3 class="kcx-box-t">Ajustes de mensajes</h3>
+
+          <label for="kc-categoria">Sobre qué escribe</label>
           <select id="kc-categoria">
-            <option value="mixto">Mixto (slots + esports + fútbol + comunidad)</option>
+            <option value="mixto">Mixto (slots, e-sports, fútbol, charla)</option>
             <option value="slots">Solo slots / casino</option>
             <option value="deportes">Solo deportes / e-sports + apuestas</option>
-            <option value="comunidad">Solo comunidad / charla general + noticias</option>
+            <option value="comunidad">Solo charla general + noticias</option>
           </select>
-        </div>
 
-        <div class="kc-sec">
-          <div class="kc-sec-t">Generación (Módulo 12)</div>
-          <div class="kc-radio">
-            <label><input type="radio" name="kc-cad-modo" value="goteo" checked> Goteo (1 mensaje cada X seg, al azar)</label>
-            <label><input type="radio" name="kc-cad-modo" value="bloque"> Bloque (1 lote entero cada X seg)</label>
+          <div class="kcx-group">
+            <div class="kcx-group-t">Cómo genera</div>
+            <div class="kc-radio kcx-radio">
+              <label><input type="radio" name="kc-cad-modo" value="goteo" checked> <span><b>Goteo</b> — de a un mensaje, cada tanto</span></label>
+              <label><input type="radio" name="kc-cad-modo" value="bloque"> <span><b>Bloque</b> — un lote entero cada tanto</span></label>
+            </div>
+            <div id="kc-f-goteo" class="kc-row">
+              <div><label for="kc-cad-min">Espera mínima (seg)</label><input type="number" id="kc-cad-min" min="3" max="600" value="25"></div>
+              <div><label for="kc-cad-max">Espera máxima (seg)</label><input type="number" id="kc-cad-max" min="3" max="600" value="70"></div>
+            </div>
+            <div id="kc-f-bloque" class="kc-row">
+              <div><label for="kc-cad-bloque">Un lote cada (seg)</label><input type="number" id="kc-cad-bloque" min="30" max="3600" value="300"></div>
+            </div>
           </div>
-          <div class="kc-row">
-            <div><label>Goteo: mínimo (seg)</label><input type="number" id="kc-cad-min" min="3" max="600" value="25"></div>
-            <div><label>Goteo: máximo (seg)</label><input type="number" id="kc-cad-max" min="3" max="600" value="70"></div>
-            <div><label>Bloque: cada (seg)</label><input type="number" id="kc-cad-bloque" min="30" max="3600" value="300"></div>
-          </div>
-        </div>
 
-        <div class="kc-sec">
-          <div class="kc-sec-t">Envío</div>
-          <div class="kc-row">
-            <div><label>Mínimo (seg)</label><input type="number" id="kc-min-seg" min="2" max="600" value="7"></div>
-            <div><label>Máximo (seg)</label><input type="number" id="kc-max-seg" min="2" max="600" value="18"></div>
+          <div class="kcx-group">
+            <div class="kcx-group-t">Cada cuánto manda al chat</div>
+            <div class="kc-row">
+              <div><label for="kc-min-seg">Mínimo (seg)</label><input type="number" id="kc-min-seg" min="2" max="600" value="7"></div>
+              <div><label for="kc-max-seg">Máximo (seg)</label><input type="number" id="kc-max-seg" min="2" max="600" value="18"></div>
+            </div>
+            <p class="kcx-help">Pausa al azar entre un mensaje y el siguiente.</p>
           </div>
-          <label style="margin-top:10px"><input type="checkbox" id="kc-bearer-random" checked> Elegir el bearer al azar (si no, rota parejo)</label>
-        </div>
 
-        <div class="kc-sec">
-          <p style="font-size:11px;color:var(--text-muted);margin:0 0 8px">
-            "Guardar" aplica al próximo lote. "Guardar y regenerar" borra la cola y arma uno nuevo ahora.
-          </p>
-          <div class="kc-set-actions">
-            <button id="kc-save" class="btn btn-secondary btn-sm">Guardar</button>
-            <button id="kc-save-regen" class="btn btn-primary btn-sm">Guardar y regenerar</button>
+          <div class="kc-actions">
+            <button id="kc-save" class="btn btn-primary btn-sm" type="button">Guardar</button>
+            <button id="kc-save-regen" class="btn btn-secondary btn-sm" type="button">Guardar y regenerar ya</button>
           </div>
-        </div>
-
-      </div>
+          <p id="kc-save-state" class="kcx-help" aria-live="polite">Sin cambios.</p>
+        </section>
+      </aside>
     </div>
+  </main>
 
-    <div class="kc-grid">
-      <div class="kc-card">
-        <h3>1 · Contexto del stream <span class="sub">Módulo 8 · Gemini lee pantalla + audio</span></h3>
-        <div id="kc-sums" class="kc-scroll"><p class="kc-empty">Esperando el primer resumen…</p></div>
-      </div>
+  <div id="kc-toast" class="kc-toast" hidden role="status"></div>
 
-      <div class="kc-card">
-        <h3>2 · Mensajes generados <span class="sub">Módulo 12 · prompt + contexto → Gemini</span></h3>
-        <div class="kc-meta">
-          <span id="kc-lote-count">0 líneas</span>
-          <span id="kc-lote-when">sin lote</span>
-        </div>
-        <div id="kc-lines" class="kc-scroll"><p class="kc-empty">Todavía no llegó ningún lote.</p></div>
-      </div>
-    </div>
-
-    <div class="kc-card">
-      <h3>3 · Envío al chat de Kick <span class="sub">pool de bearers · <span id="kc-send-int">cada 7-18s</span></span></h3>
-      <div class="kc-stats">
-        <div class="kc-stat"><b id="kc-sent">0</b><span>enviados</span></div>
-        <div class="kc-stat"><b id="kc-queued">0</b><span>en cola</span></div>
-        <div class="kc-stat"><b id="kc-failed">0</b><span>fallidos</span></div>
-      </div>
-      <div class="kc-meta">
-        <span id="kc-send-chan">canal: —</span>
-        <span id="kc-send-last">último envío: —</span>
-      </div>
-      <div id="kc-send-err"></div>
-    </div>
-  </div>
-
-  <div id="kc-toast" class="kc-toast" hidden></div>
-
-  <script src="js/pl-mascot.js"></script>
-  <script type="module" src="js/kc-ui.js?v=5"></script>
+  <script type="module" src="js/kc-ui.js?v=7"></script>
 </body>
 </html>

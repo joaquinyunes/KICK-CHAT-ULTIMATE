@@ -4,10 +4,10 @@ import { getDb } from "../models/database";
 import path from "path";
 import fs from "fs";
 import { logger } from "../utils/logger";
-import { sendWithBearer, resolveChatroomId, getSentCounters, resetSendCounters, getRealUsername } from "../services/bearer-sender.service";
-import { getRandomBearer, decryptFromHex } from "../services/security";
+import { sendAsUser } from "../services/kick20.service";
 import { stmts } from "../models/database";
 import { SYSTEM_PROMPT } from "../prompts/simulator-chat.es";
+import { composePrompt, normalizarDatos, normalizarOpciones, resumenIncluido } from "../prompts/prompt-builder";
 import { parseLlmMessages, sanitizeStreamContext } from "../utils/llm-messages";
 import { execFile } from "child_process";
 import { getKcIngestStatus, getKcSummaries, tick as kcIngestTick, primeForRegenerate, watchForRegenerate } from "../services/kc-ingest.service";
@@ -19,6 +19,7 @@ import {
   getCaptureConfig,
   setCaptureConfig,
   kcControlDir,
+  getKcChecks,
 } from "../services/kc-supervisor.service";
 import { getKcSenderStatus, clearKcSender, getSendConfig, setSendConfig } from "../services/kc-sender.service";
 import { findPython } from "../utils/python";
@@ -405,17 +406,41 @@ function generateLocalChat(
   const usedUsers = new Set<string>();
   const emoteOnlyUsers = ["tutossj", "laverde99", "Reixzer", "Gino_TN", "dekoredd", "bomboclat_0"];
 
+  // Dobles: casi todos mandan un solo mensaje; una vez cada ~15 mensajes la misma
+  // persona manda 2 seguidos (nunca 3). Es un contador, no una probabilidad.
+  const proxDoble = (): number => randInt(12, 18);
+  let desdeDoble = 0;
+  let cadaDoble = proxDoble();
+  let rafagaUser = "";
+  let rafagaRestante = 0;
+
   for (let i = 0; i < cantidad; i++) {
     const tipoRoll = Math.random();
     let text = "";
-    let user = randomOf(users);
+    let user: string;
+    desdeDoble++;
+    if (rafagaRestante > 0 && rafagaUser) {
+      user = rafagaUser;
+      rafagaRestante--;
+    } else {
+      user = randomOf(users);
+      rafagaUser = user;
+      rafagaRestante = 0;
+      if (desdeDoble >= cadaDoble) {
+        rafagaRestante = 1;
+        desdeDoble = 0;
+        cadaDoble = proxDoble();
+      }
+    }
     let tipo = "fondo";
 
     usedUsers.add(user);
 
-    if (i % 5 === 0 && i > 0) {
+    if (i > 0 && Math.random() < 0.18) {
       text = randomOf(["[KEKW][KEKW][LUL][LUL]", "[PogU][PogU][AYAYA]", "[HYPERCLAP][HYPERCLAP]", "[peepoDJ][vibePls][DanceDance][ratJAM]", "[emojiFire][emojiFire][emojiFire]"]);
       user = randomOf(emoteOnlyUsers);
+      rafagaUser = user;
+      rafagaRestante = 0;
       tipo = "emote_puro";
     } else if (tipoRoll < 0.1) {
       const followUp = historial[Math.max(0, historial.length - 1 - randInt(0, 3))];
@@ -435,7 +460,7 @@ function generateLocalChat(
       tipo = "risa";
     } else {
       text = randomMessage("", energia, cfg.capsBoost, categoria);
-      tipo = i % 8 === 0 ? "destacado" : "fondo";
+      tipo = Math.random() < 0.12 ? "destacado" : "fondo";
     }
 
     if (Math.random() < 0.08) text = text + " xd";
@@ -647,82 +672,6 @@ export async function getHistory(req: Request, res: Response): Promise<void> {
 }
 
 // ============================================================
-// POST /api/chat/news  — busca noticias con OpenRouter
-// ============================================================
-export async function fetchNews(req: Request, res: Response): Promise<void> {
-  try {
-    const orKey = env.OPENROUTER_API_KEY;
-    if (!orKey) { res.status(500).json({ error: "OpenRouter API key requerida" }); return; }
-
-    // Check cache: if we fetched news in the last 5 minutes, return cached
-    const cached = getCachedNews();
-    if (cached && cached.length > 0) {
-      const parsed = cached.map((t: string) => {
-        try { return JSON.parse(t); } catch { return { tipo: "news", texto: t }; }
-      });
-      res.json({ noticias: parsed, cache: true });
-      return;
-    }
-
-    const newsPrompt = `Generá las noticias más importantes de las ÚLTIMAS HORAS en estas 3 categorías. Respondé ÚNICAMENTE con un JSON array sin markdown:
-[
-  {"tipo":"sport","texto":"descripción breve del resultado o noticia deportiva"},
-  {"tipo":"trend","texto":"tendencia viral en redes sociales"},
-  {"tipo":"news","texto":"noticia general importante"}
-]
-Máximo 8 items en total, mezcla los 3 tipos. Priorizá Argentina y Latinoamérica. Incluí resultados de fútbol, MMA, boxeo, gaming, esports.`;
-
-    const resOR = await fetch(OR_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${orKey}`,
-      },
-      body: JSON.stringify({
-        model: OR_MODEL,
-        messages: [
-          { role: "system", content: "Sos un generador de noticias. Respondé solo JSON." },
-          { role: "user", content: newsPrompt },
-        ],
-        temperature: 0.3,
-        max_tokens: 1024,
-      }),
-    });
-
-    if (!resOR.ok) {
-      const errText = await resOR.text();
-      res.status(502).json({ error: "Error OpenRouter", status: resOR.status, detail: errText.substring(0, 200) });
-      return;
-    }
-
-    const data = await resOR.json();
-    const fullText = data?.choices?.[0]?.message?.content || "";
-
-    let parsed: any[] = [];
-    try {
-      const clean = fullText.replace(/```json|```/g, "").trim();
-      const match = clean.match(/\[[\s\S]*?\]/);
-      if (match) parsed = JSON.parse(match[0]);
-    } catch { parsed = []; }
-
-    // Cache results
-    if (parsed.length > 0) {
-      const sid = `news_${Date.now()}`;
-      for (const n of parsed) {
-        dbRun("INSERT INTO sim_noticias_cache (session_id, query_usada, resultado, usado_en_bloque) VALUES (?, ?, ?, 1)",
-          [sid, "manual", JSON.stringify(n)]);
-      }
-    }
-
-    res.json({ noticias: parsed, cache: false });
-
-  } catch (err: any) {
-    logger.error("simulator", `News error: ${err}`);
-    res.status(500).json({ error: "Error interno del simulador" });
-  }
-}
-
-// ============================================================
 // POST /api/chat/export-txt — guarda los mensajes en un .txt
 // ============================================================
 export async function exportSimTxt(req: Request, res: Response): Promise<void> {
@@ -758,111 +707,84 @@ export async function exportSimTxt(req: Request, res: Response): Promise<void> {
 }
 
 // ============================================================
-// GET /api/chat/send-stats — conteo de mensajes por bot
+// GET /api/chat/send-stats — conteo de mensajes por cuenta oficial
 // ============================================================
-const ACCOUNT_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
-const usernameCache = new Map<string, string | null>();
-
-async function resolveKickUsername(bearer: string): Promise<string | null> {
-  // 1) nombre ya aprendido de un send exitoso (fuente confiable, sin API extra)
-  const learned = getRealUsername(bearer);
-  if (learned) return learned;
-  if (usernameCache.has(bearer)) return usernameCache.get(bearer) || null;
-  try {
-    const res = await fetch("https://kick.com/api/v2/self", {
-      headers: {
-        Accept: "application/json, text/plain, */*",
-        "User-Agent": ACCOUNT_UA,
-        Authorization: bearer.startsWith("Bearer ") ? bearer : "Bearer " + bearer,
-      },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (res.status !== 200) {
-      usernameCache.set(bearer, null);
-      return null;
-    }
-    const data: any = await res.json();
-    const name = data?.username || data?.data?.username || data?.identity?.username || null;
-    usernameCache.set(bearer, name);
-    return name;
-  } catch {
-    usernameCache.set(bearer, null);
-    return null;
-  }
-}
+const sentByAccount = new Map<string, number>();
 
 export async function getSendStats(_req: Request, res: Response): Promise<void> {
-  try {
-    const counters = getSentCounters();
-    const bots = stmts.listAllBots.all() as any[];
-    const out: any[] = [];
-    for (const b of bots) {
-      let token = "";
-      try { token = (decryptFromHex(b?.encrypted_bearer || "") || "").trim(); } catch {}
-      const count = token ? counters.get(token) || 0 : 0;
-      const storedName = (b?.kick_username || "").trim();
-      let name = storedName || b.bot_name;
-      if (token && !storedName) {
-        const real = await resolveKickUsername(token);
-        if (real) {
-          name = real;
-          try { stmts.updateBotKickUsername.run([real, b.id]); } catch {}
-        }
-      }
-      out.push({ botId: name, count, botName: b.bot_name, used: count > 0 });
-    }
-    out.sort((a, b) => (b.count || 0) - (a.count || 0));
-    res.json({ success: true, total: out.reduce((s, u) => s + (u.count || 0), 0), bots: out });
-  } catch (err: any) {
-    logger.error("simulator", `Send stats error: ${err}`);
-    res.status(500).json({ error: "Error obteniendo estadísticas" });
-  }
+  const bots = [...sentByAccount.entries()]
+    .map(([name, count]) => ({ botId: name, botName: name, count, used: count > 0 }))
+    .sort((x, y) => y.count - x.count);
+  res.json({ success: true, total: bots.reduce((sum, u) => sum + u.count, 0), bots });
 }
 
 export async function resetSendStats(_req: Request, res: Response): Promise<void> {
-  resetSendCounters();
+  sentByAccount.clear();
   res.json({ success: true });
 }
 
 // ============================================================
-// POST /api/chat/send-sim — envía en vivo los mensajes con los bearers
+// POST /api/chat/send-sim — envía en vivo los mensajes por la API oficial
+// (cuenta OAuth conectada en /kick20)
 // ============================================================
 export async function sendSimMessages(req: Request, res: Response): Promise<void> {
   try {
     const body = req.body || {};
     const mensajes: any[] = Array.isArray(body.mensajes) ? body.mensajes : [];
-    const channel = (typeof body.channel === "string" && body.channel.trim())
-      ? body.channel.trim()
-      : "";
-    const chatroomId: number | undefined = body.chatroom_id ?? undefined;
+    const channel = typeof body.channel === "string" ? body.channel.trim() : "";
     const randomOrder = body.random_order !== false;
     const delay = Math.max(800, Number(body.delay) || 2500);
 
     if (mensajes.length === 0) { res.status(400).json({ error: "No hay mensajes para enviar" }); return; }
-    if (!channel && chatroomId == null) { res.status(400).json({ error: "Falta el canal o chatroom_id" }); return; }
+    if (!channel) { res.status(400).json({ error: "Falta el canal" }); return; }
 
-    let resolvedChatroomId = chatroomId;
-    if (channel && resolvedChatroomId == null) {
-      const r = await resolveChatroomId(channel);
-      if (r.chatId == null) { res.status(400).json({ error: "No se pudo resolver el canal: " + channel }); return; }
-      resolvedChatroomId = r.chatId;
+    // Ráfagas: las líneas seguidas de un mismo usuario son una tanda que se manda
+    // junta y rápido (alguien que teclea 2 o 3 mensajes al hilo). Si se mezcla el
+    // orden, se mezclan las ráfagas completas, no las líneas de adentro.
+    const rafagas: number[][] = [];
+    mensajes.forEach((m, i) => {
+      const prev = rafagas[rafagas.length - 1];
+      const mismoUser = prev && (mensajes[prev[prev.length - 1]].user || "") === (m.user || "") && !!m.user;
+      if (mismoUser && prev.length < 4) prev.push(i);
+      else rafagas.push([i]);
+    });
+    if (randomOrder) {
+      for (let i = rafagas.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [rafagas[i], rafagas[j]] = [rafagas[j], rafagas[i]];
+      }
     }
+    const order = rafagas.flat();
+    // Dentro de una ráfaga la pausa es corta; entre personas, el delay configurado
+    // con jitter, para que el chat no salga con cadencia de metrónomo.
+    const enRafaga = new Set<number>();
+    for (const r of rafagas) for (const idx of r.slice(1)) enRafaga.add(idx);
+    const pausaMs = (idx: number): number =>
+      enRafaga.has(idx)
+        ? Math.round(Math.max(400, delay * 0.15) + Math.random() * Math.max(400, delay * 0.3))
+        : Math.round(delay * (0.6 + Math.random() * 1.2));
 
-    const order = randomOrder ? mensajes.map((_, i) => i).sort(() => Math.random() - 0.5) : mensajes.map((_, i) => i);
     const results: any[] = [];
     let ok = 0, fail = 0;
 
-    for (const idx of order) {
+    for (let k = 0; k < order.length; k++) {
+      const idx = order[k];
       const m = mensajes[idx];
       if (!m.message) continue;
       const texto = `${m.user || "anonymous"}: ${m.message}`;
-      const r = await sendWithBearer(channel || "", texto, { chatroomId: resolvedChatroomId });
-      if (r.ok) ok++; else fail++;
-      results.push({ user: m.user, status: r.status, ok: r.ok });
-      await new Promise(s => setTimeout(s, delay));
+      const r = await sendAsUser(channel, texto);
+      if (r.ok) {
+        ok++;
+        if (r.account) sentByAccount.set(r.account, (sentByAccount.get(r.account) || 0) + 1);
+      } else {
+        fail++;
+      }
+      results.push({ user: m.user, status: r.status, ok: r.ok, error: r.error });
+      const next = order[k + 1];
+      if (next != null) await new Promise((s) => setTimeout(s, pausaMs(next)));
     }
 
-    res.json({ ok: true, enviados: ok, fallidos: fail, detalles: results, chatroom_id: resolvedChatroomId });
+    res.json({ ok: true, enviados: ok, fallidos: fail, detalles: results });
   } catch (err: any) {
     logger.error("simulator", `Send error: ${err}`);
     res.status(500).json({ error: "Error al enviar mensajes" });
@@ -870,52 +792,27 @@ export async function sendSimMessages(req: Request, res: Response): Promise<void
 }
 
 // ============================================================
-// POST /api/chat/build-prompt — arma un prompt con las reglas
-// adaptadas a un tema, para pegarlo en Gemini/ChatGPT/OpenRouter
+// POST /api/chat/build-prompt — arma el prompt completo (para pegarlo en otra IA)
+// a partir de los datos pegados y de los módulos elegidos. No llama a ningún modelo.
+// Body: { datos: {...}, opciones: {...} }  (compat: { tema, energia, cantidad } del formato viejo)
 // ============================================================
 export async function buildPrompt(req: Request, res: Response): Promise<void> {
   try {
     const body = req.body || {};
-    const tema = (typeof body.tema === "string" && body.tema.trim()) ? body.tema.trim() : "";
-    const categoria = (typeof body.categoria === "string" && body.categoria.trim()) ? body.categoria.trim() : "justchatting";
-    const energiaRaw = (typeof body.energia === "string" && body.energia.trim()) ? body.energia.trim() : "normal";
-    const energia = ENERGY_CONFIGS[energiaRaw] ? energiaRaw : "normal";
-    const cantidad = Math.min(Math.max(Number(body.cantidad) || 50, 10), 600);
+    const legacy = typeof body.tema === "string" && body.tema.trim() && !body.datos;
+    const datos = normalizarDatos(legacy ? { contexto: body.tema } : body.datos);
+    const opciones = normalizarOpciones(legacy ? { energia: body.energia, cantidad: body.cantidad } : body.opciones);
+    opciones.modo = "pegar";
 
-    if (!tema) { res.status(400).json({ error: "Escribí un tema de conversación" }); return; }
-
-    const cfg = ENERGY_CONFIGS[energia];
-    const energiaDesc = `ENERGÍA: ${energia.charAt(0).toUpperCase() + energia.slice(1)} — ${cfg.desc} | CAPS boost: ${cfg.capsBoost}`;
-
-    const prompt = `${SYSTEM_PROMPT.replace("{energia_desc}", energiaDesc)}
-
-═══════════════════════════════════════════════════════════════
-## TEMA / CONTEXTO DE ESTA TRANSMISIÓN (adaptá TODAS las reglas a esto)
-═══════════════════════════════════════════════════════════════
-Tema: ${tema}
-
-Categoría detectada: ${categoria}
-
-═══════════════════════════════════════════════════════════════
-## INSTRUCCIÓN FINAL PARA VOS (IA)
-═══════════════════════════════════════════════════════════════
-Generá ${cantidad} mensajes de chat en vivo (Kick/Twitch, español rioplatense) que reaccionen EXCLUSIVAMENTE a este tema: "${tema}".
-
-Segú TODAS las reglas R1 a R18:
-- Mezclá las 50 personalidades, repetí las que correspondan (spammers, emoters, hype).
-- Respetá la energía: ${energia} (${cfg.desc}).
-- Los primeros mensajes abren el tema, los del medio lo desarrollan, los finales lo cierran (narrativa continua R13).
-- Cero frases de bot: nada de "claro", "entiendo", "por supuesto". Lenguaje callejero: dale, wacho, naa, bro, crack, posta, capo.
-- Mínimo 15 usuarios distintos cada 20 mensajes.
-- En ${Math.ceil(cantidad / 5)} mensajes al azar usá SOLO emotes (emote_puro), con usuarios tipo j00p_t7, Stebwb, DanielaSleep.
-- CRÍTICO (R14-R18): si el tema es una NOTICIA o actualidad, NO resumas el "formato del programa": HABLÁ de la noticia EN SÍ. Usá hechos reales y concretos de Argentina y la región con NOMBRES PROPIOS, países, fechas, personas, equipos, resultados. Prohibido: generalidades tipo "el próximo resumen comparará", "hubo ruido político", "la semana tuvo temas". Si el tema menciona un hecho puntual (ej. "muerte del papá de Messi", "fallo de X", "clásico Boca–River"), el 90% de los mensajes deben reaccionar a ESE hecho exacto con datos, memoria o reacción emocional realista.
-
-Respondé ÚNICAMENTE con un JSON array, sin markdown, así:
-[{"user":"usuario","message":"texto","tipo":"hype|pregunta|respuesta|emote_puro|spam|analisis|risa|saludo"}]
-
-El array debe tener exactamente ${cantidad} objetos.`;
-
-    res.json({ success: true, prompt, cantidad, energia, categoria });
+    const prompt = composePrompt(datos, opciones);
+    res.json({
+      success: true,
+      prompt,
+      chars: prompt.length,
+      lineas: prompt.split(String.fromCharCode(10)).length,
+      cantidad: opciones.cantidad,
+      incluye: resumenIncluido(datos, opciones),
+    });
   } catch (err: any) {
     logger.error("simulator", `Build prompt error: ${err}`);
     res.status(500).json({ error: "Error armando el prompt" });
@@ -1071,9 +968,9 @@ export function getFileStatus(_req: Request, res: Response): void {
 // GET /api/chat/kc-context — estado + líneas absorbidas desde
 // proyecto-kick-context (Módulo 12). El panel lo consulta solo.
 // ============================================================
-export function kcContext(_req: Request, res: Response): void {
+export async function kcContext(_req: Request, res: Response): Promise<void> {
   try {
-    res.json({ success: true, ...getKcIngestStatus(), summaries: getKcSummaries(), pipeline: getKcPipelineStatus(), sender: getKcSenderStatus() });
+    res.json({ success: true, ...getKcIngestStatus(), summaries: getKcSummaries(), pipeline: getKcPipelineStatus(), sender: getKcSenderStatus(), checks: await getKcChecks() });
   } catch (err: any) {
     logger.error("simulator", `kc-context error: ${err}`);
     res.status(500).json({ error: "Error leyendo el contexto de KC" });
@@ -1092,8 +989,14 @@ export function kcContextRefresh(_req: Request, res: Response): void {
 }
 
 // POST /api/chat/kc-pipeline/start | /stop — controla el pipeline Python de contexto
-export function kcPipelineStart(_req: Request, res: Response): void {
+export async function kcPipelineStart(_req: Request, res: Response): Promise<void> {
   try {
+    // Sin ffmpeg / requests / clave Gemini el pipeline se cae en loop: avisar qué falta.
+    const falta = (await getKcChecks(true)).filter((c) => !c.ok);
+    if (falta.length > 0) {
+      res.json({ success: false, message: `No se puede encender: falta ${falta.map((c) => c.label).join(", ")}.`, pipeline: getKcPipelineStatus() });
+      return;
+    }
     const r = startKcPipeline({ manual: true });
     res.json({ success: r.ok, message: r.message, pipeline: getKcPipelineStatus() });
   } catch (err: any) {
@@ -1166,6 +1069,13 @@ export function kcSetCapture(req: Request, res: Response): void {
     logger.error("simulator", `kc-capture error: ${err}`);
     res.status(500).json({ error: "Error cambiando la pantalla de captura" });
   }
+}
+
+/** Corriendo bajo este servidor, o corrido por fuera pero con un resumen de los últimos 5 min. */
+function pipelineViva(): boolean {
+  if (getKcPipelineStatus().running) return true;
+  const last = getKcSummaries(1)[0];
+  return !!last && Date.now() - last.timestamp * 1000 < 300_000;
 }
 
 function touchControl(name: string): void {
@@ -1246,13 +1156,17 @@ export function kcSaveConfig(req: Request, res: Response): void {
     const body = req.body || {};
     const gen = body.gen ? writeGenConfig(body.gen) : readGenConfig();
     const send = body.send ? setSendConfig(body.send) : getSendConfig();
-    if (body.applyNow) {
+    const aplicar = !!body.applyNow && pipelineViva();
+    if (aplicar) {
       clearKcSender();
       primeForRegenerate();
       touchControl("regenerar_lote");
       watchForRegenerate();
     }
-    res.json({ success: true, gen, send, applied: !!body.applyNow });
+    res.json({
+      success: true, gen, send, applied: aplicar,
+      message: body.applyNow && !aplicar ? "Guardado. El analizador está apagado: se aplica cuando lo enciendas." : undefined,
+    });
   } catch (err: any) {
     logger.error("simulator", `kc-config save error: ${err}`);
     res.status(500).json({ error: "Error guardando los ajustes" });
@@ -1262,6 +1176,10 @@ export function kcSaveConfig(req: Request, res: Response): void {
 // POST /api/chat/kc-analyze — fuerza al Módulo 8 a resumir el contexto YA
 export function kcAnalyze(_req: Request, res: Response): void {
   try {
+    if (!pipelineViva()) {
+      res.json({ success: false, message: "El analizador está apagado. Encendelo primero." });
+      return;
+    }
     touchControl("analizar_ahora");
     res.json({ success: true, message: "El Módulo 8 va a analizar el contexto en unos segundos" });
   } catch (err: any) {
@@ -1274,6 +1192,10 @@ export function kcAnalyze(_req: Request, res: Response): void {
 // con el prompt y el contexto actuales, y lo envía.
 export function kcRegenerate(_req: Request, res: Response): void {
   try {
+    if (!pipelineViva()) {
+      res.json({ success: false, message: "El analizador está apagado: no hay quién genere mensajes. Encendelo primero." });
+      return;
+    }
     clearKcSender();
     primeForRegenerate();
     touchControl("analizar_ahora");   // primero un contexto fresco
