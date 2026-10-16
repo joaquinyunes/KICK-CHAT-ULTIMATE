@@ -52,6 +52,7 @@ import shlex
 import subprocess
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "common"))
@@ -66,7 +67,30 @@ BACKOFF_MAX_SEG = 300
 GEMINI_TIMEOUT = int(os.environ.get("KICK_GEMINI_TIMEOUT", 90))
 IGNORAR_OFFLINE = os.environ.get("KICK_COMENTARIO_IGNORAR_OFFLINE", "0") == "1"
 TOKEN_ENDPOINT = "https://id.kick.com/oauth/token"
-SEPARADOR = "KICKCHAT"  # el prompt separa cada 4 mensajes con KICKCHAT123456
+SEPARADOR = "KICKCHAT"  # formato viejo (texto plano): separador cada 4 mensajes
+
+# Formato nuevo: el modelo devuelve JSON {"lineas":[{n, autor, responde_a, texto}]}.
+# "autor" es un Pn del elenco del prompt; "responde_a" es el n al que contesta,
+# así el servidor puede repartir cuentas por voz y armar respuestas encadenadas.
+_SCHEMA_LOTE = {
+    "type": "OBJECT",
+    "properties": {"lineas": {"type": "ARRAY", "items": {
+        "type": "OBJECT",
+        "properties": {
+            "n": {"type": "INTEGER"},
+            "autor": {"type": "STRING"},
+            "responde_a": {"type": "INTEGER", "nullable": True},
+            "texto": {"type": "STRING"},
+        },
+        "required": ["n", "autor", "texto"],
+        "propertyOrdering": ["n", "autor", "responde_a", "texto"],
+    }}},
+    "required": ["lineas"],
+}
+_EMOTE_RE = re.compile(r"\[EMOTE:\s*([A-Za-z0-9_]+)\s*\]", re.I)
+_MENCION_RE = re.compile(r"@P\d{1,2}\b", re.I)
+_STOP = frozenset("""de la el en que y a los las un una es se me no lo con por para del al
+te le si ya yo mi tu su o e u pero como mas más muy""".split())
 
 MODELOS_GEMINI = [m.strip() for m in os.environ.get(
     "KICK_GEMINI_MODELS",
@@ -109,6 +133,57 @@ def _ultimos_comentarios(n=12):
     return list(reversed(out))
 
 
+def _historial_con_autor(n=14):
+    """Últimas líneas publicadas como 'P3: texto' (o solo el texto si no hay autor)."""
+    if not config.COMENTARIOS_DIR.exists():
+        return []
+    archivos = sorted(config.COMENTARIOS_DIR.glob("comentario_*.json"), reverse=True)[:n]
+    out = []
+    for f in archivos:
+        d = config.leer_json_seguro(f)
+        if d and d.get("comentario"):
+            autor = d.get("autor")
+            out.append(f"{autor}: {d['comentario']}" if autor else d["comentario"])
+    return list(reversed(out))
+
+
+def _palabras(texto):
+    return re.findall(r"[\wáéíóúñü']+", texto.lower())
+
+
+def _frases_a_evitar(n=60):
+    """Aperturas y expresiones que el chat repitió de más en las últimas líneas;
+    el prompt las recibe como EVITAR para que la tanda nueva no las use."""
+    textos = _ultimos_comentarios(n)
+    if len(textos) < 8:
+        return "(nada por ahora)"
+    aperturas, bigramas = Counter(), Counter()
+    for t in textos:
+        pal = _palabras(t)
+        if pal:
+            aperturas[pal[0]] += 1
+        for a, b in zip(pal, pal[1:]):
+            if a not in _STOP and b not in _STOP:
+                bigramas[f"{a} {b}"] += 1
+    ap = [w for w, c in aperturas.most_common(8) if c >= 3]
+    fr = [f for f, c in bigramas.most_common(12) if c >= 3]
+    partes = []
+    if ap:
+        partes.append("no abras mensajes con: " + ", ".join(ap))
+    if fr:
+        partes.append("expresiones muy usadas: " + ", ".join(fr))
+    return "; ".join(partes) or "(nada por ahora)"
+
+
+def _similar(a, b, umbral=0.75):
+    """Jaccard sobre palabras: detecta 'casi el mismo' mensaje, no solo el idéntico."""
+    sa = {w for w in _palabras(a) if len(w) > 2}
+    sb = {w for w in _palabras(b) if len(w) > 2}
+    if len(sa) < 3 or len(sb) < 3:
+        return False
+    return len(sa & sb) / len(sa | sb) >= umbral
+
+
 def _es_repetido(texto, previos):
     t = texto.strip().lower()
     if len(t) < 3:
@@ -117,7 +192,7 @@ def _es_repetido(texto, previos):
         p = p.strip().lower()
         if t == p:
             return True
-    return False
+    return any(_similar(t, p) for p in previos[-40:])
 
 
 # --- Token de Kick ----------------------------------------------------
@@ -182,7 +257,15 @@ def _postear_chat(requests, texto):
 
 # --- Relleno del prompt maestro + LLM --------------------------------
 
-def _vars_contexto(resumenes, estado_canal, historial):
+_DIAS_SEMANA = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+
+
+def _hora_local():
+    ahora = time.localtime()
+    return f"{_DIAS_SEMANA[ahora.tm_wday]} {time.strftime('%d/%m/%Y %H:%M', ahora)}"
+
+
+def _vars_contexto(resumenes, estado_canal, historial, evitar="(nada por ahora)"):
     ec = estado_canal or {}
     ctx = " | ".join(r["resumen_actual"] for r in resumenes if r.get("resumen_actual"))
     ult = resumenes[-1] if resumenes else {}
@@ -201,7 +284,9 @@ def _vars_contexto(resumenes, estado_canal, historial):
         "ENERGIA": "NORMAL",
         "CATEGORIA": cat or "(sin categoría)",
         "EVENTO": ult.get("resumen_actual") or "(sin evento puntual ahora)",
+        "HORA_LOCAL": _hora_local(),
         "HISTORIAL": "\n".join(historial) or "(sin mensajes previos)",
+        "EVITAR": evitar,
         "MEMORIA_USUARIOS": "(sin memoria de usuarios)",
         "SLOTS_PROBABLES": "(las del ranking de arriba)",
         "ESTADO_SLOT": "NINGUNO",
@@ -229,32 +314,98 @@ def _rellenar(prompt_base, variables):
     return out
 
 
-def _parsear_lote(texto):
-    msgs = []
-    for linea in (texto or "").splitlines():
-        s = linea.strip()
-        if not s or s.upper().startswith(SEPARADOR):
+def _linea(n, autor, responde_a, crudo):
+    """Arma una línea normalizada. `texto` es la versión plana (emotes como
+    palabra, sin @Pn) para el panel/TXT; `raw` conserva [EMOTE:X] y @Pn para
+    que el servidor los resuelva al enviar."""
+    crudo = re.sub(r"\s+", " ", str(crudo or "")).strip(" -*\t").strip()
+    if not crudo or crudo.upper().startswith(SEPARADOR):
+        return None
+    autor = str(autor or "").strip().upper()
+    if not re.fullmatch(r"P\d{1,2}", autor):
+        autor = ""
+    try:
+        responde_a = int(responde_a)
+    except (TypeError, ValueError):
+        responde_a = None
+    if responde_a is not None and not (0 < responde_a < n):
+        responde_a = None
+    raw = _EMOTE_RE.sub(lambda m: f"[EMOTE:{m.group(1)}]", crudo)[:500]
+    plano = _MENCION_RE.sub("", _EMOTE_RE.sub(r"\1", crudo))
+    plano = re.sub(r"\s+", " ", plano).strip()[:config.COMENTARIO_MAX_CHARS]
+    if not plano:
+        return None
+    return {"n": n, "autor": autor, "responde_a": responde_a, "texto": plano, "raw": raw}
+
+
+def _items_json(crudo):
+    """Extrae la lista de líneas del JSON del modelo; si vino truncado o con
+    ruido, rescata los objetos completos que haya."""
+    t = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", (crudo or "").strip(), flags=re.I)
+    try:
+        data = json.loads(t)
+        items = data.get("lineas") if isinstance(data, dict) else data
+        if isinstance(items, list):
+            return items
+    except ValueError:
+        pass
+    objs = []
+    for m in re.finditer(r"\{[^{}]*\}", t):
+        try:
+            o = json.loads(m.group(0))
+        except ValueError:
             continue
-        s = re.sub(r"\[EMOTE:\s*([A-Za-z0-9_]+)\s*\]", r"\1", s)
-        s = s.strip(" -*\t").strip()
-        if s:
-            msgs.append(s[:config.COMENTARIO_MAX_CHARS])
-    return msgs
+        if isinstance(o, dict) and "texto" in o:
+            objs.append(o)
+    return objs
 
 
-def _llamar_gemini_texto(requests, prompt):
+def _parsear_lote(texto):
+    """Devuelve una lista de líneas normalizadas (ver _linea). Acepta el JSON
+    nuevo y, por compatibilidad con prompts a medida, texto plano con una línea
+    por mensaje (y el separador KICKCHAT)."""
+    t = (texto or "").strip()
+    items = _items_json(t) if t[:1] in "{[`" else []
+    if not items:
+        items = [ln for ln in t.splitlines() if ln.strip()]
+    out = []
+    for i, it in enumerate(items, 1):
+        if isinstance(it, dict):
+            try:
+                n = int(it.get("n") or i)
+            except (TypeError, ValueError):
+                n = i
+            lin = _linea(n, it.get("autor"), it.get("responde_a"), it.get("texto"))
+        else:
+            lin = _linea(i, "", None, it)
+        if lin:
+            out.append(lin)
+    return out
+
+
+def _llamar_gemini_texto(requests, prompt, json_mode=False):
     if not config.GEMINI_API_KEY:
         raise RuntimeError("Falta KICK_GEMINI_API_KEY en el .env")
     ultimo_error = None
     for modelo in MODELOS_GEMINI:
         url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
                f"{modelo}:generateContent")
-        try:
-            r = requests.post(
+        gen = {"temperature": 1.0, "maxOutputTokens": 8192}
+        if json_mode:
+            gen["responseMimeType"] = "application/json"
+            gen["responseSchema"] = _SCHEMA_LOTE
+
+        def _post():
+            return requests.post(
                 url, headers={"x-goog-api-key": config.GEMINI_API_KEY},
-                json={"contents": [{"parts": [{"text": prompt}]}],
-                      "generationConfig": {"temperature": 1.0, "maxOutputTokens": 4096}},
+                json={"contents": [{"parts": [{"text": prompt}]}], "generationConfig": gen},
                 timeout=GEMINI_TIMEOUT)
+        try:
+            r = _post()
+            if r.status_code == 400 and "responseSchema" in gen:
+                # Este modelo no acepta el schema: reintento pidiendo solo JSON.
+                gen.pop("responseSchema")
+                r = _post()
             if r.status_code in (429, 500, 503):
                 raise RuntimeError(f"{modelo}: ocupado ({r.status_code})")
             r.raise_for_status()
@@ -266,17 +417,20 @@ def _llamar_gemini_texto(requests, prompt):
 
 
 def _generar_lote(requests, prompt_base, resumenes, estado_canal):
-    historial = _ultimos_comentarios(12)
-    prompt = _rellenar(prompt_base, _vars_contexto(resumenes, estado_canal, historial))
-    crudo = _llamar_gemini_texto(requests, prompt)
-    msgs = _parsear_lote(crudo)
-    # Filtrar los que repiten textual lo último ya dicho.
-    limpios, previos = [], list(historial)
-    for m in msgs:
-        if not _es_repetido(m, previos):
-            limpios.append(m)
-            previos.append(m)
-    config.log(MODULO, f"Lote generado: {len(limpios)} mensajes útiles (de {len(msgs)} crudos).")
+    historial = _historial_con_autor(14)
+    variables = _vars_contexto(resumenes, estado_canal, historial, _frases_a_evitar())
+    prompt = _rellenar(prompt_base, variables)
+    crudo = _llamar_gemini_texto(requests, prompt, json_mode='"responde_a"' in prompt_base)
+    lineas = _parsear_lote(crudo)[:LOTE]
+    # Filtrar repetidos (idénticos o casi iguales) contra lo publicado y contra la propia tanda.
+    limpios, previos = [], _ultimos_comentarios(40)
+    for lin in lineas:
+        if not _es_repetido(lin["texto"], previos):
+            limpios.append(lin)
+            previos.append(lin["texto"])
+    hilos = sum(1 for lin in limpios if lin["responde_a"] is None)
+    config.log(MODULO, f"Lote generado: {len(limpios)} mensajes útiles (de {len(lineas)} crudos), "
+                       f"{hilos} aperturas de hilo.")
     return limpios
 
 
@@ -289,12 +443,21 @@ def _canal_en_vivo():
     return bool(d.get("en_vivo"))
 
 
-def _guardar_comentario(texto, publicado):
+def _item(m):
+    """Normaliza un elemento de la cola: los archivos de cola viejos guardan strings."""
+    if isinstance(m, dict) and m.get("texto"):
+        return m
+    t = str(m)
+    return {"n": 0, "autor": "", "responde_a": None, "texto": t, "raw": t}
+
+
+def _guardar_comentario(texto, publicado, autor=""):
     ts = int(time.time())
-    config.escribir_json(
-        config.COMENTARIOS_DIR / f"comentario_{ts}.json",
-        {"timestamp": ts, "comentario": texto, "publicado": publicado,
-         "modo_ensayo": not config.COMENTARIO_POSTEAR})
+    datos = {"timestamp": ts, "comentario": texto, "publicado": publicado,
+             "modo_ensayo": not config.COMENTARIO_POSTEAR}
+    if autor:
+        datos["autor"] = autor
+    config.escribir_json(config.COMENTARIOS_DIR / f"comentario_{ts}.json", datos)
     _append_txt(texto, ts)
 
 
@@ -360,15 +523,17 @@ def _contexto_listo():
     return base, resumenes, estado_canal
 
 
-def _soltar_mensaje(requests, texto):
+def _soltar_mensaje(requests, item):
     """Postea (si corresponde) y guarda el mensaje + lo agrega al TXT."""
+    item = _item(item)
+    texto = item["texto"]
     publicado = False
     if config.COMENTARIO_POSTEAR:
         try:
             publicado = _postear_chat(requests, texto)
         except Exception as e:
             config.log(MODULO, f"Error posteando en Kick: {e}", "WARN")
-    _guardar_comentario(texto, publicado)
+    _guardar_comentario(texto, publicado, item.get("autor", ""))
     return publicado
 
 
@@ -405,11 +570,18 @@ def _loop_bloque(requests):
             espera = min(int(espera * 1.7), BACKOFF_MAX_SEG)
 
 
-def _espera_goteo():
+def _espera_goteo(autor_siguiente=None, autor_previo=None):
     """Segundos hasta el próximo mensaje: un valor al azar dentro del rango
-    [min, max] que se configura globalmente desde el Panel."""
+    [min, max] que se configura globalmente desde el Panel.
+
+    Ráfagas: si el mensaje que viene es de la MISMA voz que el que acabo de
+    soltar, esa persona está escribiendo dos o tres mensajes seguidos, así que
+    sale casi pegado en vez de esperar el intervalo completo."""
     cfg = config.leer_comentarista_cfg()
-    return random.randint(cfg["min_seg"], cfg["max_seg"])
+    base = random.randint(cfg["min_seg"], cfg["max_seg"])
+    if autor_siguiente and autor_previo and autor_siguiente == autor_previo:
+        return max(2, int(base * random.uniform(0.15, 0.4)))
+    return base
 
 
 def _loop_goteo(requests):
@@ -441,17 +613,19 @@ def _loop_goteo(requests):
                 continue
 
             backoff = _espera_goteo()
-            texto = cola.pop(0)
+            item = _item(cola.pop(0))
+            texto = item["texto"]
             _guardar_cola(cola)
 
             if _es_repetido(texto, _ultimos_comentarios(6)):
                 config.log(MODULO, f"Mensaje repetido, se saltea: {texto[:80]}")
             else:
-                publicado = _soltar_mensaje(requests, texto)
+                publicado = _soltar_mensaje(requests, item)
                 marca = "posteado" if publicado else ("ensayo" if not config.COMENTARIO_POSTEAR else "NO posteado")
                 config.log(MODULO, f"[{marca}] ({len(cola)} en cola) {texto}")
 
-            _heartbeat_dormir(_espera_goteo())
+            siguiente = _item(cola[0]) if cola else {}
+            _heartbeat_dormir(_espera_goteo(siguiente.get("autor"), item.get("autor")))
 
         except Exception as e:
             config.log(MODULO, f"Ciclo con error: {e}. Reintento en {backoff}s.", "WARN")
@@ -469,14 +643,18 @@ def _volcar_lote(requests, mensajes):
     if not mensajes:
         return
     ts = int(time.time())
-    payload = {"timestamp": ts, "mensajes": mensajes}
+    lineas = [_item(m) for m in mensajes]
+    textos = [lin["texto"] for lin in lineas]
+    # "mensajes" (strings) se mantiene por compatibilidad con consumidores viejos;
+    # "lineas" agrega autor / responde_a / raw para el servidor.
+    payload = {"timestamp": ts, "mensajes": textos, "lineas": lineas}
     d = config.COMENTARIO_LOTES_DIR
     lote_json = d / f"lote_{ts}.json"
     try:
         d.mkdir(parents=True, exist_ok=True)
         for final, contenido in (
             (lote_json, json.dumps(payload, ensure_ascii=False, indent=2)),
-            (d / f"lote_{ts}.txt", "\n".join(mensajes) + "\n"),
+            (d / f"lote_{ts}.txt", "\n".join(textos) + "\n"),
         ):
             parcial = final.with_suffix(final.suffix + ".part")
             parcial.write_text(contenido, encoding="utf-8")

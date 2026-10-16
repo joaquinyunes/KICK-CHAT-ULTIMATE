@@ -63,7 +63,7 @@ Con eso: cada 5 min (modo bloque) se genera el lote, se escribe el TXT/lote y
 
 ## Pasos internos
 1. Si hay prompt, el canal está en vivo y hay resúmenes.
-2. Si `len(cola) <= UMBRAL`: rellenar el prompt, 1 llamada a Gemini (texto plano, `maxOutputTokens 4096`, temp 1.0), parsear por líneas (ignora `KICKCHAT…`, convierte `[EMOTE: X]` → `X`), filtrar repetidos textuales, encolar.
+2. Si `len(cola) <= UMBRAL`: rellenar el prompt, 1 llamada a Gemini (JSON con `responseSchema`: `{n, autor, responde_a, texto}`, `maxOutputTokens 8192`, temp 1.0), parsear (tolera JSON truncado y texto plano viejo con `KICKCHAT…`; `[EMOTE: X]` → `X`), filtrar repetidos por similitud, encolar.
 3. Sacar el primero de la cola. Si `POSTEAR=1`, publicarlo (refrescando el token si vence en <120 s). Guardar el JSON siempre.
 4. Dormir `INTERVALO_SEG` ± jitter. Heartbeat durante la espera.
 

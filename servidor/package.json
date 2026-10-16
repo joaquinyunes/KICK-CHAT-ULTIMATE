@@ -11,7 +11,7 @@
     "build": "tsc && node scripts/copy-worker.js",
     "start": "node dist/server-engine.js",
     "typecheck": "tsc --noEmit",
-  "kc:install": "python -m pip install -r ../kick-context/src/requirements.txt",
+    "kc:install": "python -m pip install -r ../kick-context/src/requirements.txt",
     "lint": "eslint \"src/**/*.ts\" \"scripts/**/*.ts\"",
     "lint:fix": "eslint --fix \"src/**/*.ts\" \"scripts/**/*.ts\"",
     "format": "prettier --write \"src/**/*.{ts,js}\" \"*.{json,md}\"",
@@ -19,13 +19,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "npm run typecheck && npm run lint && npm test",
-    "encrypt-bearers": "ts-node scripts/encrypt-bearers.ts",
-    "add-bot": "ts-node scripts/add-bot.ts",
     "create-user": "ts-node scripts/create-user.ts",
-    "assign-bot": "ts-node scripts/assign-bot.ts",
-    "probe-bots": "ts-node scripts/probe-bots.ts",
-    "probe-silent": "ts-node scripts/probe-bearers-silent.ts",
-    "renew-tokens": "ts-node scripts/renew-tokens.ts"
+    "assign-bot": "ts-node scripts/assign-bot.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -43,7 +38,6 @@
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
-    "@types/better-sqlite3": "^7.6.10",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^4.17.21",

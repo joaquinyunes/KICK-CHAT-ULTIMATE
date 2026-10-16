@@ -8,15 +8,15 @@ export function requirePageAuth(
 ): void {
   const token = req.cookies?.scb_jwt;
   if (!token) {
-    return res.redirect("/");
+    return res.redirect("/login");
   }
   try {
     req.user = verifyToken(token);
     if (req.user.role !== "admin") {
-      return res.redirect("/");
+      return res.redirect("/login");
     }
     next();
   } catch {
-    return res.redirect("/");
+    return res.redirect("/login");
   }
 }

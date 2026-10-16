@@ -1,6 +1,7 @@
 import { onStatusChange, ping, sendMessage, fetchMyBots } from './bridge-client.js';
 import { getServerUrl, getAuthHeaders } from './admin-common.js';
 import { renderNav, renderAuthHeader, startStatusLoop } from './client-nav.js';
+import { bindRanges } from './kd-ui.js';
 
 function esc(s) { return s == null ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
@@ -14,8 +15,6 @@ const colas = {};
 COLA_KEYS.forEach(function(k) {
   colas[k] = { fileIndex: -1, intervalMin: 1, intervalMax: 3, running: false, sending: false, order: 'random', spam: false };
 });
-// Cola "EN VIVO" (cola 9): alimentada por la casilla de texto, no por un .txt
-colas.live = { fileIndex: -1, intervalMin: 2, intervalMax: 6, running: false, sending: false, order: 'random', spam: false, idx: 0 };
 
 const COLA_META = {
   a: { min: 15, max: 20 }, b: { min: 1, max: 3 }, c: { min: 1, max: 3 }, d: { min: 1, max: 3 },
@@ -40,12 +39,14 @@ function buildColaCards() {
           '<span class="cc-dot dot-' + k + '"></span>' +
           '<span class="cc-name">Cola ' + K + '</span>' +
           '<span id="badge-' + k + '" class="cc-badge">detenida</span>' +
+          '<div class="cc-buttons">' +
+            '<button id="start-' + k + '" class="btn btn-primary btn-sm">▶ Iniciar</button>' +
+            '<button id="stop-' + k + '" class="btn btn-danger btn-sm" disabled title="Parar">■</button>' +
+            '<button id="reset-' + k + '" class="btn btn-ghost btn-sm" title="Volver al principio del archivo">↻</button>' +
+          '</div>' +
         '</div>' +
-        '<div class="cc-field">' +
-          '<span class="cc-lbl">Archivo</span>' +
-          '<select id="file-' + k + '-select" class="cc-select"><option value="">— elegí archivo —</option></select>' +
-        '</div>' +
-        '<div class="cc-row">' +
+        '<select id="file-' + k + '-select" class="cc-select"><option value="">— elegí archivo —</option></select>' +
+        '<div class="cc-opts">' +
           '<div class="cc-field">' +
             '<span class="cc-lbl">Enviar cada</span>' +
             '<div class="cc-rate">' +
@@ -55,16 +56,11 @@ function buildColaCards() {
               '<span>s</span>' +
             '</div>' +
           '</div>' +
+          '<div class="cc-field">' +
+            '<span class="cc-lbl">Orden</span>' +
+            '<select id="order-' + k + '" class="cc-select"><option value="random">Aleatorio</option><option value="sequential">De arriba a abajo</option></select>' +
+          '</div>' +
           '<label class="cc-check" title="Ignora el tiempo y manda lo más rápido posible"><input type="checkbox" id="spam-' + k + '">⚡Spam</label>' +
-        '</div>' +
-        '<div class="cc-field">' +
-          '<span class="cc-lbl">Orden</span>' +
-          '<select id="order-' + k + '" class="cc-select"><option value="random">Aleatorio</option><option value="sequential">De arriba a abajo</option></select>' +
-        '</div>' +
-        '<div class="cc-buttons">' +
-          '<button id="start-' + k + '" class="btn btn-primary btn-sm">▶ Iniciar</button>' +
-          '<button id="stop-' + k + '" class="btn btn-danger btn-sm" disabled>■ Parar</button>' +
-          '<button id="reset-' + k + '" class="btn btn-ghost btn-sm" title="Volver al principio del archivo">↻</button>' +
         '</div>' +
         '<div id="status-' + k + '" class="cc-status">Detenida</div>' +
         '<div class="cola-progress"><div id="bar-' + k + '" class="cola-bar"></div></div>' +
@@ -74,13 +70,11 @@ function buildColaCards() {
 }
 
 function schedulerKeys() {
-  var ks = COLA_KEYS.filter(function(k) { return colas[k].running && !isNaN(colas[k].fileIndex) && colas[k].fileIndex >= 0; });
-  if (colas.live.running && liveLines.length > 0) ks.push('live');
-  return ks;
+  return COLA_KEYS.filter(function(k) { return colas[k].running && !isNaN(colas[k].fileIndex) && colas[k].fileIndex >= 0; });
 }
 
 // Global scheduler: round-robin through active colas
-let globalScheduler = { running: false, timerId: null, nextIdx: 0 };
+let globalScheduler = { running: false, timerId: null, nextIdx: 0, lastUser: '', enRafaga: false };
 
 // Unified time mode
 function isUnifiedMode() {
@@ -202,7 +196,7 @@ function setColaStatus(key, text, kind) {
 }
 
 function colaCard(key) {
-  return document.querySelector(key === 'live' ? '.live-panel' : '.cola-' + key);
+  return document.querySelector('.cola-' + key);
 }
 
 function updateColaUI(key) {
@@ -215,7 +209,6 @@ function updateColaUI(key) {
   var tb = document.getElementById('stop-' + key);
   if (sb) sb.disabled = c.running;
   if (tb) tb.disabled = !c.running;
-  if (key === 'live') { renderLiveCount(); return; }
   var ce = document.getElementById('count-' + key);
   var be = document.getElementById('bar-' + key);
   if (!isNaN(c.fileIndex) && c.fileIndex >= 0 && c.fileIndex < files.length) {
@@ -239,7 +232,7 @@ function logSend(key, botName, msg, ok, status) {
   var t = new Date().toLocaleTimeString('es-AR', { hour12: false });
   row.innerHTML =
     '<span class="log-time">' + t + '</span>' +
-    '<span class="log-tag">' + esc((key === 'live' ? 'LIVE' : key.toUpperCase())) + '</span>' +
+    '<span class="log-tag">' + esc(key.toUpperCase()) + '</span>' +
     '<span class="log-bot">' + esc(ok ? (botName || '?') : ('ERR ' + (status || '?'))) + '</span>' +
     '<span class="log-msg">' + esc(msg) + '</span>';
   box.insertBefore(row, box.firstChild);
@@ -252,9 +245,7 @@ function recordSend(ok) {
 }
 
 function activeColaKeys() {
-  var ks = COLA_KEYS.filter(function(k) { return colas[k].running; });
-  if (colas.live.running) ks.push('live');
-  return ks;
+  return COLA_KEYS.filter(function(k) { return colas[k].running; });
 }
 
 function estimateRate() {
@@ -283,10 +274,30 @@ function updateSendPanel() {
     else if (chatroomId) { ch.textContent = 'chatroom ' + chatroomId; ch.classList.remove('unset'); }
     else { ch.textContent = 'sin configurar'; ch.classList.add('unset'); }
   }
+  var shown = ch ? ch.textContent : '';
+  var av = document.getElementById('sp-avatar');
+  if (av) av.textContent = (channelName || '?').charAt(0) || '?';
+  var sc = document.getElementById('kd-sess-channel');
+  if (sc) { sc.textContent = channelName ? '@' + channelName : shown; }
+  var runningN = activeColaKeys().length;
+  var sbadge = document.getElementById('kd-sess-badge');
+  if (sbadge) { sbadge.textContent = runningN ? 'Enviando' : 'Detenida'; sbadge.className = 'kd-badge ' + (runningN ? '' : 'off'); }
+  var ssub = document.getElementById('kd-sess-sub');
+  if (ssub) ssub.textContent = runningN ? (runningN + (runningN === 1 ? ' cola enviando' : ' colas enviando')) : 'Detenida';
+  var sbar = document.getElementById('kd-active-bar');
+  if (sbar) sbar.style.width = Math.round((runningN / COLA_KEYS.length) * 100) + '%';
+  var us = document.getElementById('unified-state');
+  if (us) {
+    if (isUnifiedMode()) {
+      var ui = getUnifiedInterval();
+      var nIn = COLA_KEYS.filter(isColaInUnified).length;
+      us.textContent = 'Activo · cada ' + ui.min + '–' + ui.max + ' s · ' + nIn + (nIn === 1 ? ' cola' : ' colas');
+    } else { us.textContent = 'Desactivado · cada cola usa su propio ritmo'; }
+  }
   var dot = document.getElementById('sp-kick-dot');
   if (dot) dot.className = 'status-dot ' + (kickOk === true ? 'status-connected' : kickOk === false ? 'status-disconnected' : 'status-checking');
   var b = document.getElementById('sp-bots'); if (b) b.textContent = botCount || '0';
-  var ac = document.getElementById('sp-active'); if (ac) ac.textContent = activeColaKeys().length + ' / 9';
+  var ac = document.getElementById('sp-active'); if (ac) ac.textContent = activeColaKeys().length + ' / ' + COLA_KEYS.length;
   var r = document.getElementById('sp-rate');
   if (r) {
     var s = estimateRate();
@@ -325,27 +336,6 @@ async function globalSendOne() {
   var c = colas[key];
   if (c.sending) return;
   c.sending = true;
-
-  // Cola EN VIVO: envía desde el array liveLines, sin bloques ni archivo
-  if (key === 'live') {
-    if (liveLines.length === 0) { setLiveStatus('EN VIVO vacía'); c.sending = false; return; }
-    var li = c.order === 'sequential'
-      ? (c.idx % liveLines.length)
-      : Math.floor(Math.random() * liveLines.length);
-    c.idx = li + 1;
-    var lmsg = liveLines[li];
-    var lres = await sendOne(lmsg, 'live');
-    setLiveStatus(
-      (lres.ok ? (lres.username || '?') + ' ✓ ' : 'Error ' + (lres.status || '?') + ' · ') + lmsg.substring(0, 40),
-      lres.ok ? 'ok' : 'err'
-    );
-    logSend('live', lres.username, lmsg, lres.ok, lres.status);
-    recordSend(lres.ok);
-    renderLiveCount();
-    refreshStats();
-    c.sending = false;
-    return;
-  }
 
   var selEl = document.getElementById('file-' + key + '-select');
   var fileIdx = parseInt(selEl ? selEl.value : '', 10);
@@ -387,6 +377,11 @@ async function globalSendOne() {
 
   var res = await sendOne(msg, key);
   var username = res.username || '?';
+  // Ráfaga: el servidor deja a la misma cuenta 1, 2 o 3 mensajes seguidos. Si este
+  // salió de la misma cuenta que el anterior, esa persona sigue escribiendo y el
+  // próximo mensaje sale con menos pausa.
+  globalScheduler.enRafaga = res.ok && !!res.username && res.username === globalScheduler.lastUser;
+  globalScheduler.lastUser = res.ok ? (res.username || '') : '';
   if (res.ok) {
     setColaStatus(key, username + ' ✓  ' + msg.substring(0, 40), 'ok');
   } else {
@@ -431,6 +426,7 @@ function globalSchedulerTick() {
       var interval = getColaInterval(key);
       delay = c.spam ? (500 + Math.random() * 1000) : randInt(interval.min, interval.max);
     }
+    if (globalScheduler.enRafaga) delay = Math.max(800, delay * (0.2 + Math.random() * 0.25));
     globalScheduler.timerId = setTimeout(globalSchedulerTick, delay);
   });
 }
@@ -452,7 +448,6 @@ function stopGlobalScheduler() {
 function getActiveColaCount() {
   var count = 0;
   COLA_KEYS.forEach(function(k) { if (colas[k].running) count++; });
-  if (colas.live.running) count++;
   return count;
 }
 
@@ -634,11 +629,11 @@ function initDropZones() {
   // Evitar que un drop fuera de zona abra el archivo en el navegador
   ['dragover', 'drop'].forEach(function(ev) {
     window.addEventListener(ev, function(e) {
-      if (e.target && e.target.closest && e.target.closest('.chat-bottom .panel, .cola-card')) return;
+      if (e.target && e.target.closest && e.target.closest('#kd-files, .cola-card')) return;
       if (dtHasType(e.dataTransfer, 'Files')) e.preventDefault();
     });
   });
-  wireFilePanelDropZone(document.getElementById('file-grid') && document.getElementById('file-grid').closest('.panel'));
+  wireFilePanelDropZone(document.getElementById('kd-files'));
   COLA_KEYS.forEach(function(k) {
     wireColaDropZone(document.querySelector('.cola-' + k), k);
   });
@@ -675,137 +670,16 @@ async function maybeProbeBeforeStart() {
   await probeTokens();
 }
 
-// ── Cola EN VIVO (cola 9, alimentada por la casilla de texto) ───────
-var liveLines = [];
-var liveSending = false;
-
-function saveLiveLines() { try { localStorage.setItem('scb_live', JSON.stringify(liveLines)); } catch {} }
-function loadLiveLines() {
-  try { var s = localStorage.getItem('scb_live'); if (s) liveLines = JSON.parse(s) || []; } catch {}
-}
-
-function setLiveStatus(t, kind) {
-  setColaStatus('live', t || '', kind);
-}
-
-function renderLiveCount() {
-  var ce = document.getElementById('count-live');
-  var be = document.getElementById('bar-live');
-  var total = liveLines.length;
-  var pos = total ? (colas.live.idx % total) : 0;
-  if (ce) ce.textContent = total + ' líneas' + (colas.live.running && total ? ' · #' + (pos + 1) : '');
-  if (be) be.style.width = (total ? Math.round((pos / total) * 100) : 0) + '%';
-}
-
-function parseLiveInput() {
-  var raw = (document.getElementById('live-input') || {}).value || '';
-  return raw.split('\n').map(function(s) { return s.trim(); }).filter(Boolean);
-}
-
-function setLiveLines(lines) {
-  liveLines = lines.slice();
-  colas.live.idx = 0;
-  saveLiveLines();
-  renderLiveCount();
-}
-
-function wireLivePaste() {
-  var rep = document.getElementById('live-replace');
-  var app = document.getElementById('live-append');
-  var clr = document.getElementById('live-clear');
-  var snd = document.getElementById('live-send');
-  var stp = document.getElementById('live-send-stop');
-
-  if (rep) rep.addEventListener('click', function() {
-    setLiveLines(parseLiveInput());
-    setLiveStatus('EN VIVO: ' + liveLines.length + ' líneas cargadas');
-  });
-  if (app) app.addEventListener('click', function() {
-    var add = parseLiveInput();
-    if (!add.length) return;
-    setLiveLines(liveLines.concat(add));
-    var ta = document.getElementById('live-input'); if (ta) ta.value = '';
-    setLiveStatus('EN VIVO: ' + liveLines.length + ' líneas');
-  });
-  if (clr) clr.addEventListener('click', function() {
-    setLiveLines([]);
-    setLiveStatus('EN VIVO vaciada');
-  });
-  if (stp) stp.addEventListener('click', function() { liveSending = false; });
-  if (snd) snd.addEventListener('click', liveSendNow);
-
-  var sb = document.getElementById('start-live');
-  var tb = document.getElementById('stop-live');
-  var rb = document.getElementById('reset-live');
-  if (sb) sb.addEventListener('click', startLiveCola);
-  if (tb) tb.addEventListener('click', stopLiveCola);
-  if (rb) rb.addEventListener('click', function() { colas.live.idx = 0; renderLiveCount(); setLiveStatus('EN VIVO reiniciada'); });
-}
-
-function startLiveCola() {
-  if (colas.live.running) return;
-  if (!channelName && !chatroomId) { alert('Configurá el canal en Ajustes.'); return; }
-  if (liveLines.length === 0) { setLiveStatus('EN VIVO vacía — pegá líneas primero'); return; }
-  colas.live.intervalMin = parseFloat((document.getElementById('interval-live-min') || {}).value) || 2;
-  colas.live.intervalMax = parseFloat((document.getElementById('interval-live-max') || {}).value) || 6;
-  var os = document.getElementById('order-live');
-  colas.live.order = os ? os.value : 'random';
-  colas.live.running = true;
-  updateColaUI('live');
-  setLiveStatus('Enviando ' + liveLines.length + ' líneas cada ' + colas.live.intervalMin + '–' + colas.live.intervalMax + ' s');
-  updateSendPanel();
-  startGlobalScheduler();
-}
-
-function stopLiveCola() {
-  colas.live.running = false;
-  updateColaUI('live');
-  setLiveStatus('Detenida');
-  updateSendPanel();
-  if (getActiveColaCount() === 0) stopGlobalScheduler();
-}
-
-async function liveSendNow() {
-  if (liveSending) return;
-  var lines = parseLiveInput();
-  if (!lines.length) lines = liveLines.slice();
-  if (!lines.length) { setLiveStatus('Nada para enviar'); return; }
-  if (!channelName && !chatroomId) { alert('Configurá el canal en Ajustes.'); return; }
-
-  liveSending = true;
-  document.getElementById('live-send').disabled = true;
-  document.getElementById('live-send-stop').disabled = false;
-
-  var lo = (parseFloat((document.getElementById('interval-live-min') || {}).value) || 2) * 1000;
-  var hi = (parseFloat((document.getElementById('interval-live-max') || {}).value) || 6) * 1000;
-
-  var okCount = 0;
-  for (var i = 0; i < lines.length && liveSending; i++) {
-    setLiveStatus('Enviando ' + (i + 1) + ' de ' + lines.length + '…');
-    var res = await sendOne(lines[i], 'live');
-    if (res && res.ok) okCount++;
-    logSend('live', res && res.username, lines[i], res && res.ok, res && res.status);
-    recordSend(res && res.ok);
-    refreshStats();
-    if (i < lines.length - 1 && liveSending) await sleep(lo + Math.random() * Math.max(0, hi - lo));
-  }
-
-  setLiveStatus((liveSending ? 'Listo' : 'Parado') + ' · ' + okCount + ' de ' + lines.length + ' enviados', okCount ? 'ok' : 'err');
-  liveSending = false;
-  document.getElementById('live-send').disabled = false;
-  document.getElementById('live-send-stop').disabled = true;
-}
-
 export async function initChatUI() {
   var token = sessionStorage.getItem('scb_jwt') || localStorage.getItem('scb_jwt');
   var headers = token ? { 'Authorization': 'Bearer ' + token } : {};
   try {
     var res = await fetch('/auth/me', { headers: headers });
-    if (!res.ok) { window.location.href = '/'; return; }
+    if (!res.ok) { window.location.href = '/login'; return; }
     var data = await res.json();
     if (data.user.role === 'admin') { window.location.href = '/admin/dashboard'; return; }
     if (token) fetch('/auth/sync-cookie', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } }).catch(function() {});
-  } catch { window.location.href = '/'; return; }
+  } catch { window.location.href = '/login'; return; }
 
   renderAuthHeader('chat');
   renderNav('chat');
@@ -830,14 +704,10 @@ export async function initChatUI() {
       var sel = document.getElementById('file-' + COLA_KEYS[i] + '-select');
       if (sel && sel.value !== '') await startCola(COLA_KEYS[i]);
     }
-    if (liveLines.length) startLiveCola();
   });
   document.getElementById('stop-all').addEventListener('click', function() {
     COLA_KEYS.forEach(function(k) { stopCola(k); });
-    stopLiveCola();
   });
-
-  wireLivePaste();
 
   fetchMyBots().then(function(b) { botCount = (b || []).length; updateSendPanel(); }).catch(function() {});
 
@@ -868,10 +738,11 @@ export async function initChatUI() {
       updateSendPanel();
     });
   }
-  ['unified-min', 'unified-max'].forEach(function(id) {
+  ['unified-min', 'unified-max'].concat(COLA_KEYS.map(function(k) { return 'unified-' + k; })).forEach(function(id) {
     var el = document.getElementById(id);
-    if (el) el.addEventListener('input', updateSendPanel);
+    if (el) el.addEventListener(id.indexOf('unified-min') === 0 || id.indexOf('unified-max') === 0 ? 'input' : 'change', updateSendPanel);
   });
+  bindRanges();
   var uniStart = document.getElementById('unified-start');
   if (uniStart) uniStart.addEventListener('click', async function() {
     if (unifiedCb) unifiedCb.checked = true;
@@ -883,17 +754,13 @@ export async function initChatUI() {
       var sel = document.getElementById('file-' + k + '-select');
       if (sel && sel.value !== '') await startCola(k);
     }
-    if (isColaInUnified('live') && liveLines.length) startLiveCola();
   });
 
   loadSettings();
   loadSavedFiles();
-  loadLiveLines();
   renderFileGrid();
   renderFileSelects();
-  renderLiveCount();
   COLA_KEYS.forEach(updateColaUI);
-  updateColaUI('live');
   updateSendPanel();
   refreshStats();
   statsTimerId = setInterval(refreshStats, 2500);
@@ -903,7 +770,6 @@ export async function initChatUI() {
 window.addEventListener('beforeunload', function() {
   if (statsTimerId) clearInterval(statsTimerId);
   COLA_KEYS.forEach(function(k) { stopCola(k); });
-  colas.live.running = false;
 });
 
 window.addGeneratedMessages = function(msgs, name) {

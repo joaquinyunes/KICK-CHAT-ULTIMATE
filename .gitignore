@@ -45,3 +45,4 @@ kick-context/**/temp/
 # ─── OS / editor ───────────────────────────
 .DS_Store
 Thumbs.db
+.playwright-mcp/

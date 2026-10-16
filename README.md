@@ -50,9 +50,7 @@ docker run --env-file servidor/.env -p 3000:3000 -v kick_data:/app/data kick-cha
 | `npm run format` / `format:check` | Prettier |
 | `npm test` / `test:watch` | Vitest |
 | `npm run check` | typecheck + lint + test (lo que corre CI) |
-| `npm run encrypt-bearers` | Genera `bearers.enc` desde `bearers.plain.json` |
-| `npm run create-user` / `add-bot` / `assign-bot` | Utilidades de administración |
-| `npm run probe-bots` / `renew-tokens` | Mantenimiento de tokens de bots |
+| `npm run create-user` / `assign-bot` | Utilidades de administración |
 
 ## Variables de entorno
 
@@ -85,7 +83,7 @@ el Módulo 12 genera un lote de ~30 líneas de chat cada 5 min. Todo lo maneja e
 servidor Node — **un solo comando arranca todo**.
 
 **Reparto claro:** KC solo *genera* el contexto y las líneas. KCU *envía* al
-chat de Kick con su pool de bearers (`kc-sender.service`), espaciado, sin
+chat de Kick con la API oficial de Kick (`kc-sender.service`, cuenta conectada en `/admin/kick20`, solo admin), espaciado, sin
 depender del navegador. KC nunca postea (el supervisor le fuerza
 `KICK_COMENTARIO_POSTEAR=0`).
 
@@ -103,7 +101,7 @@ kick-context/ (Python)                     servidor/ (Node)
                                          kc-ingest.service ── cada 300 s toma el lote nuevo
                                                             │
                                          kc-sender.service ── manda cada línea al chat de
-                                              Kick (pool de bearers, 1 cada ~10 s)
+                                              Kick (API oficial, 1 cada ~10 s)
 ```
 
 Estado y control: `GET /api/chat/kc-context` (pipeline + ingesta + envío),

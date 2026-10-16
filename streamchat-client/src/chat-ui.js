@@ -32,7 +32,11 @@ let messageQueue = [];
 let currentIndex = 0;
 let sendInterval = 5;     // segundos
 let channelName  = '';
-let intervalId   = null;  // setInterval handle
+let intervalId   = null;  // handle del setTimeout que agenda el próximo envío
+let autoSending  = false; // el envío automático está corriendo
+let rafagaLeft   = 0;     // mensajes que faltan para cerrar la ráfaga actual
+let desdeDoble   = 0;     // mensajes desde la última doble
+let cadaDoble    = 12 + Math.floor(Math.random() * 7); // próxima doble a los 12–18 mensajes
 
 // ──────────────────────────────────────────────────────────────
 // Referencias DOM
@@ -216,8 +220,36 @@ async function sendCurrentMessage() {
   }
 }
 
+// Ráfagas y pausas irregulares: una persona manda 1, 2 o 3 mensajes seguidos y
+// después tarda más. Con un setInterval fijo todos los mensajes salían con
+// cadencia exacta de reloj, que es lo que delata a un bot.
+function nextDelayMs() {
+  const base = Math.max(1, sendInterval) * 1000;
+  if (rafagaLeft > 0) {
+    rafagaLeft--;
+    return Math.round(Math.max(700, base * 0.15) + Math.random() * Math.max(500, base * 0.3));
+  }
+  // casi todos de a 1; una doble (2 seguidos) cada ~15 mensajes, nunca 3
+  desdeDoble++;
+  rafagaLeft = 0;
+  if (desdeDoble >= cadaDoble) {
+    rafagaLeft = 1;
+    desdeDoble = 0;
+    cadaDoble = 12 + Math.floor(Math.random() * 7);
+  }
+  return Math.round(base * (0.6 + Math.random() * 1.2));
+}
+
+function scheduleNextSend() {
+  if (!autoSending) return;
+  intervalId = setTimeout(async () => {
+    await sendCurrentMessage();
+    scheduleNextSend();
+  }, nextDelayMs());
+}
+
 function startAutoSend() {
-  if (intervalId !== null) return;
+  if (autoSending) return;
   if (messageQueue.length === 0) {
     showFileError('Carga un archivo de mensajes primero.');
     return;
@@ -228,14 +260,18 @@ function startAutoSend() {
     return;
   }
 
-  intervalId = setInterval(sendCurrentMessage, sendInterval * 1000);
+  autoSending = true;
+  rafagaLeft = 0;
+  scheduleNextSend();
   updateButtonStates();
   dom.sendStatus()?.setAttribute('data-running', 'true');
 }
 
 function stopAutoSend() {
+  autoSending = false;
+  rafagaLeft = 0;
   if (intervalId !== null) {
-    clearInterval(intervalId);
+    clearTimeout(intervalId);
     intervalId = null;
   }
   updateButtonStates();
@@ -255,7 +291,7 @@ function updateButtonStates() {
   const stop     = dom.stopBtn();
   const sendOnce = dom.sendOnceBtn();
   const hasQueue = messageQueue.length > 0 && currentIndex < messageQueue.length;
-  const running  = intervalId !== null;
+  const running  = autoSending;
 
   if (start)    start.disabled    = running || !hasQueue;
   if (stop)     stop.disabled     = !running;

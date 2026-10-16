@@ -38,24 +38,19 @@ protegidas por cookie JWT. `bootstrap()` inicializa la DB, carga bearers y hace
 - **Pendiente**: refresh token, revocación, lockout persistente.
 
 ### Cripto (`services/security.ts`)
-AES-256-GCM. Dos usos:
-1. `bearers.enc` — archivo `[IV|Tag|CT]` con un JSON array de tokens de bot,
-   descifrado una vez y cacheado en memoria.
-2. `encryptToHex` / `decryptFromHex` — tokens OAuth guardados en la tabla `bots`.
+AES-256-GCM. `encryptToHex` / `decryptFromHex` — tokens OAuth (bots y cuentas /kick20) guardados cifrados en la DB.
 
 `decryptFromHex` tiene fallback a clave utf-8 por tokens cifrados antes de la
 migración a clave hex. **Objetivo**: `MASTER_KEY` siempre 64 hex y borrar el fallback.
 
-### Envío de mensajes — DOS caminos
-| Camino | Archivo | Mecanismo | Estado |
-|---|---|---|---|
-| **Oficial** | `services/kick-oauth.ts` | `api.kick.com/public/v1/chat` con token OAuth por bot (PKCE, refresh) | preferido |
-| **Bearer pool** | `services/bearer-sender.service.ts` | `kick.com/api/v2` (API privada) con pool de bearers scrapeados, rotación round-robin, UA por token, cooldown 60 s, `deadTokens` | frágil, sujeto a cambios/baneos de Kick |
-| Playwright | `services/playwright-sender.service.ts` + `send_to_kick_playwright.py` | navegador headless | fallback |
+### Envío de mensajes — solo API oficial
+Todo el envío va por `api.kick.com/public/v1/chat` (Kick Dev, OAuth 2.1 + PKCE):
 
-Estado del pool de bearers (`deadTokens`, cooldowns, round-robin, contadores) vive
-**en memoria del proceso**: se pierde al reiniciar y no se comparte entre instancias.
-**Objetivo**: persistir a DB con TTL de recuperación y exponerlo en el panel.
+1. `services/kick20.service.ts` — cuenta conectada en `/admin/kick20` (preferida; API y página solo admin).
+2. `services/chat-sender.service.ts` — bot OAuth asignado al usuario (`kick-oauth.ts`).
+
+`services/proxy-controller.ts` (`sendToKick`) decide entre ambos. Ya no existen los
+caminos por bearers scrapeados, Playwright ni Python para enviar chat.
 
 ### Simulador de chat (`controllers/stream-simulator.controller.ts`)
 Genera chat sintético "realista". Si hay `OPENROUTER_API_KEY`, llama al modelo con un
@@ -90,10 +85,10 @@ migraciones con tabla `schema_version`.
 
 1. `better-sqlite3` en vez de sql.js (reescritura completa del archivo por write).
 2. Partir `stream-simulator.controller.ts` en service + repo + prompt en archivo.
-3. Persistir estado del pool de bearers; panel de salud de tokens.
+3. Quitar la columna `bots.encrypted_bearer` y los endpoints de bearers de `/admin/bots`.
 4. Terminar o eliminar el motor de triggers (`trigger-engine.ts` + `fireChatMessage`
    espera un webhook que hoy nadie invoca).
-5. Consolidar los 3 caminos de envío detrás de una interfaz `ChatSender`.
+5. Unificar `kick20.service` y `chat-sender.service` detrás de una interfaz `ChatSender`.
 6. Unificar `MASTER_KEY` a 64 hex y borrar el fallback utf-8.
 7. Bundler para `public/` para poder sacar `'unsafe-inline'` del CSP.
 8. Dedupe: `streamchat-client/src/chat-ui.js` vs `servidor/public/js/chat-ui.js`.

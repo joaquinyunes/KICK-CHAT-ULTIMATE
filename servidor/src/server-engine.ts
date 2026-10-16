@@ -5,7 +5,6 @@ import cookieParser from "cookie-parser";
 import { rateLimit } from "express-rate-limit";
 import path from "path";
 import { env } from "./config/env";
-import { loadBearers } from "./services/security";
 import { startKcIngest } from "./services/kc-ingest.service";
 import { startKcPipeline, killPipelineSync } from "./services/kc-supervisor.service";
 import { requestLogger, metricsRouter } from "./telemetry";
@@ -54,14 +53,19 @@ app.use(helmet({
   },
 }));
 app.use(cookieParser());
+// El armador de prompts recibe transcripciones/contexto largos (hasta ~110k caracteres): límite propio.
+// Va antes del parser global, que se saltea el body ya parseado.
+app.use(["/api/chat/build-prompt", "/api/chat/generate", "/api/chat/auto-generate"], express.json({ limit: "512kb" }));
 app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: false }));
 app.disable("x-powered-by");
 
+// ─── Admin page routes — protegidas con cookie JWT ──────────────
+// Antes del static: si no, public/admin/*.html se serviría sin login.
+app.use("/admin", requirePageAuth);
+
 app.use(express.static(path.join(__dirname, "..", "public")));
 
-// ─── Admin page routes — protegidas con cookie JWT ──────────────
-app.use("/admin", requirePageAuth);
 app.get("/admin", (req: Request, res: Response) => {
   const query = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
   res.redirect(`/admin/dashboard${query}`);
@@ -74,6 +78,12 @@ app.get("/admin/bots", (_req: Request, res: Response) => {
 });
 app.get("/admin/kick20", (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "..", "public", "admin", "kick20.html"));
+});
+app.get("/login", (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, "..", "public", "login.html"));
+});
+app.get("/configurar", (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, "..", "public", "configurar.html"));
 });
 app.get("/vods.html", (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "..", "public", "vods.html"));
@@ -90,8 +100,15 @@ app.get("/chat", (_req: Request, res: Response) => {
 app.get("/kc", (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "..", "public", "kc.html"));
 });
-app.get("/kick20", (_req: Request, res: Response) => {
-  res.sendFile(path.join(__dirname, "..", "public", "kick20.html"));
+app.get("/tematicas", (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, "..", "public", "tematicas.html"));
+});
+app.get("/video", (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, "..", "public", "video.html"));
+});
+// Las cuentas Kick solo las gestiona el admin (requirePageAuth ya filtra /admin/*).
+app.get(["/kick20", "/kick20.html"], (_req: Request, res: Response) => {
+  res.redirect("/admin/kick20");
 });
 
 app.get("/admin/clientes", (_req: Request, res: Response) => {
@@ -152,7 +169,9 @@ app.get("/ready", (_req: Request, res: Response) => {
 
 // ─── Error Handlers ──────────────────────────────────────────────
 app.use((_req: Request, res: Response) => res.status(404).json({ error: "Ruta no encontrada" }));
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+app.use((err: Error & { status?: number; type?: string }, _req: Request, res: Response, _next: NextFunction) => {
+  if (err.type === "entity.too.large") { res.status(413).json({ error: "El texto pegado es demasiado grande." }); return; }
+  if (err.type === "entity.parse.failed") { res.status(400).json({ error: "JSON inválido" }); return; }
   logger.error(TAG, "Error no manejado", err.message, err.stack);
   res.status(500).json({ error: "Error interno del servidor" });
 });
@@ -194,8 +213,6 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 async function bootstrap(): Promise<void> {
   logger.info(TAG, "Inicializando base de datos...");
   await initDatabase();
-  logger.info(TAG, "Verificando bearers...");
-  try { loadBearers(); } catch { logger.warn(TAG, "Sin bearers.enc — solo bots OAuth disponibles"); }
   server = app.listen(env.PORT, () => {
     markReady();
     logger.info(TAG, "StreamChat Bridge en puerto " + env.PORT);

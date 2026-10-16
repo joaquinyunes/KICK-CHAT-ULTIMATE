@@ -29,12 +29,11 @@ export async function handleChatSend(
     return;
   }
 
-  const { channel, message, bot_name, chatroom_id } = validation.data as ChatSendInput;
-  const cola = (req.body as any)?.cola || undefined;
+  const { channel, message, bot_name } = validation.data as ChatSendInput;
   const userId = parseInt(req.user!.sub, 10);
   const ip     = req.ip ?? req.socket.remoteAddress;
 
-  const result = await sendToKick({ channel, message, userId, botName: bot_name, chatroomId: chatroom_id, cola });
+  const result = await sendToKick({ channel, message, userId, botName: bot_name });
 
   if (!result.success) {
     logger.warn(TAG, "sendToKick fallo", result.reason);

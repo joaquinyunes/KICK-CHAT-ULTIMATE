@@ -63,11 +63,10 @@ cambien las palabras, todas esas frases cuentan como la misma
 categoría semántica de intención (recomendación de slot), sujeta al
 cooldown dinámico del bloque base.
 
-Después de una recomendación de slot, intentar que los siguientes
-mensajes NO sean otra recomendación: puede seguir un comentario
-casual, una interacción entre chaters, una pregunta distinta, una
-broma, una respuesta tardía — y recién después otra conversación de
-slots.
+Un hilo puede debatir una recomendación de slot (uno la propone, otro
+la discute con un motivo concreto). Pero dos hilos seguidos no giran
+sobre "recomendar una slot": entre uno y otro va un hilo de otro tipo
+(una duda, una cargada, una anécdota, algo de la escena).
 
 ======================================================================
 ENTRADA DE STREAM (si MOMENTO es COMIENZO_DEL_STREAM)

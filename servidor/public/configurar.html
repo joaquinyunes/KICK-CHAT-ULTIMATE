@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StreamChat – Configurar</title>
+<link rel="stylesheet" href="css/main.css" />
+<link rel="stylesheet" href="css/kd.css" />
+<script>try{if(localStorage.getItem('kd_theme')==='light')document.documentElement.classList.add('kd-light')}catch(e){}</script>
+<style>
+  .cfg-group { margin: 6px 0 2px; font: 600 11px var(--kd-mono); color: var(--kd-dim); letter-spacing: .04em; }
+  .cfg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+  .cfg-link { display: block; text-decoration: none; color: inherit; transition: border-color .15s, background .15s; }
+  .cfg-link:hover, .cfg-link:focus-visible { border-color: var(--kd-green-line); background: var(--kd-card2); }
+  .cfg-link .kd-card-head { margin-bottom: 0; }
+</style>
+</head>
+<body class="kd">
+  <header id="chat-header" class="kd-top"></header>
+
+  <main class="kd-main">
+    <p class="cfg-group">TRANSMISIÓN</p>
+    <div class="cfg-grid">
+      <a class="kd-card cfg-link" href="/ajustes"><div class="kd-card-head"><span class="kd-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg></span><div><div class="kd-card-title">Canal de destino</div><div class="kd-card-sub">A qué canal de Kick van los mensajes</div></div></div></a>
+      <a class="kd-card cfg-link" href="/admin/kick20" data-admin hidden><div class="kd-card-head"><span class="kd-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></span><div><div class="kd-card-title">Cuentas Kick</div><div class="kd-card-sub">Conectar cuentas con el login oficial</div></div></div></a>
+      <a class="kd-card cfg-link" href="/kc#ajustes"><div class="kd-card-head"><span class="kd-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></span><div><div class="kd-card-title">Analizador</div><div class="kd-card-sub">Qué pantalla mira, categoría y ritmo del bot</div></div></div></a>
+    </div>
+
+    <p class="cfg-group">MENSAJES</p>
+    <div class="cfg-grid">
+      <a class="kd-card cfg-link" href="/tematicas"><div class="kd-card-head"><span class="kd-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h7"/></svg></span><div><div class="kd-card-title">Temáticas</div><div class="kd-card-sub">Tandas de mensajes por tema</div></div></div></a>
+      <a class="kd-card cfg-link" href="/simulador"><div class="kd-card-head"><span class="kd-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 7V4M9 13h.01M15 13h.01"/></svg></span><div><div class="kd-card-title">Simulador</div><div class="kd-card-sub">Probar chat generado sin publicar</div></div></div></a>
+    </div>
+
+    <p class="cfg-group">HERRAMIENTAS</p>
+    <div class="cfg-grid">
+      <a class="kd-card cfg-link" href="/video"><div class="kd-card-head"><span class="kd-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg></span><div><div class="kd-card-title">Video</div><div class="kd-card-sub">Temporizador y agenda</div></div></div></a>
+      <a class="kd-card cfg-link" href="/vods"><div class="kd-card-head"><span class="kd-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3Z"/></svg></span><div><div class="kd-card-title">VODs</div><div class="kd-card-sub">Tus VODs cargados</div></div></div></a>
+    </div>
+  </main>
+
+  <script type="module" src="js/configurar-ui.js"></script>
+</body>
+</html>

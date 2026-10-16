@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StreamChat – Video</title>
+<link rel="stylesheet" href="css/main.css" />
+<link rel="stylesheet" href="css/client-nav.css" />
+<link rel="stylesheet" href="css/chat.css" />
+<link rel="stylesheet" href="css/video.css" />
+</head>
+<body class="chat-page">
+  <div class="pl-feed" aria-hidden="true">
+    <div class="pl-feed-col"></div><div class="pl-feed-col"></div>
+    <div class="pl-feed-col"></div><div class="pl-feed-col"></div>
+  </div>
+  <div class="pl-feeds-overlay"></div>
+  <header id="chat-header" class="app-header"></header>
+  <div id="client-nav"></div>
+
+  <main class="chat-shell">
+
+    <!-- ═══ ESTADO ═══ -->
+    <section class="send-panel">
+      <div class="sp-line sp-line-main">
+        <div class="sp-target">
+          <span class="sp-k">Canal destino</span>
+          <a id="vd-channel" class="sp-channel" href="/ajustes">sin configurar</a>
+        </div>
+        <div class="sp-metrics">
+          <div class="sp-metric"><span id="vd-kick-dot" class="status-dot status-checking"></span><span class="sp-k">Kick</span></div>
+          <div class="sp-metric"><b id="vd-m-total">0</b><span class="sp-k">cargados</span></div>
+          <div class="sp-metric"><b id="vd-m-sent">0</b><span class="sp-k">enviados</span></div>
+          <div class="sp-metric sp-metric-fail"><b id="vd-m-failed">0</b><span class="sp-k">fallidos</span></div>
+          <div class="sp-metric"><b id="vd-m-skipped">0</b><span class="sp-k">omitidos</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="vd-grid">
+
+      <!-- ═══ PEGAR COMENTARIOS + DURACIÓN ═══ -->
+      <div class="live-panel vd-paste">
+        <div class="lp-head">
+          <span class="cc-dot dot-live"></span>
+          <span class="cc-name">Comentarios del video</span>
+          <span class="lp-note">pegá lo que devolvió la IA (con MIN 1, MIN 2…)</span>
+        </div>
+
+        <div class="vd-dur">
+          <label class="cc-lbl" for="vd-duracion">Duración del video</label>
+          <input id="vd-duracion" type="number" min="0" max="600" step="1" class="cc-num vd-dur-num" placeholder="min">
+          <span class="sp-sec">minutos</span>
+          <span id="vd-dur-hint" class="vd-dur-hint"></span>
+        </div>
+
+        <textarea id="vd-text" class="live-input vd-text" spellcheck="false"
+          placeholder="MIN 1&#10;abre el primer hilo&#10;responde uno&#10;responde dos&#10;---&#10;un mensaje suelto&#10;MIN 2&#10;otro hilo…"></textarea>
+
+        <div id="vd-summary" class="vd-summary">Sin comentarios cargados.</div>
+        <div id="vd-warn" class="vd-warn" role="status"></div>
+
+        <div class="lp-paste-actions">
+          <button id="vd-clear" class="btn btn-ghost btn-sm" type="button">Vaciar</button>
+        </div>
+        <p class="vd-help">Cada mensaje sale en el minuto del video que le tocó, repartido dentro de ese minuto. Las respuestas de un hilo salen después del mensaje que lo abre. Si no hay encabezados MIN, se reparten parejo por la duración.</p>
+      </div>
+
+      <!-- ═══ RELOJ ═══ -->
+      <div class="live-panel vd-clock" id="vd-clock-panel">
+        <div class="lp-head">
+          <span class="cc-dot dot-live"></span>
+          <span class="cc-name">Reloj del video</span>
+          <span id="vd-badge" class="cc-badge">detenido</span>
+        </div>
+
+        <div class="vd-time" aria-live="off"><span id="vd-now">0:00</span><span class="vd-total">/ <span id="vd-end">0:00</span></span></div>
+        <div class="cola-progress"><div id="vd-bar" class="cola-bar"></div></div>
+
+        <div class="cc-buttons vd-buttons">
+          <button id="vd-play" class="btn btn-primary btn-sm" type="button">▶ Iniciar</button>
+          <button id="vd-pause" class="btn btn-secondary btn-sm" type="button" disabled>⏸ Pausar</button>
+          <button id="vd-stop" class="btn btn-danger btn-sm" type="button" title="Vuelve al 0:00 y olvida lo ya enviado">■ Detener</button>
+        </div>
+
+        <div class="vd-seek">
+          <span class="cc-lbl">Ir a</span>
+          <input id="vd-seek" type="text" class="cc-num vd-seek-num" placeholder="mm:ss" inputmode="numeric" autocomplete="off">
+          <button id="vd-go" class="btn btn-secondary btn-sm" type="button">Ir</button>
+          <span class="vd-sep"></span>
+          <button id="vd-back" class="btn btn-ghost btn-sm" type="button" title="Atrasar el reloj 10 segundos (no reenvía nada)">−10 s</button>
+          <button id="vd-fwd" class="btn btn-ghost btn-sm" type="button" title="Adelantar el reloj 10 segundos (saltea lo del medio)">+10 s</button>
+        </div>
+
+        <div id="vd-status" class="cc-status">Cargá los comentarios y la duración, y dale Iniciar cuando arranque el video.</div>
+        <div id="vd-next" class="vd-next"></div>
+        <p class="vd-help">Pausá acá cuando pauses el video: el reloj se congela y no sale nada. Si se desfasan, usá “Ir a” o ±10 s para sincronizar (ir hacia atrás nunca reenvía lo ya enviado).</p>
+      </div>
+    </section>
+
+    <!-- ═══ MINUTOS ═══ -->
+    <section class="panel vd-strip-panel">
+      <div class="panel-head">
+        <span class="panel-title">Minutos</span>
+        <span class="vd-legend"><i class="lg-past"></i>pasado <i class="lg-cur"></i>ahora <i class="lg-off"></i>distinta cantidad</span>
+      </div>
+      <div id="vd-strip" class="vd-strip"><div class="empty-state">Sin minutos todavía.</div></div>
+    </section>
+
+    <!-- ═══ REGISTRO ═══ -->
+    <section class="panel vd-log-panel">
+      <div class="panel-head">
+        <span class="panel-title">Registro de envíos</span>
+        <button id="vd-clear-log" class="btn btn-ghost btn-xs" type="button">Limpiar</button>
+      </div>
+      <div id="vd-log" class="send-log vd-log">
+        <div class="empty-state">Todavía no se envió nada.</div>
+      </div>
+    </section>
+
+  </main>
+
+  <div class="pl-feeds-spacer"></div>
+  <script src="js/pl-mascot.js"></script>
+  <script type="module" src="js/video-ui.js"></script>
+</body>
+</html>

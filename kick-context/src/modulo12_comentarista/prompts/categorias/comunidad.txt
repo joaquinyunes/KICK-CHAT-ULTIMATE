@@ -3,9 +3,11 @@ CATEGORÍA: COMUNIDAD / CHARLA GENERAL + ACTUALIDAD
 ======================================================================
 
 No hay un eje temático fijo tipo casino o deporte: el eje es la propia
-comunidad. El objetivo NO es generar una encuesta — las preguntas del
-banco de abajo sirven para abrir microconversaciones, no todas deben
-recibir respuesta perfecta ni inmediata.
+comunidad y lo que se ve y se oye en CONTEXTO. El chat reacciona a eso y
+alrededor de eso vive la charla de la gente. Si CONTEXTO es de
+programación, gameplay, música o IRL, comportate como indica la
+categoría GENERAL para ese tipo de contenido (no das clases, no narrás
+cada frase).
 
 VARIABLES ESPECÍFICAS DE ESTA CATEGORÍA
 
@@ -16,76 +18,53 @@ TEMAS_COMUNIDAD_ACTUALES: {{TEMAS_COMUNIDAD_ACTUALES}}
 ACTUALIDAD / NOTICIAS
 ======================================================================
 
-Usar exclusivamente NOTICIAS_ULTIMA_SEMANA (y lo que ya esté explícito
-en CONTEXTO, HISTORIAL o EVENTO). Si NOTICIAS_ULTIMA_SEMANA está
-vacío: NO inventar noticias recientes, nombres, fechas, resultados,
-declaraciones, cifras ni consecuencias.
+Usar exclusivamente NOTICIAS_ULTIMA_SEMANA y lo que esté explícito en
+CONTEXTO, HISTORIAL o EVENTO. Si NOTICIAS_ULTIMA_SEMANA está vacío: NO hay
+noticias en esta tanda. No inventar brotes, guerras, muertes, fallos,
+sanciones, cifras, nombres, fechas ni consecuencias (REGLA 1, punto A).
+No es válido siquiera "vi en redes que...".
 
-Una noticia puede provocar: pregunta, respuesta, opinión, desacuerdo,
-sorpresa, "no la vi", "recién me entero", explicación breve,
-comparación, broma ligera o cambio de tema.
-
-No escribir como periodista. Evitar "Según los últimos
-acontecimientos..."; preferir lenguaje de chat: "che vieron esto?",
-"recién me enteré", "qué quilombo", "lo vi en twitter".
-
-La actualidad es una capa secundaria: puede aparecer y luego
-desaparecer durante muchos mensajes. Dos usuarios pueden opinar
-distinto sobre la misma noticia — no resolver la discusión
-automáticamente.
+Si hay noticias: el chat las nombra a medias ("vieron lo de X?", "recién
+me entero", "no la vi", "qué quilombo"), dos personas opinan distinto y
+nadie resuelve. No escribir como periodista ("según los últimos
+acontecimientos..."). La actualidad es una capa secundaria: aparece y
+puede desaparecer durante muchos mensajes.
 
 ======================================================================
-BANCO DE TEMAS/PREGUNTAS (posibilidades, NO checklist)
+DETONANTES DE CHARLA LATERAL (posibilidades, NO un banco de preguntas)
 ======================================================================
 
-No cubrir una categoría porque "falta". Elegir según contexto,
-momento, energía, usuarios activos y conversación reciente.
+La charla lateral nace de un detonante real y NO se le pregunta a la
+sala. Detonantes válidos:
+- la hora (HORA_LOCAL): sueño, almuerzo, salir del trabajo, fin de semana
+- algo que dijo o hizo quien streamea (según CONTEXTO)
+- algo que dijo otro chatter en HISTORIAL
+- algo que se ve o se oye: música, un juego, un objeto, un ruido
+- una queja cotidiana suelta ("se cortó el wifi", "qué sueño")
 
-Considerar equivalentes semánticos aunque cambien las palabras (no
-repetir la misma intención en una ventana corta): "¿qué comieron?" /
-"¿ya comieron?" / "¿qué están comiendo?"; "¿qué escuchan?" / "¿qué
-música ponen?" / "¿qué están escuchando?".
+Temas posibles: trabajo, estudio, comida y bebida, música, videojuegos,
+series y películas, tecnología (celular, auriculares, wifi), deportes,
+transporte, clima, mascotas, otros streams, el stream mismo.
+Nada de esto es cuota. Cada tema aparece solo si nace solo, y puede
+morir en 2 líneas. Máx. 1 hilo lateral cada ~25 líneas.
 
-Categorías del banco: vida cotidiana (qué hacen mientras miran, quién
-trabaja/estudia/está acostado/recién se levantó), trabajo (home
-office, oficina, turnos, jefe, búsqueda laboral), estudio (facultad,
-parciales, finales, materias difíciles), comida y bebidas (mate, café,
-delivery, comida favorita), clima y entorno (frío, calor, lluvia,
-tráfico), música (qué escuchan, playlists, recitales, nostalgia),
-videojuegos (CS2, Valorant, LoL, FIFA, GTA, PC vs consola, setup),
-series/películas/anime (qué están viendo, recomendaciones,
-plataformas), tecnología (celular, auriculares, wifi, apps, PC),
-deportes (partido de ayer, equipos, torneos, gimnasio), comunidad y
-stream (cómo conocieron el canal, otros streams, tradiciones, chat,
-Discord), y preguntas meta (quién mira sin sonido, quién está desde el
-trabajo/facultad/otra ciudad, qué están tomando ahora).
+Ejemplos de la forma (no copiar):
+  "que sueño" / "a esta hora no" — sin remate, sin volver al stream.
+  "se escucha bajo" / "a mi bien" — sin respuesta final, sin corregirlo.
+  Una persona dice su tema y otra le contesta media línea, o nadie.
 
-Mezclar tipos de pregunta: directas, abiertas, cerradas, de opinión,
-de experiencia, comparativas, retóricas, casuales. No producir
-cadenas de pregunta → respuesta → pregunta → respuesta: interrumpir
-con comentarios, bromas, respuestas tardías o cambios de tema.
+Prohibido: "¿quién está trabajando?", "¿qué están desayunando?",
+"¿de dónde nos miran?" como pregunta abierta a toda la sala. Los temas
+personales se cuentan, no se piden. Lo que sí se arma son hilos: alguien
+cuenta algo suyo o pregunta algo puntual, y otras personas le contestan
+en cadena, cada una contra lo que dijo la anterior (ver HILOS del bloque
+base).
 
 ======================================================================
 DINÁMICA SOCIAL
 ======================================================================
 
-Los usuarios deben hablar ENTRE ELLOS, no solo dirigirse al streamer:
-"vos siempre...", "otra vez vos...", "sabía que ibas a decir eso",
-"este aparece justo ahora", "no le des bola" — con variedad real, sin
-repetir siempre el mismo vínculo.
-
-Pueden existir pequeños grupos temporales (música, gaming, trabajo,
-comida, tecnología, deporte, actualidad) que se mezclan y desaparecen
-sin presentarse como bloques separados.
-
-======================================================================
-CALIDAD — ANTES DE CADA BLOQUE
-======================================================================
-
-1. ¿la pregunta/tema tiene sentido en este momento?
-2. ¿no apareció recientemente una equivalente?
-3. ¿varía la apertura, la perspectiva, el tono y la longitud?
-4. ¿las respuestas del bloque son coherentes entre sí pero distintas?
-5. ¿evita respuestas espejo ("yo también" x3)?
-6. ¿no fuerza humor ni actualidad?
-7. ¿no inventa un hecho, noticia o dato?
+Los chatters se hablan entre ellos y no solo al stream: se cargan,
+discrepan, no se entienden, se ignoran. La pareja de amigos que se
+carga y el habitual con la referencia críptica son voces útiles. Sin
+repetir siempre el mismo vínculo. Sin desacuerdos que se resuelvan.

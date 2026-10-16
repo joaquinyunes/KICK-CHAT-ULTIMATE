@@ -107,6 +107,7 @@ export interface Kick20Account {
   expires_at: number;
   expired: boolean;
   added_at: number;
+  sent: number; // mensajes enviados desde que arrancó el server
 }
 
 export interface Kick20Status {
@@ -133,6 +134,7 @@ export function getStatus(): Kick20Status {
     expires_at: a.expires_at,
     expired: a.expires_at <= now,
     added_at: a.added_at,
+    sent: accountSendCount(a.username),
   }));
   return {
     configured: true,
@@ -290,6 +292,75 @@ export async function forceRefresh(username?: string): Promise<{ ok: boolean; er
   return okCount > 0 ? { ok: true } : { ok: false, error: "refresh_failed" };
 }
 
+// ─── Prueba de cuentas ──────────────────────────────────────────────────────
+
+export interface Kick20TestResult {
+  username: string;
+  ok: boolean;
+  ms: number;
+  error?: string;
+  api_status?: number;
+  api_name?: string | null;
+  name_matches?: boolean;
+  has_chat_scope?: boolean;
+  refreshed?: boolean;
+}
+
+/** Prueba no destructiva (no envía mensajes): obtiene un access token válido
+ *  (refrescando si venció) y le pide a la API quién es. Si Kick responde 401 con
+ *  el token guardado, fuerza un refresh y reintenta una vez. */
+export async function testAccount(username: string): Promise<Kick20TestResult> {
+  const t0 = Date.now();
+  const done = (r: Omit<Kick20TestResult, "username" | "ms">): Kick20TestResult =>
+    ({ username, ms: Date.now() - t0, ...r });
+
+  const s = readStore();
+  const acc = s?.accounts.find((a) => a.username.toLowerCase() === username.toLowerCase());
+  if (!acc) return done({ ok: false, error: "cuenta_no_encontrada" });
+  const has_chat_scope = (acc.scope || "").split(/[\s,]+/).includes("chat:write");
+
+  let token = await accessTokenFor(acc.username);
+  if (!token) return done({ ok: false, error: "token_invalido (no se pudo refrescar; reconectá la cuenta)", has_chat_scope });
+
+  let refreshed = false;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(API_USERS_URL, {
+        headers: { Authorization: "Bearer " + token, Accept: "application/json", "User-Agent": USER_AGENT },
+        signal: AbortSignal.timeout(12000),
+      });
+      if (res.status === 401 && attempt === 0) {
+        const fresh = await accessTokenFor(acc.username, true);
+        if (!fresh) return done({ ok: false, api_status: 401, error: "token_rechazado (reconectá la cuenta)", has_chat_scope });
+        token = fresh;
+        refreshed = true;
+        continue;
+      }
+      if (!res.ok) return done({ ok: false, api_status: res.status, error: "kick_" + res.status, has_chat_scope, refreshed });
+      const data: any = await res.json();
+      const user = Array.isArray(data?.data) ? data.data[0] : data?.data;
+      const api_name: string | null = user?.name ?? null;
+      const name_matches = api_name != null && api_name.toLowerCase() === acc.username.toLowerCase();
+      return done({
+        ok: has_chat_scope,
+        api_status: res.status,
+        api_name,
+        name_matches,
+        has_chat_scope,
+        refreshed,
+        ...(has_chat_scope ? {} : { error: "falta el scope chat:write (reconectá la cuenta)" }),
+      });
+    } catch (e: any) {
+      return done({ ok: false, error: e.message, has_chat_scope, refreshed });
+    }
+  }
+  return done({ ok: false, error: "desconocido" });
+}
+
+export async function testAllAccounts(): Promise<Kick20TestResult[]> {
+  return Promise.all(listAccountUsernames().map((u) => testAccount(u)));
+}
+
 // ─── Auto-refresh en segundo plano ──────────────────────────────────────────
 // Cada hora renueva TODOS los access token (el access dura 2 h, así que con
 // refrescar cada 1 h nunca se acercan a vencer). Cada refresh rota también el
@@ -319,13 +390,117 @@ export function startAutoRefresh(): void {
   logger.info(TAG, "auto-refresh de tokens activado (cada 1 h)");
 }
 
-// Round-robin entre cuentas para repartir el envío
-let rrIndex = 0;
+// Reparto de cuentas: entre las menos usadas, evitando la última. Un round-robin
+// producía el patrón fijo cuenta 1, 2, 3, 1, 2, 3 que se nota en el chat.
+const recentAccounts: string[] = [];
+const RECENT_MAX = 8;
+
+/** Solo se evita la última cuenta usada: evitar más, con pocas cuentas, vuelve a armar un ciclo. */
+function avoidCount(total: number): number {
+  return total >= 2 ? 1 : 0;
+}
+
+// Envíos por cuenta desde que arrancó el server. El sorteo prefiere siempre a las
+// que menos enviaron, así las 32 cuentas hablan y ninguna queda dormida (un azar
+// puro deja a algunas sin usar durante mucho tiempo).
+const sendCounts = new Map<string, number>();
+
+/** Envíos de una cuenta desde que arrancó el server. */
+export function accountSendCount(username: string): number {
+  return sendCounts.get(username.toLowerCase()) ?? 0;
+}
+
+/** Entre `names`, una al azar de las que MENOS enviaron (desempata al azar). */
+export function pickLeastUsed(names: string[]): string {
+  let min = Infinity;
+  for (const n of names) min = Math.min(min, accountSendCount(n));
+  const ties = names.filter((n) => accountSendCount(n) === min);
+  return ties[Math.floor(Math.random() * ties.length)];
+}
+
+/** Registra que una cuenta acaba de enviar (para que el sorteo no la repita enseguida). */
+export function noteAccountUsed(username: string): void {
+  const k = username.toLowerCase();
+  recentAccounts.push(k);
+  if (recentAccounts.length > RECENT_MAX) recentAccounts.shift();
+  sendCounts.set(k, (sendCounts.get(k) ?? 0) + 1);
+}
+
+/** Las últimas cuentas que enviaron, la más reciente al final (minúsculas). */
+export function recentAccountUsernames(): string[] {
+  return [...recentAccounts];
+}
+
+/** Usernames de las cuentas conectadas, en el orden guardado. */
+export function listAccountUsernames(): string[] {
+  return (readStore()?.accounts ?? []).map((a) => a.username);
+}
+
+// Dobles: casi todos los mensajes salen de a uno, y UNA vez cada ~15 mensajes una
+// cuenta manda 2 seguidos (nunca 3). Es un contador, no una probabilidad: con
+// azar puro, a veces salían varias dobles juntas. Lo comparten todos los caminos
+// de envío (video/kc, simulador, proxy), así la cuenta es de verdad "1 de cada 15".
+const DOUBLE_EVERY_MIN = 12;
+const DOUBLE_EVERY_MAX = 18; // promedio 15
+let sinceDouble = 0;
+let nextDoubleAt = 0;
+
+function rollNextDouble(): void {
+  nextDoubleAt = DOUBLE_EVERY_MIN + Math.floor(Math.random() * (DOUBLE_EVERY_MAX - DOUBLE_EVERY_MIN + 1));
+}
+rollNextDouble();
+
+/** Cuenta un mensaje más hacia la próxima doble. */
+export function tickMessage(): void {
+  sinceDouble++;
+}
+
+/** ¿Toca una doble ahora? Si sí, reinicia el contador (la doble se "gasta"). */
+export function takeDouble(): boolean {
+  if (sinceDouble < nextDoubleAt) return false;
+  sinceDouble = 0;
+  rollNextDouble();
+  return true;
+}
+
+/** Solo para tests: fija cuántos mensajes faltan para la próxima doble (0 = ya toca). */
+export function resetDoublePlanner(nextAt?: number): void {
+  sinceDouble = 0;
+  if (nextAt == null) rollNextDouble();
+  else nextDoubleAt = nextAt;
+}
+
+// Ráfagas del sorteo de cuentas: cuando quien envía no eligió cuenta, a veces (la
+// doble de arriba) la misma cuenta manda 2 seguidos y después pasa a otra.
+let burstAccount = "";
+let burstLeft = 0;
+let burstLastAt = 0;
+/** Si pasó demasiado desde el último envío, la doble se considera cortada. */
+const BURST_GAP_MS = 90_000;
+
 function pickAccountUsername(s: Store): string | null {
-  if (s.accounts.length === 0) return null;
-  const a = s.accounts[rrIndex % s.accounts.length];
-  rrIndex = (rrIndex + 1) % s.accounts.length;
-  return a.username;
+  const names = s.accounts.map((a) => a.username);
+  if (names.length === 0) return null;
+
+  tickMessage();
+  const now = Date.now();
+  const seguida = burstLeft > 0 && now - burstLastAt <= BURST_GAP_MS;
+  burstLastAt = now;
+  if (seguida) {
+    const misma = names.find((n) => n.toLowerCase() === burstAccount.toLowerCase());
+    if (misma) {
+      burstLeft -= 1;
+      return misma;
+    }
+  }
+
+  const avoid = recentAccounts.slice(-avoidCount(names.length));
+  const pool = names.filter((n) => !avoid.includes(n.toLowerCase()));
+  const list = pool.length > 0 ? pool : names;
+  const elegida = pickLeastUsed(list);
+  burstAccount = elegida;
+  burstLeft = takeDouble() ? 1 : 0;
+  return elegida;
 }
 
 // ─── API pública ─────────────────────────────────────────────────────────────
@@ -391,6 +566,8 @@ export async function sendAsUser(
   const username = opts.username && s.accounts.some((a) => a.username.toLowerCase() === opts.username!.toLowerCase())
     ? opts.username
     : pickAccountUsername(s)!;
+
+  noteAccountUsed(username);
 
   const accessToken = await accessTokenFor(username);
   if (!accessToken) return { ok: false, status: 401, error: "token_invalido:" + username, account: username };

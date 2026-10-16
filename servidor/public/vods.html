@@ -5,88 +5,67 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>StreamChat – VODs</title>
 <link rel="stylesheet" href="css/main.css" />
-<link rel="stylesheet" href="css/client-nav.css" />
-<style>
-.vod-container { max-width:900px; margin:0 auto; padding:20px; }
-.vod-form { display:flex; gap:8px; margin-bottom:16px; }
-.vod-form input { flex:1; }
-.vod-list { display:flex; flex-direction:column; gap:8px; margin-bottom:20px; }
-.vod-item { display:flex; justify-content:space-between; align-items:center; background:var(--card-bg,#1a1d25); border:1px solid var(--border,#2a2d35); border-radius:6px; padding:10px 14px; }
-.vod-item .vod-url { font-size:12px; color:var(--text-muted); word-break:break-all; flex:1; margin-right:12px; }
-.vod-item .vod-meta { font-size:11px; display:flex; gap:8px; flex-shrink:0; align-items:center; }
-.vod-item .vod-badge { font-size:10px; padding:1px 6px; border-radius:3px; background:var(--surface2); }
-.vod-item .vod-badge.clip { background:rgba(109,90,252,.15); color:var(--accent); }
-.vod-item .vod-badge.vod { background:rgba(59,130,246,.15); color:#60a5fa; }
-.viewer-panel { background:var(--card-bg,#1a1d25); border:1px solid var(--border,#2a2d35); border-radius:8px; padding:16px; margin-top:16px; }
-.viewer-panel h3 { margin:0 0 12px; font-size:14px; }
-.viewer-stats { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px; margin-bottom:12px; }
-.viewer-stat { background:var(--surface2); padding:10px; border-radius:6px; text-align:center; }
-.viewer-stat .val { font-size:22px; font-weight:800; }
-.viewer-stat .lbl { font-size:10px; color:var(--text-muted); margin-top:2px; }
-.vod-actions { display:flex; gap:8px; margin-top:12px; }
-.progress-bar { height:6px; background:var(--surface2); border-radius:3px; overflow:hidden; margin-top:8px; }
-.progress-bar .fill { height:100%; background:var(--accent); border-radius:3px; transition:width .3s; }
-.nav-links { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
-.nav-links a { color:var(--text-muted); text-decoration:none; font-size:13px; padding:4px 8px; border-radius:4px; }
-.nav-links a:hover { color:var(--text); background:var(--surface2); }
-.nav-links a.active { color:var(--accent); background:var(--surface2); }
-</style>
+<link rel="stylesheet" href="css/kd.css" />
+<script>try{if(localStorage.getItem('kd_theme')==='light')document.documentElement.classList.add('kd-light')}catch(e){}</script>
 </head>
-<body class="chat-page">
-  <div class="pl-scene" aria-hidden="true"></div>
-  <div class="pl-grid" aria-hidden="true"></div>
-  <div class="pl-orbs" aria-hidden="true"><div class="pl-orb"></div><div class="pl-orb"></div><div class="pl-orb"></div></div>
-  <div class="pl-grain" aria-hidden="true"></div>
-  <header class="app-header">
-    <span class="app-title">StreamChat Bridge · VODs</span>
-    <div class="connection-status">
-      <span id="status-badge" class="status-dot status-disconnected"></span>
-      <span id="status-label">Desconectado</span>
-      <button id="logout-btn" class="btn btn-ghost" style="margin-left:12px">Cerrar sesión</button>
-    </div>
-  </header>
+<body class="kd">
+  <header id="chat-header" class="kd-top"></header>
 
-  <div id="client-nav" class="client-nav"></div>
-
-  <div class="vod-container">
-    <div id="nav-links" class="nav-links"></div>
-
+  <main class="kd-main">
     <p id="vod-msg" class="settings-msg" hidden></p>
 
-    <div class="vod-form">
-      <input id="vod-url-input" type="url" placeholder="https://kick.com/canal/videos/... o /clips/..." />
-      <button id="btn-add-vod" class="btn btn-primary">Agregar</button>
-    </div>
+    <div class="kd-cols-2" style="grid-template-columns:minmax(0,1.75fr) minmax(0,1fr)">
 
-    <h3 style="margin-bottom:8px">Tus VODs y Clips</h3>
-    <div id="vod-list" class="vod-list">
-      <p style="opacity:0.6;font-style:italic">Cargando...</p>
-    </div>
+      <!-- VODs y clips -->
+      <section class="kd-card">
+        <div class="kd-card-head">
+          <span class="kd-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m10 9 5 3-5 3Z"/></svg></span>
+          <div>
+            <div class="kd-card-title">Tus VODs y clips</div>
+            <div class="kd-card-sub">Pegá la URL de un VOD o clip de Kick</div>
+          </div>
+        </div>
 
-    <div class="viewer-panel">
-      <h3>Generador de vistas</h3>
-      <div id="viewer-stats" class="viewer-stats">
-        <div class="viewer-stat"><div class="val" id="stat-status">—</div><div class="lbl">Estado</div></div>
-        <div class="viewer-stat"><div class="val" id="stat-views-gen">0</div><div class="lbl">Vistas generadas</div></div>
-        <div class="viewer-stat"><div class="val" id="stat-views-fail">0</div><div class="lbl">Fallos</div></div>
-        <div class="viewer-stat"><div class="val" id="stat-hourly">0 / 50</div><div class="lbl">Esta hora</div></div>
-        <div class="viewer-stat"><div class="val" id="stat-total">0</div><div class="lbl">Totales</div></div>
-        <div class="viewer-stat"><div class="val" id="stat-uptime">—</div><div class="lbl">Tiempo activo</div></div>
-        <div class="viewer-stat" style="grid-column:1/-1"><div class="val" id="stat-current-visit" style="font-size:13px;font-weight:400;word-break:break-all">—</div><div class="lbl">Visitando ahora</div></div>
-      </div>
-      <div id="hourly-progress" class="progress-bar" style="display:none"><div class="fill" id="hourly-fill" style="width:0%"></div></div>
-      <div class="vod-actions">
-        <button id="btn-start-viewer" class="btn btn-primary">Iniciar visits</button>
-        <button id="btn-stop-viewer" class="btn btn-danger" style="display:none">Detener visits</button>
-      </div>
-    </div>
-  </div>
+        <div class="kd-addrow" style="margin-bottom:12px">
+          <input id="vod-url-input" type="url" placeholder="https://kick.com/canal/videos/... o /clips/..." />
+          <button id="btn-add-vod" class="btn btn-primary" type="button">Agregar</button>
+        </div>
 
-  <script src="js/pl-mascot.js"></script>
+        <div id="vod-list" class="vod-list">
+          <p class="vod-empty">Cargando…</p>
+        </div>
+      </section>
+
+      <!-- Generador de vistas (como "Viewers") -->
+      <section class="kd-card hl">
+        <div class="kd-card-head">
+          <span class="kd-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></span>
+          <div>
+            <div class="kd-card-title">Generador de vistas</div>
+            <div class="kd-card-sub">Sesión de visitas a tus VODs</div>
+          </div>
+        </div>
+
+        <div id="viewer-stats" class="viewer-stats">
+          <div class="viewer-stat"><div class="lbl">Estado</div><div class="val" id="stat-status">—</div></div>
+          <div class="viewer-stat"><div class="lbl">Tiempo activo</div><div class="val" id="stat-uptime">—</div></div>
+          <div class="viewer-stat"><div class="lbl">Vistas generadas</div><div class="val" id="stat-views-gen">0</div></div>
+          <div class="viewer-stat"><div class="lbl">Fallos</div><div class="val" id="stat-views-fail">0</div></div>
+          <div class="viewer-stat"><div class="lbl">Esta hora</div><div class="val" id="stat-hourly">0 / 50</div></div>
+          <div class="viewer-stat"><div class="lbl">Totales</div><div class="val" id="stat-total">0</div></div>
+          <div class="viewer-stat wide"><div class="lbl">Visitando ahora</div><div class="val" id="stat-current-visit">—</div></div>
+        </div>
+
+        <div id="hourly-progress" class="progress-bar" style="display:none;margin-top:12px"><div class="fill" id="hourly-fill" style="width:0%"></div></div>
+
+        <div class="kd-btns" style="margin-top:14px">
+          <button id="btn-start-viewer" class="kd-btn kd-btn-primary kd-btn-block" type="button">▶ Iniciar visitas</button>
+          <button id="btn-stop-viewer" class="kd-btn kd-btn-red kd-btn-block" type="button" style="display:none">■ Detener visitas</button>
+        </div>
+      </section>
+    </div>
+  </main>
+
   <script type="module" src="js/vods-ui.js"></script>
-  <script type="module">
-    import { renderNav } from './js/client-nav.js';
-    renderNav('vods');
-  </script>
 </body>
 </html>

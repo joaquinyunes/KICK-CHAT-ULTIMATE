@@ -367,7 +367,7 @@ function handleLogout() {
   localStorage.removeItem('scb_jwt');
   localStorage.removeItem('scb_role');
   localStorage.removeItem('scb_server_url');
-  window.location.href = '/';
+  window.location.href = '/login';
 }
 
 // ════════════════════════════════════════════════════════════════

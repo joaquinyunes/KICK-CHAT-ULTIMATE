@@ -20,9 +20,7 @@ router.post("/chat/send", requireAuth, async (req: Request, res: Response) => {
   if (!userId) {
     return res.status(500).json({ error: "Error de autenticación" });
   }
-  console.log(`[CHAT/SEND] userId=${userId} channel=${req.body?.channel} msg="${(req.body?.message||'').substring(0,40)}"`);
   await handleChatSend(req, res);
-  console.log(`[CHAT/SEND] result=${res.statusCode}`);
   if (res.statusCode === 200) {
     recordMessage();
   }

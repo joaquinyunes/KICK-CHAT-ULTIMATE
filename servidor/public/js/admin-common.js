@@ -19,7 +19,10 @@ export function updateStatusUI(status) {
   const label = document.getElementById('status-label');
   if (!badge || !label) return;
   badge.className = 'status-dot status-' + status;
-  label.textContent = status === 'connected' ? 'Conectado' : status === 'checking' ? 'Verificando…' : 'Desconectado';
+  const kd = document.body.classList.contains('kd');
+  label.textContent = kd
+    ? (status === 'connected' ? 'Sistemas en línea' : status === 'checking' ? 'Verificando…' : 'Sin conexión')
+    : (status === 'connected' ? 'Conectado' : status === 'checking' ? 'Verificando…' : 'Desconectado');
 }
 
 export function showMsg(elId, msg, type) {
@@ -43,7 +46,7 @@ export async function handleLogout() {
   localStorage.removeItem('scb_jwt');
   localStorage.removeItem('scb_role');
   localStorage.removeItem('scb_server_url');
-  window.location.href = '/';
+  window.location.href = '/login';
 }
 
 export function checkOAuthResult(msgElId) {
@@ -68,12 +71,12 @@ export async function initCommon() {
   try {
     const res = await fetch('/auth/me', { headers });
     if (!res.ok) {
-      window.location.href = '/';
+      window.location.href = '/login';
       return false;
     }
     const data = await res.json();
     if (data.user.role !== 'admin') {
-      window.location.href = '/';
+      window.location.href = '/login';
       return false;
     }
     // Sincronizar token existente a cookie httpOnly para futuras navegaciones
@@ -81,7 +84,7 @@ export async function initCommon() {
       fetch('/auth/sync-cookie', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } }).catch(() => {});
     }
   } catch {
-    window.location.href = '/';
+    window.location.href = '/login';
     return false;
   }
 

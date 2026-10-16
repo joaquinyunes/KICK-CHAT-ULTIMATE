@@ -1,24 +1,27 @@
 import { Router, type Request, type Response } from "express";
 import {
   getStatus, saveConfig, disconnectAccount, buildAuthUrl, exchangeCode,
-  forceRefresh, sendAsUser, isPendingState, DEFAULT_REDIRECT_URI,
+  forceRefresh, sendAsUser, isPendingState, testAccount, testAllAccounts, DEFAULT_REDIRECT_URI,
 } from "../services/kick20.service";
 import { logger } from "../utils/logger";
+import { requireAuth } from "../middleware/jwt.middleware";
+import { requireAdmin } from "../middleware/admin.middleware";
 
 /**
- * Rutas del módulo "kick20" — página + API para OAuth 2.1 oficial y envío
- * de mensajes vía api.kick.com/public/v1/chat como usuario. Multi-cuenta.
- * Sin auth de API: pensado para uso local (localhost); la UI vive en el área
- * autenticada (/kick20 y /admin/kick20).
+ * Rutas del módulo "kick20" — API para OAuth 2.1 oficial y envío de mensajes
+ * vía api.kick.com/public/v1/chat como usuario. Multi-cuenta.
+ * Solo admin (JWT por cookie o Bearer): la UI vive en /admin/kick20. Única excepción:
+ * los callbacks OAuth, que los abre Kick en el navegador y se validan con `state`.
  */
 const router = Router();
 const TAG = "kick20";
+const adminOnly = [requireAuth, requireAdmin];
 
-router.get("/kick20/api/status", (_req: Request, res: Response) => {
+router.get("/kick20/api/status", ...adminOnly, (_req: Request, res: Response) => {
   res.json(getStatus());
 });
 
-router.post("/kick20/api/config", (req: Request, res: Response) => {
+router.post("/kick20/api/config", ...adminOnly, (req: Request, res: Response) => {
   const { client_id, client_secret, redirect_uri } = req.body ?? {};
   if (!client_id || typeof client_id !== "string") { res.status(400).json({ error: "client_id requerido" }); return; }
   if (!client_secret || typeof client_secret !== "string") { res.status(400).json({ error: "client_secret requerido" }); return; }
@@ -26,19 +29,32 @@ router.post("/kick20/api/config", (req: Request, res: Response) => {
   res.json({ ok: true, status: getStatus() });
 });
 
-router.post("/kick20/api/disconnect", (req: Request, res: Response) => {
+router.post("/kick20/api/disconnect", ...adminOnly, (req: Request, res: Response) => {
   const username = typeof req.body?.username === "string" ? req.body.username : undefined;
   disconnectAccount(username);
   res.json({ ok: true, status: getStatus() });
 });
 
-router.post("/kick20/api/refresh", async (req: Request, res: Response) => {
+router.post("/kick20/api/refresh", ...adminOnly, async (req: Request, res: Response) => {
   const username = typeof req.body?.username === "string" ? req.body.username : undefined;
   const r = await forceRefresh(username);
   res.status(r.ok ? 200 : 400).json({ ...r, status: getStatus() });
 });
 
-router.get("/kick20/api/auth-url", (_req: Request, res: Response) => {
+// Prueba no destructiva (no envía mensajes). Sin `username` prueba todas las cuentas.
+router.post("/kick20/api/test", ...adminOnly, async (req: Request, res: Response) => {
+  const username = typeof req.body?.username === "string" ? req.body.username : undefined;
+  const results = username ? [await testAccount(username)] : await testAllAccounts();
+  res.json({
+    ok: results.length > 0 && results.every((r) => r.ok),
+    total: results.length,
+    passed: results.filter((r) => r.ok).length,
+    results,
+    status: getStatus(),
+  });
+});
+
+router.get("/kick20/api/auth-url", ...adminOnly, (_req: Request, res: Response) => {
   try {
     res.json({ url: buildAuthUrl() });
   } catch (e: any) {
@@ -46,7 +62,7 @@ router.get("/kick20/api/auth-url", (_req: Request, res: Response) => {
   }
 });
 
-router.get("/kick20/connect", (_req: Request, res: Response) => {
+router.get("/kick20/connect", ...adminOnly, (_req: Request, res: Response) => {
   try {
     res.redirect(buildAuthUrl());
   } catch (e: any) {
@@ -57,14 +73,14 @@ router.get("/kick20/connect", (_req: Request, res: Response) => {
 async function handleCallback(req: Request, res: Response) {
   const { code, state, error } = req.query as Record<string, string>;
   if (error || !code || !state) {
-    return res.redirect("/kick20?err=" + encodeURIComponent(error || "missing_params"));
+    return res.redirect("/admin/kick20?err=" + encodeURIComponent(error || "missing_params"));
   }
   const r = await exchangeCode(code, state);
   if (!r.ok) {
     logger.error(TAG, "callback fallo", r.error);
-    return res.redirect("/kick20?err=" + encodeURIComponent(r.error || "exchange_failed"));
+    return res.redirect("/admin/kick20?err=" + encodeURIComponent(r.error || "exchange_failed"));
   }
-  res.redirect("/kick20?ok=1&user=" + encodeURIComponent(r.username || ""));
+  res.redirect("/admin/kick20?ok=1&user=" + encodeURIComponent(r.username || ""));
 }
 
 router.get("/kick20/callback", handleCallback);
@@ -78,7 +94,7 @@ router.get("/auth/kick/callback", (req: Request, res: Response, next) => {
   next();
 });
 
-router.post("/kick20/api/send", async (req: Request, res: Response) => {
+router.post("/kick20/api/send", ...adminOnly, async (req: Request, res: Response) => {
   const { channel, content, reply_to_message_id, username } = req.body ?? {};
   if (!channel || typeof channel !== "string") { res.status(400).json({ error: "channel requerido" }); return; }
   if (!content || typeof content !== "string") { res.status(400).json({ error: "content requerido" }); return; }

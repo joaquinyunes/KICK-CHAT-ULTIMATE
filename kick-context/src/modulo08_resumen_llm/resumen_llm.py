@@ -20,6 +20,10 @@ Variables de entorno:
     KICK_GEMINI_MODEL          default "gemini-flash-lite-latest"
     KICK_RESUMEN_INTERVALO_SEG cada cuánto resume (default 120)
     KICK_RESUMEN_AUDIO         "1" para mandarle el audio a Gemini (default "1")
+    KICK_RESUMEN_MODO          "rapido" = mira cada ~10 s, 1 frame liviano, sin
+                               audio, y solo llama al modelo si la pantalla
+                               cambió (objetivo: < 15 s de atraso). Default "completo".
+    KICK_RESUMEN_UMBRAL_CAMBIO cuánto tiene que cambiar la pantalla (0-1, default 0.04)
 """
 
 import base64
@@ -37,9 +41,15 @@ import config  # noqa: E402
 from memoria_historica import obtener_ultimos_resumenes  # noqa: E402
 
 MODULO = "modulo08_resumen_llm"
-INTERVALO_SEG = int(os.environ.get("KICK_RESUMEN_INTERVALO_SEG", 120))
+RAPIDO = os.environ.get("KICK_RESUMEN_MODO", "completo").lower() == "rapido"
+INTERVALO_SEG = int(os.environ.get("KICK_RESUMEN_INTERVALO_SEG", 10 if RAPIDO else 120))
+# En modo rápido, aunque la pantalla no cambie, refresca cada tanto igual.
+REFRESCO_MAX_SEG = 120
+UMBRAL_CAMBIO = float(os.environ.get("KICK_RESUMEN_UMBRAL_CAMBIO", 0.04))
+ANCHO_FRAME = 768 if RAPIDO else 1152
 BACKOFF_MAX_SEG = 300
-USAR_AUDIO = os.environ.get("KICK_RESUMEN_AUDIO", "1") not in ("0", "false", "False", "")
+USAR_AUDIO = (not RAPIDO and
+              os.environ.get("KICK_RESUMEN_AUDIO", "1") not in ("0", "false", "False", ""))
 CLIPS_AUDIO = 3  # cuántos clips del buffer juntar (~30 s)
 # 1 = más rápido y confiable; 2 = ve el "antes y después" pero pesa el doble.
 N_FRAMES = max(1, min(2, int(os.environ.get("KICK_RESUMEN_FRAMES", 1))))
@@ -72,7 +82,7 @@ def _extraer_frame(clip: Path, out: Path) -> bool:
         try:
             r = subprocess.run(
                 ["ffmpeg", "-y", "-loglevel", "error", "-ss", ss, "-i", str(clip),
-                 "-frames:v", "1", "-vf", "scale=1152:-2",
+                 "-frames:v", "1", "-vf", f"scale={ANCHO_FRAME}:-2",
                  # yuvj420p (full-range) es lo que quiere el encoder mjpeg;
                  # gdigrab entrega full-range y sin esto falla.
                  "-pix_fmt", "yuvj420p", str(out)],
@@ -92,13 +102,24 @@ def _clips_video():
     return sorted(clips)
 
 
+def _ts_frame(clip: Path) -> float:
+    """Momento real del frame: inicio del clip (por nombre; si no, mtime menos
+    la duración) + los 3 s de seek de _extraer_frame. El mtime solo es el FINAL
+    del clip, y medir desde ahí esconde ~7 s de atraso."""
+    inicio = config.timestamp_desde_nombre(clip)
+    if inicio is None:
+        inicio = clip.stat().st_mtime - config.DURACION_CLIP_SEGUNDOS
+    return inicio + 3
+
+
 def _frames_actuales():
-    """Frames del video reciente. Con N_FRAMES=2 manda uno viejo + uno nuevo
-    para que Gemini vea qué cambió; con 1 (default) solo el más reciente."""
+    """Frames del video reciente + el momento real del frame (para medir atraso).
+    Con N_FRAMES=2 manda uno viejo + uno nuevo para que Gemini vea qué cambió;
+    con 1 (default, y siempre en modo rápido) solo el más reciente."""
     clips = _clips_video()
     if not clips:
-        return []
-    if N_FRAMES >= 2 and len(clips) >= 4:
+        return [], None
+    if N_FRAMES >= 2 and len(clips) >= 4 and not RAPIDO:
         elegidos = [clips[-4], clips[-1]]
     else:
         elegidos = [clips[-1]]
@@ -108,7 +129,26 @@ def _frames_actuales():
             out = Path(tmp) / f"f{i}.jpg"
             if _extraer_frame(clip, out):
                 frames.append(out.read_bytes())
-    return frames
+    return frames, _ts_frame(elegidos[-1])
+
+
+def _huella(jpg: bytes):
+    """Miniatura 32x32 en gris (1024 bytes) para comparar frames sin IA."""
+    try:
+        r = subprocess.run(
+            ["ffmpeg", "-loglevel", "error", "-i", "pipe:0", "-vf",
+             "scale=32:32,format=gray", "-f", "rawvideo", "pipe:1"],
+            input=jpg, capture_output=True, timeout=10)
+    except subprocess.TimeoutExpired:
+        return None
+    return r.stdout if r.returncode == 0 and len(r.stdout) == 1024 else None
+
+
+def _diferencia(a: bytes, b: bytes) -> float:
+    """0 = idénticas, 1 = opuestas. Sin huella previa cuenta como cambio total."""
+    if not a or not b or len(a) != len(b):
+        return 1.0
+    return sum(abs(x - y) for x, y in zip(a, b)) / (255 * len(a))
 
 
 def _audio_actual():
@@ -244,6 +284,8 @@ IGNORÁ el chat de espectadores. No menciones lo que escriben los viewers.
 
 Español rioplatense, directo. Devolvé ÚNICAMENTE este JSON:
 {{
+  "evento": "si pasó algo puntual respecto al resumen anterior (pegó un bonus, cambió de slot, ganó/perdió la mano, cerró la apuesta), en pocas palabras; si no pasó nada nuevo, null",
+  "detalle": {{"juego": "nombre del slot/juego/partido/programa o null", "apuesta": "monto o cuota visible o null", "balance": "balance visible o null", "resultado": "si pagó/ganó/perdió o null"}},
   "fase": "UNA palabra que resuma qué está haciendo: apostando | slots | poker | ruleta | jugando | programando | charlando | viendo-deporte | pausa | cargando | otro",
   "resumen_actual": "la acción puntual de ahora, concreta y con datos (equipos, cuotas, slot, cartas, montos), 1-2 frases",
   "contexto_previo": "qué venía haciendo antes (resúmenes anteriores + lo que cambió entre las 2 capturas)",
@@ -329,7 +371,7 @@ def _hay_pedido_manual():
 
 def main():
     config.ensure_dirs()
-    config.log(MODULO, f"Módulo 8 (Resumen) iniciado. {config.LLM_PROVIDER}, "
+    config.log(MODULO, f"Módulo 8 (Resumen) iniciado{' en modo RÁPIDO' if RAPIDO else ''}. {config.LLM_PROVIDER}, "
                        f"modelos: {', '.join(MODELOS_GEMINI)}, cada {INTERVALO_SEG}s, "
                        f"audio={'sí' if USAR_AUDIO else 'no'}.")
     requests = _cargar_requests()
@@ -339,29 +381,43 @@ def main():
         sys.exit(1)
 
     backoff = INTERVALO_SEG
+    ultima_huella = None
+    ultimo_analisis = 0.0
+    forzar = False   # un "Analizar ahora" salta el filtro de pantalla-sin-cambios
 
     def _dormir(segundos):
-        """Duerme, pero se corta apenas el Panel pide 'Analizar ahora'."""
+        """Duerme, pero se corta apenas el Panel pide 'Analizar ahora'.
+        Devuelve True si fue por un pedido manual (hay que analizar sí o sí)."""
         restante = segundos
         while restante > 0:
             config.heartbeat(MODULO)
             if _hay_pedido_manual():
                 config.log(MODULO, "Pedido manual de resumen desde el Panel.")
-                return
+                return True
             time.sleep(min(5, restante))
             restante -= 5
+        return False
 
     while True:
         try:
             config.heartbeat(MODULO)
             if config.LLM_PROVIDER == "gemini":
                 _procesar_audios_nota(requests)
-            frames = _frames_actuales()
+            frames, ts_frame = _frames_actuales()
             audio = _audio_actual()
+
+            if RAPIDO and frames:
+                huella = _huella(frames[-1])
+                cambio = _diferencia(huella, ultima_huella)
+                if (not forzar and cambio < UMBRAL_CAMBIO
+                        and time.time() - ultimo_analisis < REFRESCO_MAX_SEG):
+                    forzar = _dormir(INTERVALO_SEG)   # pantalla igual: no gastar una llamada
+                    continue
+                ultima_huella = huella
 
             if not frames and not audio:
                 config.log(MODULO, "Todavía no hay captura (¿módulos 1/2 corriendo? ¿pantalla activa?).", "WARN")
-                _dormir(15)   # reintento pronto, no esperar el intervalo completo
+                forzar = _dormir(15)   # reintento pronto, no esperar el intervalo completo
                 continue
 
             prompt = _armar_prompt(obtener_ultimos_resumenes(4), len(frames), _leer_nota())
@@ -369,26 +425,33 @@ def main():
             config.heartbeat(MODULO)
             parsed = _parsear_respuesta(_llamar_llm(requests, prompt, frames, audio))
 
+            ultimo_analisis = time.time()
             if not parsed:
                 config.log(MODULO, "Respuesta del modelo no es JSON válido, se descarta este ciclo.", "WARN")
             else:
+                ahora = time.time()
                 resultado = {
-                    "timestamp": int(time.time()),
+                    "timestamp": int(ahora),
                     "fase": parsed.get("fase"),
+                    "evento": parsed.get("evento") or None,
+                    "detalle": parsed.get("detalle") if isinstance(parsed.get("detalle"), dict) else None,
+                    # Atraso real: desde el momento del frame hasta que hay resumen.
+                    "latencia_seg": round(ahora - ts_frame, 1) if ts_frame else None,
                     "resumen_actual": parsed.get("resumen_actual"),
                     "contexto_previo": parsed.get("contexto_previo"),
                     "tendencia_detectada": parsed.get("tendencia_detectada"),
                 }
                 config.escribir_json(
                     config.SUMMARIES_DIR / f"resumen_{resultado['timestamp']}.json", resultado)
-                config.log(MODULO, f"[{resultado.get('fase')}] {resultado['resumen_actual']}")
+                config.log(MODULO, f"[{resultado.get('fase')}] {resultado['resumen_actual']} "
+                                   f"(atraso {resultado['latencia_seg']}s)")
 
             backoff = INTERVALO_SEG
-            _dormir(INTERVALO_SEG)
+            forzar = _dormir(INTERVALO_SEG)
 
         except Exception as e:
             config.log(MODULO, f"LLM ({config.LLM_PROVIDER}) no disponible: {e}. Reintento en {backoff}s.", "WARN")
-            _dormir(backoff)
+            forzar = _dormir(backoff)
             backoff = min(int(backoff * 1.7), BACKOFF_MAX_SEG)
 
 

@@ -3,52 +3,65 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StreamChat – Simulador</title>
+<title>StreamChat – Armador de prompt</title>
 <link rel="stylesheet" href="css/main.css" />
 <link rel="stylesheet" href="css/client-nav.css" />
 <style>
-  .sim-layout { flex:1; display:flex; gap:16px; padding:16px; overflow:hidden; }
-  .sim-controls { width:320px; flex-shrink:0; display:flex; flex-direction:column; gap:12px; overflow-y:auto; }
-  .sim-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px; }
-  .sim-card h3 { font-size:12px; margin:0 0 10px; color:var(--text); font-weight:600; }
-  .sim-output { flex:1; display:flex; flex-direction:column; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); overflow:hidden; }
-  .sim-output-head { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-bottom:1px solid var(--border); font-size:13px; font-weight:600; flex-wrap:wrap; gap:8px; }
-  .sim-actions { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
-  #sim-msgs { flex:1; overflow-y:auto; padding:4px 0; font-size:13px; }
-  .msg { display:flex; gap:6px; padding:3px 14px; line-height:1.4; animation:fadeIn .15s ease; }
-  .msg-user { font-weight:700; color:var(--accent); flex-shrink:0; }
-  .msg-sep { color:var(--text-muted); }
-  .msg-text { color:var(--text); word-break:break-word; }
-  @keyframes fadeIn { from{opacity:0;transform:translateY(2px)} to{opacity:1;transform:translateY(0)} }
-  .sim-badge { display:inline-block; font-size:10px; padding:2px 8px; border-radius:20px; background:var(--surface2); border:1px solid var(--border); color:var(--text-muted); }
-  .sim-badge.local { border-color:var(--success); color:var(--success); }
+  .pb-layout { flex:1; display:grid; grid-template-columns: minmax(280px,1fr) minmax(280px,360px) minmax(320px,1.2fr); gap:14px; padding:14px 16px; min-height:0; }
+  .pb-col { display:flex; flex-direction:column; gap:10px; min-height:0; overflow-y:auto; padding-right:2px; }
+  .pb-col > h2 { font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--text-muted); margin:0; font-weight:700; display:flex; align-items:center; gap:8px; }
+  .pb-col > h2 .n { display:inline-flex; width:20px; height:20px; border-radius:50%; align-items:center; justify-content:center; background:rgba(109,90,252,.18); color:var(--accent); font-size:11px; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:12px; }
+  .card.off { opacity:.55; }
+  .card-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+  .card-head h3 { margin:0; font-size:12px; font-weight:600; color:var(--text); }
+  .card-hint { margin:0 0 8px; font-size:11px; color:var(--text-muted); line-height:1.4; }
+  textarea.pb-input { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:8px 10px; color:var(--text); font-family:var(--font-mono); font-size:12px; line-height:1.45; resize:vertical; min-height:64px; }
+  textarea.pb-input:focus, select:focus, input[type="number"]:focus { outline:none; border-color:var(--accent); }
+  textarea.pb-input:disabled { cursor:not-allowed; }
+
+  .switch { display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-size:12px; color:var(--text); user-select:none; }
+  .switch input { position:absolute; opacity:0; width:0; height:0; }
+  .switch .track { width:32px; height:18px; border-radius:20px; background:var(--surface2); border:1px solid var(--border); position:relative; flex-shrink:0; transition:all .15s; }
+  .switch .track::after { content:""; position:absolute; top:2px; left:2px; width:12px; height:12px; border-radius:50%; background:var(--text-muted); transition:all .15s; }
+  .switch input:checked + .track { background:rgba(109,90,252,.25); border-color:var(--accent); }
+  .switch input:checked + .track::after { left:16px; background:var(--accent); }
+  .switch input:focus-visible + .track { outline:2px solid var(--accent); outline-offset:2px; }
+  .switch input:disabled + .track { opacity:.6; }
+
+  .rules { display:flex; flex-direction:column; gap:9px; }
+  .rule { display:flex; flex-direction:column; gap:1px; }
+  .rule small { margin-left:40px; font-size:11px; color:var(--text-muted); line-height:1.35; }
+
   .chips { display:flex; gap:6px; flex-wrap:wrap; }
-  .chip { background:var(--surface2); border:1px solid var(--border); color:var(--text-muted); font-size:12px; padding:4px 10px; border-radius:6px; cursor:pointer; font-family:inherit; transition:all .1s; }
+  .chip { background:var(--surface2); border:1px solid var(--border); color:var(--text-muted); font-size:12px; padding:5px 10px; border-radius:6px; cursor:pointer; font-family:inherit; transition:all .1s; }
   .chip:hover { border-color:var(--accent); color:var(--text); }
-  .chip.active { border-color:var(--accent); background:rgba(109,90,252,.12); color:var(--accent); }
-  .field input, .field select { width:100%; }
-  .field-input { font-family:inherit; }
-  .sim-modal { position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:90; padding:16px; }
-  .sim-modal[hidden] { display:none; }
-  .sim-modal-box { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); width:100%; max-width:560px; padding:16px; display:flex; flex-direction:column; gap:12px; }
-  .sim-modal-head { display:flex; align-items:center; justify-content:space-between; font-size:14px; font-weight:700; color:var(--text); }
-  .sim-modal-hint { font-size:12px; color:var(--text-muted); margin:0; }
-  .sim-modal-hint code { background:var(--surface2); padding:1px 5px; border-radius:4px; }
-  #sim-paste-input { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:10px 12px; color:var(--text); font-family:var(--font-mono); font-size:12px; resize:vertical; }
-  .sim-modal-actions { display:flex; justify-content:flex-end; }
-  .mode-tabs { display:flex; gap:0; border:1px solid var(--border); border-radius:6px; overflow:hidden; margin-bottom:12px; }
-  .mode-tab { flex:1; padding:8px 12px; font-size:12px; font-weight:600; cursor:pointer; background:var(--surface2); border:none; color:var(--text-muted); font-family:inherit; transition:all .15s; text-align:center; }
-  .mode-tab:first-child { border-right:1px solid var(--border); }
-  .mode-tab.active { background:rgba(109,90,252,.15); color:var(--accent); }
-  .mode-tab:hover:not(.active) { background:var(--surface); color:var(--text); }
-  .screenshot-zone { border:2px dashed var(--border); border-radius:8px; padding:20px; text-align:center; cursor:pointer; transition:all .15s; position:relative; }
-  .screenshot-zone:hover { border-color:var(--accent); background:rgba(109,90,252,.05); }
-  .screenshot-zone.has-img { padding:8px; }
-  .screenshot-zone img { max-width:100%; max-height:200px; border-radius:6px; display:block; margin:0 auto; }
-  .screenshot-zone .hint { font-size:11px; color:var(--text-muted); margin-top:8px; }
-  .betting-field { display:none; }
-  .betting-field.visible { display:block; }
-  #screenshot-input { display:none; }
+  .chip[aria-pressed="true"] { border-color:var(--accent); background:rgba(109,90,252,.14); color:var(--accent); }
+
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .grid2 .field { margin:0; }
+  .field label { font-size:11px; }
+  select, input[type="number"] { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:6px 8px; color:var(--text); font-family:inherit; font-size:12px; }
+
+  .presets { display:flex; gap:6px; flex-wrap:wrap; }
+
+  .out-card { flex:1; display:flex; flex-direction:column; min-height:0; }
+  .out-bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+  .out-bar .spacer { flex:1; }
+  .stat { font-size:11px; color:var(--text-muted); }
+  #pb-out { flex:1; min-height:260px; width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:10px 12px; color:var(--text); font-family:var(--font-mono); font-size:12px; line-height:1.45; resize:none; }
+  .incluye { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .tag { font-size:10px; padding:2px 8px; border-radius:20px; background:var(--surface2); border:1px solid var(--border); color:var(--text-muted); }
+  #pb-status { min-height:16px; font-size:11px; color:var(--text-muted); margin:6px 0 0; }
+  #pb-status[data-type="error"] { color:var(--danger); }
+  #pb-status[data-type="ok"] { color:var(--success); }
+
+  @media (max-width: 1100px) {
+    body.chat-page { height:auto; min-height:100vh; overflow:auto; }
+    .pb-layout { grid-template-columns:1fr; overflow:visible; }
+    .pb-col { overflow:visible; }
+    #pb-out { min-height:360px; }
+  }
 </style>
 </head>
 <body class="chat-page">
@@ -59,100 +72,114 @@
   <header id="chat-header" class="app-header"></header>
   <div id="client-nav"></div>
 
-  <div class="sim-layout">
-    <!-- CONTROLES -->
-    <div class="sim-controls">
-      <div class="sim-card">
-        <h3>Modo</h3>
-        <div class="mode-tabs">
-          <button class="mode-tab active" data-mode="general">💬 Chat General</button>
-          <button class="mode-tab" data-mode="betting">🎰 Apuestas Esports</button>
+  <main class="pb-layout">
+    <!-- ① DATOS -->
+    <section class="pb-col" aria-labelledby="h-datos">
+      <h2 id="h-datos"><span class="n">1</span> Pegá los datos</h2>
+      <p class="card-hint" style="margin:0">Lo que dejes vacío o apagado no existe para el chat: no se inventa. Cada casilla decide si ese dato entra al prompt.</p>
+      <div id="datos"></div>
+      <div class="presets">
+        <button id="pb-clear" class="btn btn-ghost btn-sm" type="button">Vaciar datos</button>
+      </div>
+    </section>
+
+    <!-- ② OPCIONES -->
+    <section class="pb-col" aria-labelledby="h-opts">
+      <h2 id="h-opts"><span class="n">2</span> Elegí qué incluir</h2>
+
+      <div class="card">
+        <div class="card-head"><h3>Preajustes</h3></div>
+        <div class="presets" id="presets"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>Tipo de contenido</h3></div>
+        <p class="card-hint">Podés marcar varios. Si no marcás ninguno, la IA lo infiere de tus datos.</p>
+        <div class="chips" id="contenidos"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>Reglas</h3></div>
+        <div class="rules" id="reglas"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>Estilo de escritura</h3></div>
+        <div class="grid2">
+          <div class="field"><label for="o-tildes">Tildes</label>
+            <select id="o-tildes"><option value="mixto">A veces (natural)</option><option value="cero">Cero tildes</option></select></div>
+          <div class="field"><label for="o-emojis">Emojis</label>
+            <select id="o-emojis"><option value="ninguno">Ninguno</option><option value="pocos">Muy pocos</option></select></div>
+          <div class="field"><label for="o-acentos">Acentos</label>
+            <select id="o-acentos"><option value="rioplatense">Rioplatense</option><option value="regional">+ uruguayo y chileno</option></select></div>
+          <div class="field"><label for="o-emotes">Emotes</label>
+            <select id="o-emotes"><option value="completa">Lista completa (33)</option><option value="reducida">Lista corta (12)</option><option value="ninguno">Sin emotes</option></select></div>
         </div>
       </div>
 
-      <div class="sim-card">
-        <h3>Contexto</h3>
-        <div class="field general-field">
-          <textarea id="sim-ctx" class="field-input" rows="3" placeholder="¿Qué está pasando en el stream? (ej: "jugando LoL ranked, casi choco a un amigo")" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:inherit;resize:vertical"></textarea>
-          <button id="sim-auto-btn" class="btn btn-ghost btn-sm">🤖 Auto (que lo invente)</button>
+      <div class="card" id="card-video">
+        <div class="card-head"><h3>🎬 Video con tiempo</h3></div>
+        <p class="card-hint">Poné cuánto dura el video y cuántos comentarios querés por minuto: el prompt pide los mensajes ordenados por minuto (MIN 1, MIN 2…), en hilos. Después los pegás en la pestaña <a href="/video" style="color:var(--accent)">Video</a>, que los manda al chat sincronizados con el reloj del video. Dejalo vacío si no es un video.</p>
+        <div class="grid2">
+          <div class="field"><label for="o-duracion">Duración del video (min)</label>
+            <input id="o-duracion" type="number" min="0" max="600" step="1" placeholder="ej: 30"></div>
+          <div class="field"><label for="o-permin">Comentarios por minuto</label>
+            <input id="o-permin" type="number" min="0" max="60" step="1" placeholder="ej: 8"></div>
+          <div class="field"><label for="o-desde">Generar desde el minuto</label>
+            <input id="o-desde" type="number" min="1" max="600" step="1" value="1"></div>
+          <div class="field"><label for="o-hasta">hasta el minuto</label>
+            <input id="o-hasta" type="number" min="1" max="600" step="1" placeholder="hasta el final"></div>
         </div>
-        <div class="betting-field" id="betting-fields">
-          <div class="field" style="margin-bottom:8px">
-            <label style="font-size:11px;color:var(--text-muted)">Estado de apuestas</label>
-            <textarea id="betting-state" class="field-input" rows="2" placeholder='Ej: "La mayoría del chat tiene plata en el Over de rondas o en el equipo que va perdiendo"' style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:inherit;resize:vertical;font-size:12px"></textarea>
-          </div>
-          <div class="field" style="margin-bottom:8px">
-            <label style="font-size:11px;color:var(--text-muted)">Screenshot del stream</label>
-            <div class="screenshot-zone" id="screenshot-zone">
-              <span id="screenshot-label">📸 Subí una captura del stream</span>
-              <p class="hint" id="screenshot-hint">Arrastrá o tocá para seleccionar. La IA analiza el marcador, la economía, las cuotas.</p>
-              <img id="screenshot-preview" src="" alt="" hidden>
-            </div>
-            <input type="file" id="screenshot-input" accept="image/*">
-          </div>
-        </div>
+        <p id="video-resumen" class="card-hint" style="margin:8px 0 0" aria-live="polite"></p>
+        <div class="presets" style="margin-top:8px"><button id="video-next" class="btn btn-secondary btn-sm" type="button">Siguiente tramo ▶</button></div>
       </div>
 
-      <div class="sim-card">
-        <h3>Categoría</h3>
-        <div class="chips" id="sim-cats"></div>
-      </div>
-
-      <div class="sim-card general-field">
-        <h3>Energía del chat</h3>
-        <div class="chips" id="sim-energies"></div>
-      </div>
-
-      <div class="sim-card">
-        <h3>Opciones</h3>
-        <div class="field">
-          <label>Cantidad de mensajes</label>
-          <select id="sim-cant">
-            <option value="20">20</option>
-            <option value="50">50</option>
-            <option value="100" selected>100</option>
-            <option value="200">200</option>
-          </select>
+      <div class="card">
+        <div class="card-head"><h3>Salida</h3></div>
+        <div class="grid2">
+          <div class="field" style="grid-column:1/-1"><label for="o-formato">Formato que devuelve la IA</label>
+            <select id="o-formato">
+              <option value="hilos">Hilos: mensaje + respuestas (recomendado)</option>
+              <option value="mensajes">Solo mensajes (uno por línea)</option>
+              <option value="json">JSON: user, message, tipo</option>
+              <option value="json_delay">JSON + delay_ms</option>
+              <option value="usuario_texto">Líneas “usuario: mensaje”</option>
+              <option value="lineas">Solo mensajes + KICKCHAT123456</option>
+            </select></div>
+          <div class="field" style="grid-column:1/-1"><label for="o-elenco">Usuarios</label>
+            <select id="o-elenco">
+              <option value="pool">Lista general</option>
+              <option value="apuestas">Elenco de apuestas (A–I)</option>
+              <option value="libre">Que invente los nombres</option>
+            </select></div>
+          <div class="field"><label for="o-cantidad">Cantidad</label>
+            <input id="o-cantidad" type="number" min="4" max="600" step="1" value="100"></div>
+          <div class="field"><label for="o-momento">Momento</label>
+            <select id="o-momento"><option value="">Auto</option></select></div>
         </div>
-        <button id="sim-gen-btn" class="btn btn-primary" style="width:100%">✨ Generar chat</button>
-        <button id="sim-prompt-btn" class="btn btn-secondary btn-sm" style="width:100%;margin-top:8px" title="Arma un prompt con las reglas adaptadas a tu tema y lo copia para pegarlo en Gemini/OpenAI">📌 Generar prompt para IA</button>
-        <button id="sim-paste-btn" class="btn btn-secondary btn-sm" style="width:100%;margin-top:8px" title="Pegá un JSON con user/message y quedan solo los mensajes">⬇️ Pegar JSON de chat</button>
-        <p id="sim-msg" class="settings-msg" hidden></p>
+        <div class="field" style="margin:10px 0 0"><label>Energía</label><div class="chips" id="energias"></div></div>
+        <div style="margin-top:12px"><label class="switch"><input type="checkbox" id="o-hora"><span class="track"></span><span>Incluir día y hora actual</span></label></div>
       </div>
-    </div>
+    </section>
 
-    <!-- SALIDA -->
-    <div class="sim-output">
-      <div class="sim-output-head">
-        <span>💬 Chat simulado</span>
-        <div class="sim-actions">
-          <span id="sim-count" class="sim-badge">0 mensajes</span>
-          <button id="sim-export-btn" class="btn btn-ghost btn-sm" disabled>💾 Guardar .txt</button>
-          <button id="sim-send-btn" class="btn btn-danger btn-sm" disabled>📤 Enviar a Kick</button>
+    <!-- ③ PROMPT -->
+    <section class="pb-col" aria-labelledby="h-out">
+      <h2 id="h-out"><span class="n">3</span> Prompt completo</h2>
+      <div class="card out-card">
+        <div class="out-bar">
+          <button id="pb-copy" class="btn btn-primary" type="button" disabled>📋 Copiar prompt</button>
+          <button id="pb-download" class="btn btn-secondary btn-sm" type="button" disabled>⬇️ Descargar .txt</button>
+          <span class="spacer"></span>
+          <span id="pb-stats" class="stat" aria-live="polite">—</span>
         </div>
+        <textarea id="pb-out" readonly spellcheck="false" aria-label="Prompt armado" placeholder="Acá aparece el prompt listo para pegar en otra IA."></textarea>
+        <div class="incluye" id="pb-incluye"></div>
+        <p id="pb-status" role="status" aria-live="polite"></p>
       </div>
-      <div id="sim-msgs">
-        <p id="sim-empty" style="color:var(--text-muted);text-align:center;padding:40px 16px">
-          Configurá el contexto y tocá <b>Generar</b> para simular un chat en vivo.</p>
-      </div>
-    </div>
-  </div>
+    </section>
+  </main>
 
   <script src="js/pl-mascot.js"></script>
   <script type="module" src="js/simulador-ui.js"></script>
-
-  <div id="sim-modal" class="sim-modal" hidden>
-    <div class="sim-modal-box">
-      <div class="sim-modal-head">
-        <span>⬇️ Pegar JSON de chat</span>
-        <button id="sim-modal-close" class="btn btn-ghost btn-sm">✕</button>
-      </div>
-      <p class="sim-modal-hint">Pegá el JSON (con <code>user</code>/<code>message</code>). Se importan <b>solo los mensajes</b>, sin usuarios.</p>
-      <textarea id="sim-paste-input" class="field-input" rows="10" spellcheck="false" placeholder='[{"user":"alguien","message":"hola"},{"user":"otro","message":"que tal"}]'></textarea>
-      <div class="sim-modal-actions">
-        <button id="sim-paste-go" class="btn btn-primary">Importar solo mensajes</button>
-      </div>
-    </div>
-  </div>
 </body>
 </html>

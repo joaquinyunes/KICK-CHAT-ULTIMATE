@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StreamChat – Temáticas</title>
+<link rel="stylesheet" href="css/main.css" />
+<link rel="stylesheet" href="css/chat.css" />
+<link rel="stylesheet" href="css/tematicas.css" />
+<link rel="stylesheet" href="css/kd.css" />
+<script>try{if(localStorage.getItem('kd_theme')==='light')document.documentElement.classList.add('kd-light')}catch(e){}</script>
+</head>
+<body class="kd">
+  <header id="chat-header" class="kd-top"></header>
+
+  <main class="kd-main">
+
+    <!-- ═══ CANAL ═══ -->
+    <section class="kd-card hl kd-channel">
+      <div class="kd-ch-id">
+        <span class="kd-avatar-lg"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg></span>
+        <a id="tm-channel" class="sp-channel" href="/ajustes">sin configurar</a>
+      </div>
+      <div class="kd-tiles">
+        <div class="kd-tile"><span>Enviados</span><b id="tm-sent">0</b></div>
+        <div class="kd-tile fail"><span>Fallidos</span><b id="tm-failed">0</b></div>
+      </div>
+      <div class="kd-ch-r">
+        <button id="tm-stop-all" class="kd-btn kd-btn-red" type="button">■ Parar todo</button>
+      </div>
+    </section>
+
+    <!-- ═══ EN VIVO: mensaje suelto, sale ya ═══ -->
+    <section class="kd-card live-panel tm-live">
+      <div class="kd-card-head">
+        <span class="kd-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></span>
+        <div>
+          <div class="kd-card-title">En vivo</div>
+          <div class="kd-card-sub">Escribí y Enter: sale al chat ahora. Podés usar {variables}.</div>
+        </div>
+      </div>
+      <div class="tm-live-row">
+        <input id="tm-live-input" type="text" maxlength="500" placeholder="ej: que locura lo que pago {slot}" autocomplete="off" spellcheck="false">
+        <button id="tm-live-send" class="btn btn-primary">📤 Enviar</button>
+      </div>
+      <div id="tm-live-status" class="cc-status"></div>
+    </section>
+
+    <!-- ═══ SECCIONES ═══ -->
+    <nav id="tm-tabs" class="tm-tabs" aria-label="Secciones"></nav>
+
+    <section id="tm-sec" class="kd-card tm-sec">
+      <p id="tm-desc" class="tm-desc"></p>
+
+      <!-- Slots: cómo viene -->
+      <div id="tm-modos" class="tm-modos" hidden></div>
+
+      <!-- Noticias: se pegan acá -->
+      <label id="tm-news-box" class="tm-news" hidden>
+        <span class="cc-lbl">Noticias · una por renglón, cortita y como la diría alguien (ej: subio la nafta)</span>
+        <textarea id="tm-news" rows="3" spellcheck="false" placeholder="subio la nafta&#10;se corto la luz en medio pais"></textarea>
+      </label>
+
+      <div id="tm-vars" class="tm-vars" hidden></div>
+
+      <div class="tm-run">
+        <div id="tm-orden" class="tm-orden" role="group" aria-label="Cómo salen los mensajes">
+          <button type="button" data-orden="azar" title="Las conversaciones salen mezcladas">🔀 Aleatorio</button>
+          <button type="button" data-orden="orden" title="Salen de arriba hacia abajo, como están escritas">⬇ En orden</button>
+        </div>
+        <div class="tm-every">
+          <span>Enviar cada</span>
+          <input id="tm-min" type="number" min="1" max="600" step="1" class="cc-num">
+          <span>a</span>
+          <input id="tm-max" type="number" min="1" max="600" step="1" class="cc-num">
+          <span>segundos</span>
+        </div>
+        <button id="tm-start" class="btn btn-primary">▶ Iniciar</button>
+        <button id="tm-stop" class="btn btn-danger" disabled>■ Parar</button>
+        <button id="tm-once" class="btn btn-secondary" title="Manda el próximo mensaje ahora">📤 1 ya</button>
+        <span id="tm-status" class="cc-status">Detenido</span>
+      </div>
+      <div id="tm-stat" class="tm-stat"></div>
+
+      <div id="tm-preview" class="tm-preview"></div>
+
+      <details id="tm-edit" class="tm-edit">
+        <summary>✏️ Editar los mensajes de esta sección</summary>
+        <div class="tm-edit-top">
+          <input id="tm-edit-name" class="tm-edit-name" type="text" maxlength="40" placeholder="Nombre de la sección" spellcheck="false">
+          <span id="tm-edit-count" class="tm-edit-count"></span>
+          <button id="tm-edit-reset" class="btn btn-ghost btn-sm" type="button">↺ Restaurar originales</button>
+          <button id="tm-edit-del" class="btn btn-ghost btn-sm" type="button">🗑 Borrar sección</button>
+        </div>
+        <textarea id="tm-edit-lines" class="tm-lines" spellcheck="false" placeholder="un mensaje por renglón"></textarea>
+        <p class="tm-hint">Un mensaje por renglón. Para armar una conversación separá con una línea <code>---</code>: el primer renglón abre y los siguientes le responden, en orden.
+          <code>{slot}</code>, <code>{streamer}</code>… crean un campo arriba.</p>
+      </details>
+    </section>
+
+    <!-- ═══ REGISTRO ═══ -->
+    <section class="kd-card tm-log-panel">
+      <div class="kd-card-head">
+        <span class="kd-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span>
+        <div>
+          <div class="kd-card-title">Registro de envíos</div>
+          <div class="kd-card-sub">Cada mensaje que sale al chat, en vivo</div>
+        </div>
+        <div class="kd-head-r"><button id="tm-clear-log" class="kd-link-btn" type="button">Limpiar</button></div>
+      </div>
+      <div id="tm-log" class="send-log">
+        <div class="empty-state">Todavía no se envió nada.</div>
+      </div>
+    </section>
+
+  </main>
+
+  <script type="module" src="js/tematicas-ui.js"></script>
+</body>
+</html>

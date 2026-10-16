@@ -1,22 +1,16 @@
 import { logger } from "../utils/logger";
 
-// services/security.ts - Cifrado AES-256-GCM y lectura de bearers.enc
 /**
  * services/security.ts
  * Módulo de cifrado/descifrado AES-256-GCM.
  *
- * RESPONSABILIDAD ÚNICA: leer y descifrar `bearers.enc` usando la
+ * RESPONSABILIDAD ÚNICA: cifrar/descifrar secretos (tokens OAuth) con la
  * MASTER_KEY del entorno. El cliente NUNCA interactúa con este módulo.
  *
- * Formato del archivo .enc (binario):
- *   [12 bytes IV][16 bytes Auth Tag][N bytes ciphertext]
- *
- * Para GENERAR bearers.enc usa el script: scripts/encrypt-bearers.ts
+ * Formato binario: [12 bytes IV][16 bytes Auth Tag][N bytes ciphertext]
  */
 
 import crypto from "crypto";
-import fs from "fs";
-import path from "path";
 import { env } from "../config/env";
 
 // Constantes del algoritmo
@@ -24,12 +18,7 @@ const ALGORITHM  = "aes-256-gcm" as const;
 const IV_LENGTH  = 12;   // 96 bits — recomendado para GCM
 const TAG_LENGTH = 16;   // 128 bits
 
-const BEARERS_PATH = path.resolve(process.cwd(), "bearers.enc");
-
-// Cache en memoria: los bearers se descifran una sola vez al arrancar
-let _bearersCache: string[] | null = null;
-
-// ─── Cifrado (usado solo por el script de setup) ───────────────────────────────
+// ─── Cifrado ───────────────────────────────
 
 /**
  * Cifra un texto plano con AES-256-GCM.
@@ -82,68 +71,6 @@ export function decrypt(data: Buffer): string {
     // No revelar detalles internos al exterior
     throw new Error("Descifrado fallido: integridad comprometida o clave incorrecta");
   }
-}
-
-// ─── Carga de Bearers ──────────────────────────────────────────────────────────
-
-/**
- * Lee, descifra y cachea la lista de Bearers desde `bearers.enc`.
- * Solo se ejecuta una vez por ciclo de vida del proceso.
- *
- * El archivo .enc contiene un JSON array:
- *   ["bearer_token_1", "bearer_token_2", ...]
- */
-export function loadBearers(): string[] {
-  if (_bearersCache) return _bearersCache;
-
-  if (!fs.existsSync(BEARERS_PATH)) {
-    throw new Error(
-      `No se encontró ${BEARERS_PATH}. ` +
-      "Genera el archivo con: npm run encrypt-bearers"
-    );
-  }
-
-  const encryptedData = fs.readFileSync(BEARERS_PATH);
-  const plaintext     = decrypt(encryptedData);
-
-  let bearers: unknown;
-  try {
-    bearers = JSON.parse(plaintext);
-  } catch {
-    throw new Error("bearers.enc contiene JSON inválido tras descifrar");
-  }
-
-  if (
-    !Array.isArray(bearers) ||
-    bearers.length === 0 ||
-    bearers.some((b) => typeof b !== "string")
-  ) {
-    throw new Error("bearers.enc debe contener un array de strings no vacío");
-  }
-
-  _bearersCache = bearers as string[];
-  logger.info("security", `${_bearersCache.length} bearer(s) cargado(s) en memoria`);
-  return _bearersCache;
-}
-
-/**
- * Invalida el cache de bearers (útil para hot-reload en desarrollo).
- */
-/**
- * Retorna un Bearer aleatorio de la lista en cache.
- * Llama a loadBearers() si el cache está vacío.
- * Retorna undefined si bearers.enc no existe o está vacío.
- */
-export function getRandomBearer(): string | undefined {
-  let bearers: string[];
-  try {
-    bearers = loadBearers();
-  } catch {
-    return undefined;
-  }
-  if (bearers.length === 0) return undefined;
-  const idx = crypto.randomInt(0, bearers.length);
-  return bearers[idx];
 }
 
 // ─── Helpers para almacenar tokens cifrados en DB ────────────────────────────

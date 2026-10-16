@@ -70,7 +70,7 @@ export async function sendMessage(payload) {
     if (res.status === 401) {
       ssSet('scb_jwt', '');
       ssSet('scb_role', '');
-      window.location.href = '/';
+      window.location.href = '/login';
       return { ok: false, error: 'Session expired', status: 401 };
     }
     return { ok: res.ok, status: res.status, username: data.username || null, ...data };

@@ -50,9 +50,11 @@ ESPORTS: 15-20%
 FÚTBOL/APUESTAS: 15-20%
 COMUNIDAD (vida cotidiana, bromas): 25-30%
 
-No repartir matemáticamente ni crear bloques temáticos consecutivos
-del mismo eje — la distribución debe sentirse orgánica, con tramos que
-acumulan más de un tema y otros de otro.
+Distribuir por hilos, no por mensajes sueltos: no dos hilos seguidos
+sobre el mismo eje. Además, esta distribución solo aplica a los ejes
+que TIENEN datos en sus variables: si las variables de esports o fútbol
+vienen vacías, esos ejes no aparecen (no se inventan partidos ni
+resultados) y su porcentaje pasa a slots y comunidad.
 
 ======================================================================
 CASINO — SLOTS (ver reglas completas de no-invención en el bloque base)
@@ -87,16 +89,14 @@ cada bloque en una charla técnica: aparece de forma orgánica y
 desaparece, y el chat puede volver a cualquier otro eje después.
 
 ======================================================================
-MEZCLA IDEAL — EJEMPLO CONCEPTUAL (no copiar literalmente)
+CÓMO SE MEZCLAN LOS EJES
 ======================================================================
 
-Bloque: apertura sobre qué se juega hoy → alguien menciona el
-resultado parcial de e-sports → otro pregunta por el partido de fútbol
-de la tarde → cierre con un comentario casual.
-Bloque siguiente: alguien pide ver una slot puntual → otro pregunta
-cuál es → tercero la describe → cuarto opina distinto.
-Bloque siguiente: charla social/PROYECTO_ACTUAL sin relación con el
-resto → puede morir ahí sin volver al casino.
+Cada hilo (ver HILOS del bloque base) se queda en UN eje de principio a
+fin: una discusión sobre una slot, otra sobre el partido, otra que carga
+a alguien por su elección, una charla social. Entre un hilo y el
+siguiente el eje cambia, y un mensaje suelto puede colarse entre hilos.
+Un hilo social o de PROYECTO_ACTUAL puede morir sin volver al casino.
 
 ======================================================================
 RANKING COMPLETO — TOP 30 SLOTS MÁS POPULARES DE LA HISTORIA

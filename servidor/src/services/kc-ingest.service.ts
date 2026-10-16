@@ -4,7 +4,7 @@ import os from "os";
 import { env } from "../config/env";
 import { logger } from "../utils/logger";
 import { kcDataDir } from "./kc-supervisor.service";
-import { enqueueKcLines } from "./kc-sender.service";
+import { enqueueKcLines, type KcLine } from "./kc-sender.service";
 
 /**
  * Ingesta automática del contexto de proyecto-kick-context (Módulo 12).
@@ -74,14 +74,40 @@ function writeState(s: IngestState): void {
   }
 }
 
-function parseLote(file: string): string[] {
+const oneLine = (s: unknown): string => String(s ?? "").replace(/[\r\n]+/g, " ").trim();
+
+/**
+ * Lee un lote. Formato nuevo: `lineas` [{n, autor, responde_a, texto, raw}] (el
+ * servidor reparte cuentas por voz y encadena respuestas). Formato viejo:
+ * `mensajes` (strings sueltos), que se envían sin autor.
+ */
+function parseLote(file: string): KcLine[] {
   const data = JSON.parse(fs.readFileSync(file, "utf-8"));
+
+  if (Array.isArray(data?.lineas) && data.lineas.length > 0) {
+    const out: KcLine[] = [];
+    data.lineas.forEach((l: any, i: number) => {
+      const texto = oneLine(l?.texto);
+      if (!texto) return;
+      const n = Number(l?.n);
+      const reply = Number(l?.responde_a);
+      out.push({
+        n: Number.isFinite(n) && n > 0 ? n : i + 1,
+        autor: oneLine(l?.autor).toUpperCase() || undefined,
+        reply_a: l?.responde_a != null && Number.isFinite(reply) && reply > 0 ? reply : null,
+        texto,
+        raw: oneLine(l?.raw) || undefined,
+      });
+    });
+    if (out.length > 0) return out;
+  }
+
   const arr: unknown = data?.mensajes;
   if (!Array.isArray(arr)) return [];
   return arr
-    .map((m: any) => (typeof m === "string" ? m : String(m?.mensaje ?? m?.message ?? "")))
-    .map((s: string) => s.replace(/[\r\n]+/g, " ").trim())
-    .filter((s: string) => s.length > 0);
+    .map((m: any) => oneLine(typeof m === "string" ? m : (m?.mensaje ?? m?.message)))
+    .filter((s: string) => s.length > 0)
+    .map((texto: string): KcLine => ({ texto }));
 }
 
 function writeIncoming(lines: string[]): void {
@@ -128,7 +154,7 @@ export function tick(): void {
       writeState({ ...state, lastTs: elegido.ts });
       return;
     }
-    writeIncoming(lines);
+    writeIncoming(lines.map((l) => l.texto));
     writeState({ lastTs: elegido.ts, lastCount: lines.length, lastIngestAt: new Date().toISOString() });
     logger.info(TAG, `Absorbido ${elegido.name}: ${lines.length} líneas`);
     enqueueKcLines(lines, elegido.ts);
@@ -220,6 +246,9 @@ export interface KcSummary {
   resumen_actual: string | null;
   contexto_previo: string | null;
   tendencia_detectada: string | null;
+  evento: string | null;
+  detalle: Record<string, string | null> | null;
+  latencia_seg: number | null;
 }
 
 /** Últimos N resúmenes del Módulo 8 — el contexto real que alimenta al M12. */
@@ -242,6 +271,9 @@ export function getKcSummaries(n = 8): KcSummary[] {
         resumen_actual: d.resumen_actual ?? null,
         contexto_previo: d.contexto_previo ?? null,
         tendencia_detectada: d.tendencia_detectada ?? null,
+        evento: d.evento ?? null,
+        detalle: d.detalle && typeof d.detalle === "object" ? d.detalle : null,
+        latencia_seg: typeof d.latencia_seg === "number" ? d.latencia_seg : null,
       });
     } catch {
       /* archivo a medio escribir */

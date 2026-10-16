@@ -3,167 +3,212 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StreamChat – Enviar mensajes</title>
+<title>StreamChat – Chat</title>
 <link rel="stylesheet" href="css/main.css" />
-<link rel="stylesheet" href="css/client-nav.css" />
 <link rel="stylesheet" href="css/chat.css" />
+<link rel="stylesheet" href="css/kd.css" />
+<script>try{if(localStorage.getItem('kd_theme')==='light')document.documentElement.classList.add('kd-light')}catch(e){}</script>
 </head>
-<body class="chat-page">
-  <div class="pl-feed" aria-hidden="true">
-    <div class="pl-feed-col"></div><div class="pl-feed-col"></div>
-    <div class="pl-feed-col"></div><div class="pl-feed-col"></div>
-  </div>
-  <div class="pl-feeds-overlay"></div>
-  <header id="chat-header" class="app-header"></header>
-  <div id="client-nav"></div>
+<body class="kd">
+  <header id="chat-header" class="kd-top"></header>
 
-  <main class="chat-shell">
+  <main class="kd-main">
 
-    <!-- ═══ PANEL DE ENVÍO ═══ -->
-    <section class="send-panel">
-      <div class="sp-line sp-line-main">
-        <div class="sp-target">
-          <span class="sp-k">Canal destino</span>
-          <a id="sp-channel" class="sp-channel" href="/ajustes">sin configurar</a>
-        </div>
-        <div class="sp-metrics">
-          <div class="sp-metric"><span id="sp-kick-dot" class="status-dot status-disconnected"></span><span class="sp-k">Kick</span></div>
-          <div class="sp-metric"><b id="sp-bots">0</b><span class="sp-k">bots</span></div>
-          <div class="sp-metric"><b id="sp-active">0 / 9</b><span class="sp-k">colas enviando</span></div>
-          <div class="sp-metric"><b id="sp-rate">—</b><span class="sp-k">ritmo</span></div>
-          <div class="sp-metric"><b id="sp-sent">0</b><span class="sp-k">enviados</span></div>
-          <div class="sp-metric sp-metric-fail"><b id="sp-failed">0</b><span class="sp-k">fallidos</span></div>
-        </div>
-        <div class="sp-master">
-          <button id="start-all" class="btn btn-primary">▶ Iniciar todo</button>
-          <button id="stop-all" class="btn btn-danger">■ Parar todo</button>
-        </div>
+    <!-- ═══ CANAL ═══ -->
+    <section class="kd-card hl kd-channel">
+      <div class="kd-ch-id">
+        <span id="sp-avatar" class="kd-avatar-lg">?</span>
+        <a id="sp-channel" class="sp-channel" href="/ajustes">sin configurar</a>
       </div>
-
-      <div class="sp-line sp-line-sub">
-        <label class="sp-switch">
-          <input type="checkbox" id="unified-mode">
-          <span><b>Tiempo unificado</b> — las colas marcadas se mezclan en un solo envío con un ritmo común</span>
-        </label>
-        <div id="unified-interval" class="sp-unified" hidden>
-          <span class="sp-sec">enviar cada</span>
-          <input id="unified-min" type="number" min="1" max="600" value="4" class="sp-num">
-          <span class="sp-sec">a</span>
-          <input id="unified-max" type="number" min="1" max="600" value="10" class="sp-num">
-          <span class="sp-sec">segundos · colas:</span>
-          <label class="sp-chip"><input type="checkbox" id="unified-a" checked>A</label>
-          <label class="sp-chip"><input type="checkbox" id="unified-b" checked>B</label>
-          <label class="sp-chip"><input type="checkbox" id="unified-c" checked>C</label>
-          <label class="sp-chip"><input type="checkbox" id="unified-d" checked>D</label>
-          <label class="sp-chip"><input type="checkbox" id="unified-e" checked>E</label>
-          <label class="sp-chip"><input type="checkbox" id="unified-f" checked>F</label>
-          <label class="sp-chip"><input type="checkbox" id="unified-g" checked>G</label>
-          <label class="sp-chip"><input type="checkbox" id="unified-h" checked>H</label>
-          <label class="sp-chip"><input type="checkbox" id="unified-live" checked>EN&nbsp;VIVO</label>
-          <button id="unified-start" class="btn btn-secondary btn-sm">▶ Iniciar marcadas</button>
-        </div>
-        <details class="sp-tokens">
-          <summary>Tokens de los bots</summary>
-          <div class="sp-tokens-body">
-            <button id="probe-tokens-btn" class="btn btn-secondary btn-sm">🔎 Probar tokens ahora</button>
-            <label class="sp-switch sp-switch-sm"><input type="checkbox" id="probe-before-start"> Probar antes de cada inicio</label>
-            <span id="probe-status" class="sp-hint"></span>
-          </div>
-        </details>
+      <div class="kd-tiles">
+        <div class="kd-tile"><span>Bots</span><b id="sp-bots">0</b></div>
+        <div class="kd-tile"><span>Enviados</span><b id="sp-sent">0</b></div>
+        <div class="kd-tile fail"><span>Fallidos</span><b id="sp-failed">0</b></div>
+        <div class="kd-tile"><span>Ritmo</span><b id="sp-rate">—</b></div>
+      </div>
+      <div class="kd-ch-r">
+        <span id="sp-kick-dot" class="status-dot status-checking"></span><span>Kick</span>
       </div>
     </section>
 
-    <!-- ═══ COLA EN VIVO ═══ -->
-    <section class="live-panel">
-      <div class="lp-head">
-        <span class="cc-dot dot-live"></span>
-        <span class="cc-name">Cola EN VIVO</span>
-        <span id="badge-live" class="cc-badge">detenida</span>
-        <span class="lp-note">pegás líneas a mano, sin archivo .txt</span>
-      </div>
-      <div class="lp-body">
-        <div class="lp-paste">
-          <textarea id="live-input" class="live-input" rows="4" placeholder="Pegá acá tus mensajes, uno por línea…"></textarea>
-          <div class="lp-paste-actions">
-            <button id="live-replace" class="btn btn-secondary btn-sm">Reemplazar la cola</button>
-            <button id="live-append" class="btn btn-secondary btn-sm">Agregar al final</button>
-            <button id="live-clear" class="btn btn-ghost btn-sm">Vaciar</button>
+    <!-- ═══ TIEMPO UNIFICADO (plegable) ═══ -->
+    <details class="kd-card kd-fold" open>
+      <summary>
+        <div class="kd-card-head">
+          <span class="kd-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+          <div>
+            <div class="kd-card-title">Tiempo unificado</div>
+            <div id="unified-state" class="kd-card-sub">Desactivado · cada cola usa su propio ritmo</div>
           </div>
         </div>
-        <div class="lp-controls">
-          <div class="cc-field">
-            <span class="cc-lbl">Enviar cada</span>
-            <div class="cc-rate">
-              <input id="interval-live-min" type="number" min="1" max="600" value="2" class="cc-num">
-              <span>a</span>
-              <input id="interval-live-max" type="number" min="1" max="600" value="6" class="cc-num">
-              <span>s</span>
+        <svg class="kd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </summary>
+      <div class="kd-fold-body">
+        <label class="kd-switch">
+          <input type="checkbox" id="unified-mode">
+          <span class="kd-sw"></span>
+          <span><b>Mezclar las colas marcadas</b> en un solo envío con un ritmo común</span>
+        </label>
+
+        <div id="unified-interval" class="kd-stack" hidden>
+          <div>
+            <span class="kd-k" style="margin-bottom:8px">Colas incluidas</span>
+            <div class="kd-chips">
+              <label class="kd-chip"><input type="checkbox" id="unified-a" checked><span>A</span></label>
+              <label class="kd-chip"><input type="checkbox" id="unified-b" checked><span>B</span></label>
+              <label class="kd-chip"><input type="checkbox" id="unified-c" checked><span>C</span></label>
+              <label class="kd-chip"><input type="checkbox" id="unified-d" checked><span>D</span></label>
+              <label class="kd-chip"><input type="checkbox" id="unified-e" checked><span>E</span></label>
+              <label class="kd-chip"><input type="checkbox" id="unified-f" checked><span>F</span></label>
+              <label class="kd-chip"><input type="checkbox" id="unified-g" checked><span>G</span></label>
+              <label class="kd-chip"><input type="checkbox" id="unified-h" checked><span>H</span></label>
             </div>
           </div>
-          <div class="cc-field">
-            <span class="cc-lbl">Orden</span>
-            <select id="order-live" class="cc-select">
-              <option value="random">Aleatorio</option>
-              <option value="sequential">De arriba a abajo</option>
-            </select>
+          <div class="kd-cols-2">
+            <div>
+              <div class="kd-range-cap">Enviar cada, mínimo <b>(segundos)</b></div>
+              <div class="kd-range-row">
+                <input type="range" class="kd-range" data-for="unified-min" min="1" max="120" value="4" aria-label="Mínimo en segundos">
+                <input id="unified-min" type="number" min="1" max="600" value="4" class="kd-num">
+              </div>
+            </div>
+            <div>
+              <div class="kd-range-cap">Enviar cada, máximo <b>(segundos)</b></div>
+              <div class="kd-range-row">
+                <input type="range" class="kd-range" data-for="unified-max" min="1" max="120" value="10" aria-label="Máximo en segundos">
+                <input id="unified-max" type="number" min="1" max="600" value="10" class="kd-num">
+              </div>
+            </div>
           </div>
-          <div class="cc-buttons">
-            <button id="start-live" class="btn btn-primary btn-sm">▶ Iniciar cola</button>
-            <button id="stop-live" class="btn btn-danger btn-sm" disabled>■ Parar</button>
-            <button id="reset-live" class="btn btn-ghost btn-sm" title="Volver al principio">↻ Reset</button>
-            <button id="live-send" class="btn btn-secondary btn-sm" title="Manda todo lo pegado una sola vez, ahora">📤 Enviar todo ya</button>
-            <button id="live-send-stop" class="btn btn-danger btn-sm" disabled>■</button>
+          <div>
+            <button id="unified-start" class="btn btn-secondary btn-sm" type="button">▶ Iniciar marcadas</button>
           </div>
-          <div id="status-live" class="cc-status">Detenida</div>
-          <div class="cola-progress"><div id="bar-live" class="cola-bar"></div></div>
-          <div id="count-live" class="cc-count">0 líneas</div>
         </div>
       </div>
-    </section>
+    </details>
 
-    <!-- ═══ COLAS A–H (generadas por JS) ═══ -->
-    <section id="colas" class="colas-grid"></section>
+    <!-- ═══ SESIÓN · COLAS · LISTAS ═══ -->
+    <div class="kd-cols">
 
-    <!-- ═══ ARCHIVOS · REGISTRO · BOTS ═══ -->
-    <section class="chat-bottom">
-      <div class="panel">
-        <div class="panel-head">
-          <span class="panel-title">Archivos .txt</span>
-          <button id="load-file-btn" class="btn btn-secondary btn-sm">+ Agregar</button>
+      <!-- Sesión (como "Viewers") -->
+      <section id="kd-session" class="kd-card hl">
+        <div class="kd-card-head">
+          <span class="kd-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></span>
+          <div>
+            <div class="kd-card-title">Sesión de envío</div>
+            <div id="kd-sess-sub" class="kd-card-sub">Detenida</div>
+          </div>
         </div>
-        <p class="panel-note">Arrastrá un archivo a una cola para asignarlo. 1 bloque = 5 líneas.</p>
+
+        <div class="kd-inner">
+          <span class="kd-k">Canal</span>
+          <div class="kd-inner-chan">
+            <a id="kd-sess-channel" class="nm" href="/ajustes">sin configurar</a>
+            <span id="kd-sess-badge" class="kd-badge off">Detenida</span>
+          </div>
+          <div>
+            <div class="kd-big"><span id="sp-active">0 / 8</span> <small>colas activas</small></div>
+            <div class="kd-meter" style="margin-top:8px"><i id="kd-active-bar"></i></div>
+          </div>
+        </div>
+
+        <div class="kd-btns" style="margin-top:12px">
+          <button id="start-all" class="kd-btn kd-btn-primary kd-btn-block" type="button">▶ Iniciar todo</button>
+          <button id="stop-all" class="kd-btn kd-btn-red kd-btn-block" type="button">■ Parar todo</button>
+        </div>
+
+        <details class="kd-fold kd-fold-mini" style="margin-top:12px">
+          <summary>
+            <span>Tokens de los bots</span>
+            <svg class="kd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </summary>
+          <div class="kd-fold-body">
+            <button id="probe-tokens-btn" class="btn btn-secondary btn-sm" type="button">🔎 Probar tokens ahora</button>
+            <label class="kd-switch"><input type="checkbox" id="probe-before-start"><span class="kd-sw"></span><span>Probar antes de cada inicio</span></label>
+            <span id="probe-status" class="kd-hint"></span>
+          </div>
+        </details>
+      </section>
+
+      <!-- Colas (como "Chatters") -->
+      <section class="kd-card">
+        <div class="kd-card-head">
+          <span class="kd-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></svg></span>
+          <div>
+            <div class="kd-card-title">Colas de mensajes</div>
+            <div class="kd-card-sub">Cada cola reparte un archivo entre tus bots</div>
+          </div>
+        </div>
+
+        <span class="kd-k" style="margin-bottom:8px">¿Cómo deben correr?</span>
+        <div class="kd-opts" style="margin-bottom:14px">
+          <a class="kd-opt" href="/kc">
+            <span class="t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 4v4M9 14h.01M15 14h.01"/></svg>Autopiloto IA</span>
+            <span class="d">Lee el stream y escribe solo, sin lista de mensajes.<small>Se configura en Contexto →</small></span>
+          </a>
+          <div class="kd-opt on" aria-current="true">
+            <span class="t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h6"/></svg>Manual</span>
+            <span class="d">Elegís el archivo y el ritmo de cada cola, o las mezclás con tiempo unificado.</span>
+            <svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>
+          </div>
+        </div>
+
+        <!-- colas A–H (generadas por JS) -->
+        <div id="colas" class="kd-colas"></div>
+      </section>
+
+      <!-- Listas de mensajes (como "Followers"/"Message Lists") -->
+      <section id="kd-files" class="kd-card">
+        <div class="kd-card-head">
+          <span class="kd-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg></span>
+          <div>
+            <div class="kd-card-title">Listas de mensajes</div>
+            <div class="kd-card-sub">Archivos .txt · 1 bloque = 5 líneas</div>
+          </div>
+          <div class="kd-head-r">
+            <button id="load-file-btn" class="kd-link-btn" type="button">+ Agregar</button>
+          </div>
+        </div>
+        <p class="kd-hint" style="margin-bottom:10px">Arrastrá un archivo a una cola para asignarlo.</p>
         <div id="file-grid" class="file-grid">
           <div class="empty-state full">Sin archivos. Agregá tus .txt.</div>
         </div>
-      </div>
+      </section>
+    </div>
 
-      <div class="panel">
-        <div class="panel-head">
-          <span class="panel-title">Registro de envíos</span>
-          <button id="clear-log-btn" class="btn btn-ghost btn-xs">Limpiar</button>
+    <!-- ═══ REGISTRO · BOTS ═══ -->
+    <div class="kd-cols-2">
+      <section class="kd-card">
+        <div class="kd-card-head">
+          <span class="kd-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span>
+          <div>
+            <div class="kd-card-title">Registro de envíos</div>
+            <div class="kd-card-sub">Cada mensaje que sale al chat, en vivo</div>
+          </div>
+          <div class="kd-head-r"><button id="clear-log-btn" class="kd-link-btn" type="button">Limpiar</button></div>
         </div>
-        <p class="panel-note">Cada mensaje que sale al chat, en vivo.</p>
         <div id="send-log" class="send-log">
           <div class="empty-state">Todavía no se envió nada.</div>
         </div>
-      </div>
+      </section>
 
-      <div class="panel">
-        <div class="panel-head">
-          <span class="panel-title">Mensajes por bot</span>
-          <button id="reset-stats-btn" class="btn btn-ghost btn-xs">Reset</button>
+      <section class="kd-card">
+        <div class="kd-card-head">
+          <span class="kd-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 4v4M9 14h.01M15 14h.01"/></svg></span>
+          <div>
+            <div class="kd-card-title">Mensajes por bot</div>
+            <div class="kd-card-sub">Cuántos mandó cada bot en esta sesión</div>
+          </div>
+          <div class="kd-head-r"><button id="reset-stats-btn" class="kd-link-btn" type="button">Reiniciar</button></div>
         </div>
-        <p class="panel-note">Cuántos mensajes mandó cada bot en esta sesión.</p>
         <div id="bots-stats" class="bots-stats">
           <div class="empty-state">Aún no se enviaron mensajes.</div>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
 
   </main>
 
-  <div class="pl-feeds-spacer"></div>
-  <script src="js/pl-mascot.js"></script>
   <script type="module" src="js/chat-ui.js"></script>
 </body>
 </html>

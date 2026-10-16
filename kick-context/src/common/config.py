@@ -114,6 +114,7 @@ PROMPTS_BASE_TXT = PROMPTS_DIR / "base.txt"
 PROMPTS_CATEGORIAS_DIR = PROMPTS_DIR / "categorias"
 # value -> etiqueta legible para el <select> del Panel.
 CATEGORIAS_PROMPT = {
+    "general": "General (se adapta a lo que muestre el stream)",
     "mixto": "Mixto (slots + esports + fútbol + comunidad)",
     "slots": "Solo slots / casino",
     "deportes": "Solo deportes / e-sports + apuestas",

@@ -77,8 +77,14 @@ Cada vez que termines de trabajar en un módulo, edita la tabla de estado, agreg
   - **`goteo`**: encola (`<data>/comentarios/cola.json`) y suelta 1 msg cada
     `KICK_COMENTARIO_INTERVALO_SEG`=30 s; regenera al bajar de umbral 4.
   Esquiva los 503 del free tier.
-- Parseo por líneas: ignora `KICKCHAT123456`, convierte `[EMOTE: X]` → `X`,
-  dedupe textual contra los últimos.
+- Salida en JSON (`{"lineas":[{n, autor, responde_a, texto}]}`, `responseSchema`
+  de Gemini, `maxOutputTokens 8192`): hilos encadenados con voces fijas P1..P12.
+  El parser es tolerante (JSON truncado, bloque markdown) y cae al texto plano
+  viejo (ignora `KICKCHAT123456`). `[EMOTE: X]` → `X` en `texto`; `raw` conserva
+  `[EMOTE:X]` y `@Pn` para el servidor. Dedupe por similitud (Jaccard) contra los
+  últimos 40 y contra la propia tanda; `EVITAR` le pasa al prompt las aperturas y
+  expresiones que el chat repitió de más. El lote (`lote_<ts>.json`) trae
+  `mensajes` (strings, compatibilidad) y `lineas` (estructurado).
 - **Posteo:** `POST https://api.kick.com/public/v1/chat` (`type: "bot"`).
   Default `KICK_COMENTARIO_POSTEAR=0` = **modo ensayo** (genera y guarda, NO
   postea). Con `=1` publica; requiere `login_kick.py` con el scope `chat:write`

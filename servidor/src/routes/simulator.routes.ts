@@ -4,7 +4,7 @@ import { rateLimit } from "express-rate-limit";
 import type { Request, Response } from "express";
 import { requireAuth } from "../middleware/jwt.middleware";
 import { requireFeature } from "../middleware/feature.middleware";
-import { generateChat, getHistory, fetchNews, setUserApiKey, exportSimTxt, sendSimMessages, getSendStats, resetSendStats, buildPrompt, autoGenerate, watchFile, getFileStatus, kcContext, kcContextRefresh, kcPipelineStart, kcPipelineStop, kcMonitors, kcSetCapture, kcAnalyze, kcRegenerate, kcConfig, kcSaveConfig } from "../controllers/stream-simulator.controller";
+import { generateChat, getHistory, setUserApiKey, exportSimTxt, sendSimMessages, getSendStats, resetSendStats, buildPrompt, autoGenerate, watchFile, getFileStatus, kcContext, kcContextRefresh, kcPipelineStart, kcPipelineStop, kcMonitors, kcSetCapture, kcAnalyze, kcRegenerate, kcConfig, kcSaveConfig } from "../controllers/stream-simulator.controller";
 
 const router = Router();
 
@@ -21,7 +21,6 @@ router.get("/ajustes", (_req: Request, res: Response) => {
 });
 router.post("/api/chat/generate", requireAuth, requireFeature("simulator"), aiLimiter, generateChat);
 router.get("/api/chat/history", requireAuth, requireFeature("simulator"), getHistory);
-router.post("/api/chat/news", requireAuth, aiLimiter, fetchNews);
 router.post("/api/chat/set-key", requireAuth, (req: Request, res: Response) => {
   const key = typeof req.body?.key === "string" ? req.body.key.trim() : "";
   if (!key) { res.status(400).json({ error: "key requerida" }); return; }

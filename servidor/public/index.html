@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StreamChat — tu chat sabe qué está pasando en tu stream</title>
+<meta name="description" content="StreamChat mira la pantalla de tu stream de Kick, entiende la jugada (qué slot, qué apuesta, qué mano) y le pasa ese contexto a tu bot de chat.">
+<meta name="theme-color" content="#050805">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Cpath fill=%27%2335e82a%27 d=%27M2 9h3v6H2zM6.5 1h3v14h-3zM11 5h3v10h-3z%27/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/landing.css">
+</head>
+<body class="lp">
+<a class="skip" href="#main">Saltar al contenido</a>
+
+<!-- Símbolos del slot de ejemplo (juego ficticio) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="s-gem" viewBox="0 0 40 40"><path d="M8 15 14 7h12l6 8-12 18Z" fill="#35e82a"/><path d="M8 15h24M14 7l6 8 6-8M20 15v18" stroke="#04170a" stroke-width="1.6" fill="none"/></symbol>
+  <symbol id="s-sun" viewBox="0 0 40 40"><circle cx="20" cy="20" r="8" fill="#f2b134"/><g stroke="#f2b134" stroke-width="2.6" stroke-linecap="round"><path d="M20 4v5M20 31v5M4 20h5M31 20h5M8.7 8.7l3.5 3.5M27.8 27.8l3.5 3.5M8.7 31.3l3.5-3.5M27.8 12.2l3.5-3.5"/></g></symbol>
+  <symbol id="s-eye" viewBox="0 0 40 40"><path d="M4 20s6-10 16-10 16 10 16 10-6 10-16 10S4 20 4 20Z" fill="none" stroke="#5fd3ff" stroke-width="2.6"/><circle cx="20" cy="20" r="5" fill="#5fd3ff"/><path d="M20 30v7M16 34h8" stroke="#5fd3ff" stroke-width="2.6" stroke-linecap="round"/></symbol>
+</svg>
+
+<header class="nav" id="top">
+  <div class="wrap nav-in">
+    <a class="brand" href="/" aria-label="StreamChat, inicio">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><span>Stream<b>Chat</b></span>
+    </a>
+    <nav class="nav-links" aria-label="Secciones">
+      <a href="#como">Cómo lo ve</a>
+      <a href="#detecta">Qué detecta</a>
+      <a href="#chat">El chat</a>
+      <a href="#panel">Panel</a>
+      <a href="#preguntas">Preguntas</a>
+    </nav>
+    <a class="btn btn-sm" href="/login" data-panel-link>Entrar</a>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ── 1. HERO ─────────────────────────────────────────────── -->
+  <section class="hero" data-scene>
+    <div class="sticky hero-sticky">
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="live-dot" aria-hidden="true"></span>Para streamers de Kick</p>
+          <h1>Tu chat sabe qué slot estás jugando. <em>Y si pagó.</em></h1>
+          <p class="lead">StreamChat mira tu pantalla mientras transmitís, entiende la jugada —qué juego, cuánto apostaste, qué pasó— y le pasa ese contexto a tu bot de chat.</p>
+          <div class="cta-row">
+            <a class="btn" href="/login" data-panel-link>Entrar al panel</a>
+            <a class="btn btn-ghost" href="#como">Ver cómo lo lee</a>
+          </div>
+          <ul class="facts" aria-label="Datos clave">
+            <li><b>10 s</b><span>entre cada mirada</span></li>
+            <li><b>0 llamadas</b><span>si la pantalla no cambió</span></li>
+            <li><b>API oficial</b><span>de Kick para publicar</span></li>
+          </ul>
+        </div>
+
+        <div class="hero-stage" aria-hidden="true">
+          <div class="monitor">
+            <div class="screen" data-screen>
+              <div class="slot">
+                <div class="slot-top"><span class="tag-live">EN VIVO</span><span class="slot-name">TEMPLO DEL SOL</span><span class="slot-mult">x4,8</span></div>
+                <div class="reels">
+                  <span class="sym r">A</span><span class="sym"><svg><use href="#s-sun"/></svg></span><span class="sym k">K</span><span class="sym"><svg><use href="#s-eye"/></svg></span><span class="sym q">Q</span>
+                  <span class="sym win"><svg><use href="#s-gem"/></svg></span><span class="sym win"><svg><use href="#s-gem"/></svg></span><span class="sym win"><svg><use href="#s-gem"/></svg></span><span class="sym win"><svg><use href="#s-gem"/></svg></span><span class="sym j">J</span>
+                  <span class="sym q">Q</span><span class="sym k">K</span><span class="sym"><svg><use href="#s-eye"/></svg></span><span class="sym r">A</span><span class="sym"><svg><use href="#s-sun"/></svg></span>
+                </div>
+                <div class="slot-banner">MEGA WIN</div>
+                <div class="hud"><span>APUESTA <b>GC 1.000</b></span><span>GANANCIA <b>GC 4.869</b></span><span>BALANCE <b>GC 109.800</b></span></div>
+              </div>
+            </div>
+          </div>
+          <div class="readout">
+            <div class="ro-head"><span class="ro-fase">slots</span><span class="ro-time">hace 4 s · atraso 11,2 s</span></div>
+            <p class="ro-evento">⚡ Pegó un Mega Win x4,8</p>
+            <p class="ro-txt">Jugando Templo del Sol con GC 1.000 por giro; el balance venía bajando y remontó.</p>
+          </div>
+        </div>
+      </div>
+      <p class="scroll-hint" aria-hidden="true">Bajá para ver cómo lo lee</p>
+    </div>
+  </section>
+
+  <!-- ── 2. CÓMO LO VE (vista explotada) ─────────────────────── -->
+  <section class="explode" id="como" data-scene data-steps="3" aria-labelledby="como-h">
+    <div class="sticky">
+      <div class="wrap explode-grid">
+        <div class="explode-copy">
+          <p class="kicker">01 — Cómo lo ve</p>
+          <h2 id="como-h">Una captura. Tres capas.</h2>
+          <ol class="steps-list">
+            <li data-i="0"><b>Captura.</b> Toma tu monitor, una ventana o la cámara virtual de OBS. No necesita que estés en vivo para probarlo.</li>
+            <li data-i="1"><b>Lectura.</b> Una IA de visión busca lo que importa: nombre del juego, apuesta, balance, si pagó. Ignora el decorado y el chat de tus viewers.</li>
+            <li data-i="2"><b>Contexto.</b> Lo compara con lo que venías haciendo y anota qué cambió. Eso es lo que recibe tu bot.</li>
+          </ol>
+        </div>
+        <div class="explode-stage" aria-hidden="true">
+          <div class="stack">
+            <div class="layer l1">
+              <div class="layer-label">captura</div>
+              <div class="mini-screen"><div class="mini-reels"><i></i><i></i><i></i><i></i><i></i><i class="w"></i><i class="w"></i><i class="w"></i><i class="w"></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="mini-hud"></div></div>
+            </div>
+            <div class="layer l2">
+              <div class="layer-label">lectura</div>
+              <span class="box b-name">juego</span>
+              <span class="box b-row">resultado</span>
+              <span class="box b-bet">apuesta</span>
+              <span class="box b-bal">balance</span>
+            </div>
+            <div class="layer l3">
+              <div class="layer-label">contexto</div>
+<pre class="json"><code>{
+  <span class="k">"fase"</span>: <span class="s">"slots"</span>,
+  <span class="k">"evento"</span>: <span class="s">"Mega Win x4,8"</span>,
+  <span class="k">"detalle"</span>: {
+    <span class="k">"juego"</span>: <span class="s">"Templo del Sol"</span>,
+    <span class="k">"apuesta"</span>: <span class="s">"GC 1.000"</span>,
+    <span class="k">"balance"</span>: <span class="s">"GC 109.800"</span>
+  },
+  <span class="k">"latencia_seg"</span>: <span class="n">11.2</span>
+}</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 3. QUÉ DETECTA (carrusel cilíndrico) ────────────────── -->
+  <section class="ring-scene" id="detecta" data-scene aria-labelledby="det-h">
+    <div class="sticky">
+      <div class="wrap ring-head">
+        <p class="kicker">02 — Qué detecta</p>
+        <h2 id="det-h">No describe la pantalla. Dice qué estás haciendo.</h2>
+        <p class="sub">Lecturas reales de las pruebas en vivo, tal cual las devolvió.</p>
+      </div>
+      <div class="ring-viewport">
+        <ul class="ring" role="list">
+          <li class="card" style="--i:0"><span class="fase">slots</span><p>«Pegó un Mega Win de GC 4.869 con apuesta de GC 1.000; el balance venía en GC 109.800.»</p></li>
+          <li class="card" style="--i:1"><span class="fase">viendo-deporte</span><p>«Partido Bournemouth vs Everton por ESPN 2, minuto 12, 0-0.»</p></li>
+          <li class="card" style="--i:2"><span class="fase">poker</span><p>«Arrancaste una mano importante de póker en la Mesa 4 con un pozo de $1200.»</p></li>
+          <li class="card" style="--i:3"><span class="fase">jugando</span><p>«Estás jugando CS2 en Mirage, tirando en medio y pidiendo drop.»</p></li>
+          <li class="card" style="--i:4"><span class="fase">charlando</span><p>«Instagram, post de @minjares.ia sobre alternativas a Todoist.»</p></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 4. CONTEXTO ACUMULADO ──────────────────────────────── -->
+  <section class="block" aria-labelledby="ctx-h">
+    <div class="wrap ctx-grid">
+      <div>
+        <p class="kicker">03 — Memoria</p>
+        <h2 id="ctx-h">Cada lectura sabe lo que pasó antes.</h2>
+        <p class="sub">El analizador guarda todo lo que vio y le pasa las últimas lecturas al modelo. Por eso puede decir «remontó» y no solo «está jugando».</p>
+        <p class="note">Ejemplo ilustrativo de una sesión de slots.</p>
+      </div>
+      <ol class="timeline">
+        <li class="reveal"><time>21:04</time><span class="fase">slots</span><p>Arranca Templo del Sol con GC 500 por giro.</p></li>
+        <li class="reveal"><time>21:11</time><span class="fase">slots</span><p>Sube la apuesta a GC 1.000. El balance viene bajando.</p></li>
+        <li class="reveal ev"><time>21:16</time><span class="fase">slots</span><p><b>Entró el bonus.</b> 10 giros gratis.</p></li>
+        <li class="reveal ev"><time>21:18</time><span class="fase">slots</span><p><b>Mega Win x4,8.</b> Recupera casi todo lo perdido.</p></li>
+        <li class="reveal"><time>21:25</time><span class="fase">pausa</span><p>Sale del juego, está en el menú del casino.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ── 5. EL CHAT ─────────────────────────────────────────── -->
+  <section class="block chat-block" id="chat" data-pass aria-labelledby="chat-h">
+    <div class="wrap chat-grid">
+      <div class="chat-copy">
+        <p class="kicker">04 — El chat</p>
+        <h2 id="chat-h">Tu bot comenta la jugada, no frases de relleno.</h2>
+        <p class="sub">Cuando hay un evento, el bot lo sabe. Publica con la API oficial de Kick, como bot y no como persona, al ritmo que elijas.</p>
+        <ul class="ticks">
+          <li>Elegís la categoría: slots, comunidad o mixto.</li>
+          <li>Ritmo configurable: goteo o en bloque.</li>
+          <li>Modo ensayo: genera y te muestra, sin publicar.</li>
+        </ul>
+      </div>
+      <div class="chat-mock" aria-label="Ejemplo de chat">
+        <div class="chat-top"><span class="tag-live">EN VIVO</span><span>chat</span></div>
+        <ul role="list">
+          <li class="msg" style="--i:0"><b class="u1">nahue_23</b> otra vez el templo jaja</li>
+          <li class="msg" style="--i:1"><b class="u2">lucre.gg</b> bajá la apuesta che</li>
+          <li class="msg bot" style="--i:2"><span class="bot-tag">BOT</span><b>streamchat</b> ese x4,8 con 1.000 por giro te devolvió casi todo lo del bonus 👀</li>
+          <li class="msg" style="--i:3"><b class="u3">elfran</b> NOOO qué remontada</li>
+          <li class="msg" style="--i:4"><b class="u1">nahue_23</b> cobrá y andate</li>
+          <li class="msg bot" style="--i:5"><span class="bot-tag">BOT</span><b>streamchat</b> balance otra vez arriba de 109k, ¿cortás o seguís?</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 6. PANEL ───────────────────────────────────────────── -->
+  <section class="block" id="panel" aria-labelledby="panel-h">
+    <div class="wrap">
+      <p class="kicker">05 — Panel</p>
+      <h2 id="panel-h">Tres pestañas. Nada más.</h2>
+      <p class="sub">Todo lo que usás durante el stream entra en una pantalla. El resto queda guardado en Configurar.</p>
+
+      <div class="app">
+        <div class="app-bar">
+          <span class="app-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <div class="app-tabs" role="tablist" aria-label="Pestañas del panel">
+            <button role="tab" id="tab-vivo" aria-selected="true" aria-controls="pane-vivo">En vivo</button>
+            <button role="tab" id="tab-chat" aria-selected="false" aria-controls="pane-chat" tabindex="-1">Chat</button>
+            <button role="tab" id="tab-cfg" aria-selected="false" aria-controls="pane-cfg" tabindex="-1">Configurar</button>
+          </div>
+        </div>
+        <div class="app-body">
+          <div class="pane" role="tabpanel" id="pane-vivo" aria-labelledby="tab-vivo">
+            <div class="pane-grid">
+              <div class="pc"><h3>Analizador</h3><p class="on">● Capturando monitor 2</p><p>Última lectura hace 6 s · atraso 10,8 s</p><button type="button" class="btn btn-sm btn-ghost" tabindex="-1">Analizar ahora</button></div>
+              <div class="pc"><h3>Qué está pasando</h3><p class="ev">⚡ Entró el bonus</p><p>Templo del Sol · GC 1.000 · balance GC 98.400</p></div>
+              <div class="pc"><h3>Bot</h3><p>12 enviados · 3 en cola</p><p>cada 7–18 s · canal yundev</p></div>
+            </div>
+          </div>
+          <div class="pane" role="tabpanel" id="pane-chat" aria-labelledby="tab-chat" hidden>
+            <div class="pane-grid"><div class="pc wide"><h3>Chat manual</h3><p>Escribí y mandá al chat con tus cuentas conectadas, igual que siempre.</p></div><div class="pc"><h3>Temáticas</h3><p>Tandas de mensajes por tema, listas para soltar.</p></div></div>
+          </div>
+          <div class="pane" role="tabpanel" id="pane-cfg" aria-labelledby="tab-cfg" hidden>
+            <div class="pane-grid"><div class="pc"><h3>Captura</h3><p>Monitor, ventana u OBS Virtual Camera.</p></div><div class="pc"><h3>Cuenta de Kick</h3><p>Conexión por OAuth oficial.</p></div><div class="pc"><h3>Canal y ritmo</h3><p>A qué canal publica y cada cuánto.</p></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 7. LO QUE NO HACE ─────────────────────────────────── -->
+  <section class="block honest" aria-labelledby="no-h">
+    <div class="wrap">
+      <p class="kicker">06 — Sin vueltas</p>
+      <h2 id="no-h">Lo que no hace.</h2>
+      <div class="no-grid">
+        <div><h3>No lee a tus viewers</h3><p>Ignora el chat que aparece en pantalla a propósito. Mira tu jugada, no lo que escriben.</p></div>
+        <div><h3>No inventa montos</h3><p>Si un número no se ve en pantalla, queda vacío. No lo completa con un estimado.</p></div>
+        <div><h3>No gasta de más</h3><p>Si la pantalla no cambió, no llama a la IA. Refresca igual cada dos minutos.</p></div>
+        <div><h3>No es instantáneo</h3><p>Cada lectura muestra su atraso real en segundos. Lo medís vos, no te lo prometemos.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 8. EMPEZAR ─────────────────────────────────────────── -->
+  <section class="block" aria-labelledby="start-h">
+    <div class="wrap">
+      <p class="kicker">07 — Empezar</p>
+      <h2 id="start-h">Tres pasos.</h2>
+      <ol class="start">
+        <li class="reveal"><span>1</span><h3>Elegís qué mirar</h3><p>Un monitor, una ventana o la cámara virtual de OBS.</p></li>
+        <li class="reveal"><span>2</span><h3>Conectás Kick</h3><p>Con el login oficial de Kick. No guarda tu contraseña.</p></li>
+        <li class="reveal"><span>3</span><h3>Prendés el analizador</h3><p>Desde En vivo. Lo apagás con el mismo botón.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ── 9. PREGUNTAS ───────────────────────────────────────── -->
+  <section class="block" id="preguntas" aria-labelledby="faq-h">
+    <div class="wrap faq-wrap">
+      <h2 id="faq-h">Preguntas</h2>
+      <details><summary>¿Tengo que estar en vivo para probarlo?</summary><p>No. Puede mirar tu escritorio o la cámara virtual de OBS sin que transmitas.</p></details>
+      <details><summary>¿Qué IA usa?</summary><p>Gemini, de Google, para mirar la imagen. Si un modelo está saturado, prueba el siguiente de la lista.</p></details>
+      <details><summary>¿Qué pasa si la IA se cae en medio del stream?</summary><p>El analizador reintenta solo y tu chat sigue funcionando igual. El bot solo pierde el contexto nuevo hasta que vuelve.</p></details>
+      <details><summary>¿Publica como si fuera una persona?</summary><p>No. Publica por la API oficial de Kick, marcado como bot.</p></details>
+      <details><summary>¿Puedo apagarlo y volver a lo de antes?</summary><p>Sí. El analizador es un interruptor. Apagado, el panel funciona igual que siempre.</p></details>
+    </div>
+  </section>
+
+  <section class="final">
+    <div class="wrap final-in">
+      <h2>Que tu chat sepa lo que pasa.</h2>
+      <a class="btn" href="/login" data-panel-link>Entrar al panel</a>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <span class="brand small"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><span>Stream<b>Chat</b></span></span>
+    <span>Hecho para Kick. No afiliado a Kick.</span>
+    <a href="#top">Volver arriba</a>
+  </div>
+</footer>
+
+<script src="js/landing.js" defer></script>
+</body>
+</html>
