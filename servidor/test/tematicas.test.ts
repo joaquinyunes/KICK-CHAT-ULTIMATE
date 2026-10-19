@@ -8,8 +8,8 @@ type Sec = { id: string; textos: Record<string, string>; usaNoticias?: boolean }
 const pozos = () => (SECCIONES as Sec[]).flatMap((s) => Object.entries(s.textos).map(([modo, t]) => ({ s, modo, t })));
 
 describe("secciones de fábrica", () => {
-  it("están Saludos, Noticias, Slots (3 modos) y Cierre, en ese orden", () => {
-    expect((SECCIONES as Sec[]).map((s) => s.id)).toEqual(["saludos", "noticias", "slots", "cierre"]);
+  it("están Saludos, Noticias, Slots (3 modos), las de juego y Cierre, en ese orden", () => {
+    expect((SECCIONES as Sec[]).map((s) => s.id)).toEqual(["saludos", "noticias", "slots", "bonus", "premio", "apuestas", "pedidos", "charla", "sorteo", "pausa", "cierre"]);
     expect(Object.keys((SECCIONES as Sec[])[2].textos)).toEqual(["pendiente", "bien", "mal"]);
   });
 

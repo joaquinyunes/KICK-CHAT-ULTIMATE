@@ -1,13 +1,42 @@
 import { getServerUrl, getAuthHeaders, showMsg, esc } from './admin-common.js';
-import { requireAuth, renderAuthHeader, startStatusLoop } from './client-nav.js';
+import { onStatusChange, ping } from './bridge-client.js';
+
+function ss(key) { return sessionStorage.getItem(key) || localStorage.getItem(key) || ''; }
 
 let viewerInterval = null;
 
 async function initAuth() {
-  if (!(await requireAuth())) return false;
-  renderAuthHeader('vods');
-  startStatusLoop();
+  const token = ss('scb_jwt');
+  const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+  try {
+    const res = await fetch('/auth/me', { headers });
+    if (!res.ok) { window.location.href = '/login'; return false; }
+    const data = await res.json();
+    if (data.user.role !== 'admin' && data.user.role !== 'client') { window.location.href = '/login'; return false; }
+    if (token) { fetch('/auth/sync-cookie', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } }).catch(() => {}); }
+  } catch { window.location.href = '/login'; return false; }
+  onStatusChange(updateStatusUI);
+  ping();
+  setInterval(() => ping(), 15000);
+  document.getElementById('logout-btn')?.addEventListener('click', handleLogout);
   return true;
+}
+
+function updateStatusUI(status) {
+  const badge = document.getElementById('status-badge');
+  const label = document.getElementById('status-label');
+  if (!badge || !label) return;
+  badge.className = 'status-dot status-' + status;
+  label.textContent = status === 'connected' ? 'Conectado' : status === 'checking' ? 'Verificando…' : 'Desconectado';
+}
+
+async function handleLogout() {
+  try { await fetch('/auth/logout', { method: 'POST' }); } catch {}
+  sessionStorage.clear();
+  localStorage.removeItem('scb_jwt');
+  localStorage.removeItem('scb_role');
+  localStorage.removeItem('scb_server_url');
+  window.location.href = '/login';
 }
 
 async function loadVods() {
@@ -15,10 +44,10 @@ async function loadVods() {
   try {
     const res = await fetch(getServerUrl() + '/api/client/vods', { headers: getAuthHeaders() });
     const data = await res.json();
-    if (!data.success) { container.innerHTML = '<p class="vod-empty">Error al cargar.</p>'; return; }
+    if (!data.success) { container.innerHTML = '<p style="opacity:0.6;font-style:italic">Error al cargar.</p>'; return; }
     const vods = data.vods || [];
     if (vods.length === 0) {
-      container.innerHTML = '<p class="vod-empty">No tenés VODs o clips agregados. Pegá una URL arriba.</p>';
+      container.innerHTML = '<p style="opacity:0.6;font-style:italic">No tienes VODs o clips agregados. Pegá URLs arriba.</p>';
       return;
     }
     container.innerHTML = vods.map(v => `
@@ -26,8 +55,8 @@ async function loadVods() {
         <div class="vod-url">${esc(v.url)}</div>
         <div class="vod-meta">
           <span class="vod-badge ${v.type}">${esc(v.type)}</span>
-          ${v.channel ? `<span>${esc(v.channel)}</span>` : ''}
-          <span>${v.views_count} views</span>
+          ${v.channel ? `<span style="font-size:11px;color:var(--text-muted)">${esc(v.channel)}</span>` : ''}
+          <span style="font-size:11px;color:var(--text-muted)">${v.views_count} views</span>
           <button class="btn btn-small btn-danger vod-del" data-id="${v.id}">X</button>
         </div>
       </div>
@@ -48,7 +77,7 @@ async function loadVods() {
       });
     });
   } catch {
-    container.innerHTML = '<p class="vod-empty">Error de conexión.</p>';
+    container.innerHTML = '<p style="opacity:0.6;font-style:italic">Error de conexión.</p>';
   }
 }
 
@@ -73,7 +102,7 @@ async function loadViewerStats() {
 
     const running = v.running;
     document.getElementById('stat-status').textContent = running ? 'Corriendo' : 'Detenido';
-    document.getElementById('stat-status').style.color = running ? 'var(--kd-green, var(--success))' : 'var(--text-muted)';
+    document.getElementById('stat-status').style.color = running ? 'var(--success,#27ae60)' : 'var(--text-muted)';
     document.getElementById('stat-views-gen').textContent = v.viewsGenerated || 0;
     document.getElementById('stat-views-fail').textContent = v.viewsFailed || 0;
     document.getElementById('stat-hourly').textContent = (s.last_hour || 0) + ' / ' + limit;
@@ -107,9 +136,31 @@ async function loadViewerStats() {
   } catch {}
 }
 
+async function refreshPermissions() {
+  try {
+    const res = await fetch(getServerUrl() + '/api/client/permissions', { headers: getAuthHeaders() });
+    const data = await res.json();
+    if (!data.success) return;
+    renderNav(data.permissions || []);
+  } catch {}
+}
+
+function renderNav(permissions) {
+  const container = document.getElementById('nav-links');
+  const links = [];
+  if (permissions.includes('chat')) links.push({ href: '/chat', label: '💬 Chat' });
+  if (permissions.includes('simulator')) links.push({ href: '/simulador', label: '🤖 Simulador' });
+  if (permissions.includes('vods')) links.push({ href: '/vods', label: '🎬 VODs', active: true });
+  container.innerHTML = links.map(l =>
+    `<a href="${l.href}" class="${l.active ? 'active' : ''}">${l.label}</a>`
+  ).join('');
+}
+
 async function init() {
   const ok = await initAuth();
   if (!ok) return;
+
+  await refreshPermissions();
 
   document.getElementById('btn-add-vod').addEventListener('click', async () => {
     const url = document.getElementById('vod-url-input').value.trim();

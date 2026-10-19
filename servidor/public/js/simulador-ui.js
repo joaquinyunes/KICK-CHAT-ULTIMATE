@@ -9,6 +9,7 @@ const STORE_VERSION = 4; // v4: el formato por defecto pasó a "hilos" (mensaje 
 
 const DATOS = [
   { key: 'contexto', titulo: 'Contexto del stream', rows: 4, hint: 'Qué se ve y qué se oye. Lo más reciente, al final.', ph: 'Ej: quien streamea muestra su ticket en vivo y comenta los partidos.' },
+  { key: 'glosario', titulo: 'Mis palabras (glosario)', rows: 5, hint: 'Una palabra o frase por línea. Si querés, agregá el significado: "pagó = salió premio". El chat las va a usar con naturalidad.', ph: 'rekt\nal horno = perdió todo\nse prendió\npagó = salió premio' },
   { key: 'transcripcion', titulo: 'Transcripción', rows: 4, hint: 'Opcional. Con o sin timestamps: el chat solo reacciona a los momentos relevantes.', ph: '00:12 …' },
   { key: 'evento', titulo: 'Último evento', rows: 2, hint: 'Lo último que pasó (un gol, una muerte, se cayó una pata del ticket…).', ph: '' },
   { key: 'estado', titulo: 'Marcador, tiempo y estadísticas', rows: 3, hint: 'Solo lo que esté confirmado.', ph: 'Ej: Fiorentina 0-1 Napoli, entretiempo' },
@@ -144,8 +145,105 @@ function renderDatos() {
     const hint = document.createElement('p'); hint.className = 'card-hint'; hint.textContent = d.hint;
 
     card.append(head, hint, ta);
+    if (d.key === 'contexto') card.append(contextoTools(ta));
+    if (d.key === 'glosario') card.append(glosarioTools(ta));
     root.appendChild(card);
   }
+}
+
+
+// ─── Contexto: traerlo del analizador o resumirlo con IA gratis / local ─────
+const IA_KEY = 'sim_ia_proveedor';
+const btn = (txt, cls = 'btn btn-secondary btn-sm') => { const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = txt; return b; };
+const guardarCampo = (ta, key, valor) => { ta.value = valor; state.datos[key] = valor; schedule(); };
+
+function contextoTools(ta) {
+  const box = document.createElement('div'); box.className = 'pb-tools';
+  const traer = btn('⬇ Traer del analizador');
+  const sel = document.createElement('select'); sel.className = 'pb-sel'; sel.setAttribute('aria-label', 'IA para resumir');
+  for (const [v, l] of [['auto', 'IA: automática'], ['gemini', 'IA: Gemini (gratis)'], ['ollama', 'IA: local (Ollama)']]) { const o = document.createElement('option'); o.value = v; o.textContent = l; sel.appendChild(o); }
+  try { sel.value = localStorage.getItem(IA_KEY) || 'auto'; } catch { /* sin storage */ }
+  sel.addEventListener('change', () => { try { localStorage.setItem(IA_KEY, sel.value); } catch { /* ignorar */ } });
+  const ia = btn('✨ Resumir con IA', 'btn btn-primary btn-sm');
+  const undo = btn('↩ Deshacer'); undo.hidden = true;
+  const st = document.createElement('span'); st.className = 'stat'; st.setAttribute('aria-live', 'polite');
+  box.append(traer, sel, ia, undo, st);
+  let previo = null;
+  const msg = (t, type) => { st.textContent = t; if (type) st.dataset.type = type; else delete st.dataset.type; };
+
+  fetch('/api/chat/context-ai').then(r => r.json()).then(d => {
+    if (d && d.success && !d.gemini) msg('Sin clave de Gemini: sacá una gratis en aistudio.google.com/apikey y pegala en servidor/.env como KICK_GEMINI_API_KEY (o usá Ollama local).');
+  }).catch(() => {});
+
+  traer.addEventListener('click', async () => {
+    msg('Buscando…');
+    try {
+      const d = await (await fetch('/api/chat/kc-context')).json();
+      const lineas = (d.summaries || []).map(x => {
+        const t = x.timestamp ? new Date(x.timestamp * 1000).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '';
+        return `${t ? '[' + t + '] ' : ''}${x.resumen_actual || ''}${x.evento ? ' (' + x.evento + ')' : ''}`.trim();
+      }).filter(Boolean);
+      if (!lineas.length) { msg('El analizador no tiene resúmenes todavía (encendelo en la pestaña Contexto).', 'error'); return; }
+      previo = ta.value; undo.hidden = false;
+      guardarCampo(ta, 'contexto', lineas.join('\n'));
+      msg(`✓ ${lineas.length} resúmenes del analizador.`, 'ok');
+    } catch { msg('No se pudo leer el analizador.', 'error'); }
+  });
+
+  ia.addEventListener('click', async () => {
+    const fuente = (state.datos.transcripcion || '').trim().length >= 20 ? state.datos.transcripcion : ta.value;
+    if ((fuente || '').trim().length < 20) { msg('Pegá primero notas o una transcripción (aunque sea desordenada) y después resumí.', 'error'); return; }
+    ia.disabled = true; msg('Resumiendo…');
+    try {
+      const res = await fetch('/api/chat/context-ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto: fuente, proveedor: sel.value }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.success) { msg(d.error || `Error ${res.status}.`, 'error'); return; }
+      previo = ta.value; undo.hidden = false;
+      guardarCampo(ta, 'contexto', d.contexto);
+      const salto = (d.intentos || []).length ? ` (antes falló ${d.intentos.map(i => i.proveedor).join(', ')})` : '';
+      msg(`✓ Resumido con ${d.proveedor === 'gemini' ? 'Gemini' : 'Ollama'} en ${(d.ms / 1000).toFixed(1)} s${salto}.`, 'ok');
+    } catch { msg('No se pudo conectar con el servidor.', 'error'); } finally { ia.disabled = false; }
+  });
+
+  undo.addEventListener('click', () => { if (previo !== null) guardarCampo(ta, 'contexto', previo); undo.hidden = true; msg('Volvió el contexto anterior.'); });
+  return box;
+}
+
+// ─── Glosario: sugerir palabras desde el texto que ya pegaste ───────────────
+const STOP = new Set(('para pero como esta este esto estos estas esos esas porque cuando donde desde hasta entre sobre sino tambien también muy mas más menos todo toda todos todas nada algo alguien nadie cada otro otra otros otras tiene tienen tengo hacer hace hacen puede pueden quiero quiere fue ser son era eran hay han has hemos están estoy estamos estan estar bien aca acá alla allá ahi ahí aqui aquí aunque mismo misma ellos ellas nosotros usted ustedes vos tus sus mis nos les que con por una uno unos unas del los las sin sea van vamos voy vas dale dice dijo decir digo ver veo vio visto ahora luego antes despues después siempre nunca todavia todavía ya asi así entonces solo sólo').split(/\s+/));
+
+function sugerirPalabras(texto, yaEstan) {
+  const cuenta = new Map();
+  for (const m of texto.toLowerCase().matchAll(/[a-záéíóúñü]{4,}/g)) {
+    const w = m[0];
+    if (!STOP.has(w) && !yaEstan.has(w)) cuenta.set(w, (cuenta.get(w) || 0) + 1);
+  }
+  const todas = [...cuenta].sort((a, b) => b[1] - a[1]);
+  const repetidas = todas.filter(([, n]) => n >= 2);
+  return (repetidas.length >= 8 ? repetidas : todas).slice(0, 30).map(([w]) => w);
+}
+
+function glosarioTools(ta) {
+  const box = document.createElement('div'); box.className = 'pb-tools';
+  const sug = btn('💡 Sugerir palabras de mi texto');
+  const cnt = document.createElement('span'); cnt.className = 'stat';
+  const chips = document.createElement('div'); chips.className = 'chips'; chips.style.cssText = 'width:100%;margin-top:4px';
+  const palabras = () => (ta.value || '').split('\n').map(l => l.split('=')[0].trim().toLowerCase()).filter(Boolean);
+  const contar = () => { const n = palabras().length; cnt.textContent = n ? `${n} palabra${n === 1 ? '' : 's'}` : ''; };
+  ta.addEventListener('input', contar); contar();
+  sug.addEventListener('click', () => {
+    chips.replaceChildren();
+    const fuente = ['historial', 'transcripcion', 'contexto', 'noticias'].map(k => state.datos[k] || '').join('\n');
+    const lista = sugerirPalabras(fuente, new Set(palabras()));
+    if (!lista.length) { cnt.textContent = 'No encontré candidatas: pegá antes el historial del chat o una transcripción.'; return; }
+    for (const w of lista) {
+      const c = btn(w, 'chip'); c.setAttribute('aria-pressed', 'false');
+      c.addEventListener('click', () => { guardarCampo(ta, 'glosario', (ta.value.trim() ? ta.value.trim() + '\n' : '') + w); c.remove(); contar(); });
+      chips.appendChild(c);
+    }
+  });
+  box.append(sug, cnt, chips);
+  return box;
 }
 
 function renderChips(rootId, items, isActive, onClick) {
@@ -393,8 +491,8 @@ function descargar() {
 }
 
 function vaciarDatos() {
-  if (!window.confirm('¿Vaciar todos los datos pegados? Las opciones se mantienen.')) return;
-  state.datos = {};
+  if (!window.confirm('¿Vaciar todos los datos pegados? Las opciones y tu glosario se mantienen.')) return;
+  state.datos = state.datos.glosario ? { glosario: state.datos.glosario } : {};
   renderDatos();
   schedule();
 }

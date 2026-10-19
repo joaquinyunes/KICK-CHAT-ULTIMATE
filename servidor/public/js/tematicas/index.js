@@ -2,9 +2,16 @@ import saludos from './saludos.js';
 import noticias from './noticias.js';
 import slots from './slots.js';
 import cierre from './cierre.js';
+import bonus from './bonus.js';
+import premio from './premio.js';
+import apuestas from './apuestas.js';
+import pedidos from './pedidos.js';
+import charla from './charla.js';
+import sorteo from './sorteo.js';
+import pausa from './pausa.js';
 
 /** Secciones de fábrica, en el orden del stream. Se pueden editar ("Restaurar" vuelve a este texto). */
-export const SECCIONES = [saludos, noticias, slots, cierre];
+export const SECCIONES = [saludos, noticias, slots, bonus, premio, apuestas, pedidos, charla, sorteo, pausa, cierre];
 
 /** Etiquetas y ejemplos de las variables conocidas (las de secciones propias usan su nombre). */
 export const VARIABLES = {

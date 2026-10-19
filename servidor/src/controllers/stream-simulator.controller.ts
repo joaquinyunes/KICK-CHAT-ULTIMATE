@@ -23,6 +23,7 @@ import {
 } from "../services/kc-supervisor.service";
 import { getKcSenderStatus, clearKcSender, getSendConfig, setSendConfig } from "../services/kc-sender.service";
 import { findPython } from "../utils/python";
+import { generarContexto, geminiKey, MAX_ENTRADA, type Proveedor } from "../services/context-ai.service";
 
 const OR_MODEL = "openai/gpt-oss-20b:free";
 const OR_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -974,6 +975,28 @@ export async function kcContext(_req: Request, res: Response): Promise<void> {
   } catch (err: any) {
     logger.error("simulator", `kc-context error: ${err}`);
     res.status(500).json({ error: "Error leyendo el contexto de KC" });
+  }
+}
+
+// ============================================================
+// POST /api/chat/context-ai — resume lo pegado en un contexto corto con IA gratis (Gemini) o local (Ollama).
+// Body: { texto: string, proveedor?: "auto"|"gemini"|"ollama" }. Opcional: si falla, el Simulador sigue como estaba.
+// GET  /api/chat/context-ai — qué proveedores hay disponibles.
+// ============================================================
+export function contextoIAEstado(_req: Request, res: Response): void {
+  res.json({ success: true, gemini: !!geminiKey(), ollama: (process.env.KICK_CONTEXT_OLLAMA_MODEL || "llama3.1:8b").trim() });
+}
+
+export async function contextoIA(req: Request, res: Response): Promise<void> {
+  const texto = typeof req.body?.texto === "string" ? req.body.texto.trim() : "";
+  const proveedor: Proveedor = ["auto", "gemini", "ollama"].includes(req.body?.proveedor) ? req.body.proveedor : "auto";
+  if (texto.length < 20) { res.status(400).json({ error: "Pegá primero el texto a resumir (notas, transcripción o lo que se ve en el stream)." }); return; }
+  try {
+    const r = await generarContexto(texto.slice(-MAX_ENTRADA), proveedor);
+    res.json({ success: true, ...r });
+  } catch (err: any) {
+    logger.warn("simulator", `context-ai fallo: ${err.message}`);
+    res.status(502).json({ error: `La IA no respondió (${err.message}). Se mantiene el contexto que ya tenías.`, intentos: err.intentos || [] });
   }
 }
 

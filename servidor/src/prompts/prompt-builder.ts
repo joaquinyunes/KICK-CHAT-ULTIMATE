@@ -18,6 +18,7 @@ export interface Datos {
   historial?: string;
   memoria?: string;
   reglas_extra?: string;
+  glosario?: string;
   hora_local?: string;
 }
 
@@ -165,6 +166,8 @@ PRIORIDAD (si dos reglas chocan, gana la de arriba)
 5. Variedad. Una métrica NUNCA justifica una línea artificial.`;
 }
 
+const REGLA_GLOSARIO = "Cómo usar el VOCABULARIO_PROPIO: son las palabras reales de esta comunidad. Usalas tal cual están escritas (misma ortografía), con naturalidad y repartidas entre distintos usuarios: no todas en cada tanda y nunca más de 1 de cada 4 líneas con una. Si trae un significado, respetalo; si no lo trae, no se lo inventes. Si una palabra no encaja con lo que pasa, no la fuerces. No las expliques ni las pongas entre comillas.";
+
 function bloqueDatosPegar(d: Datos, o: Opciones): string {
   const partes: string[] = [];
   partes.push(h("DATOS DE ESTA TANDA"));
@@ -193,6 +196,7 @@ function bloqueDatosPegar(d: Datos, o: Opciones): string {
   add("HISTORIAL (líneas que el chat ya publicó; continuá desde ahí)", d.historial);
   add("MEMORIA_USUARIOS (memoria débil)", d.memoria);
   if (noProv.length) partes.push(`No proporcionados (no existen: no los inventes): ${noProv.map((n) => n.split(" (")[0]).join(", ")}.`);
+  if (d.glosario) partes.push(bloque('VOCABULARIO_PROPIO (palabras y expresiones de esta comunidad; una por línea, a veces "palabra = qué significa")', d.glosario) + "\n" + REGLA_GLOSARIO);
   if (d.reglas_extra) partes.push(bloque("REGLAS_EXTRA (del usuario; aplicalas salvo que contradigan HECHOS o FORMATO)", d.reglas_extra));
   if (!d.contexto && !d.transcripcion && !d.evento && !d.estado && !d.apuestas && !o.imagen) {
     partes.push("Sin datos concretos del stream: el chat se aquieta y habla en general (\"estoy mirando\", \"se escucha bien\", alguien que llega, ruido). No inventes de qué se habla.");
@@ -767,6 +771,7 @@ export function normalizarDatos(raw: any): Datos {
     historial: limpiar(r.historial, 10000),
     memoria: limpiar(r.memoria, 6000),
     reglas_extra: limpiar(r.reglas_extra, 4000),
+    glosario: limpiar(r.glosario, 6000),
     hora_local: limpiar(r.hora_local, 80),
   };
 }
@@ -795,7 +800,7 @@ export function composePrompt(datos: Datos, opciones: Opciones): string {
 /** Resumen de qué quedó incluido (para mostrar en la UI). */
 export function resumenIncluido(d: Datos, o: Opciones): string[] {
   const out: string[] = [];
-  const dat: [string, string | undefined][] = [["contexto", d.contexto], ["transcripción", d.transcripcion], ["evento", d.evento], ["estado", d.estado], ["apuestas", d.apuestas], ["noticias", d.noticias], ["historial", d.historial], ["memoria", d.memoria], ["reglas extra", d.reglas_extra]];
+  const dat: [string, string | undefined][] = [["contexto", d.contexto], ["transcripción", d.transcripcion], ["evento", d.evento], ["estado", d.estado], ["apuestas", d.apuestas], ["noticias", d.noticias], ["historial", d.historial], ["memoria", d.memoria], ["reglas extra", d.reglas_extra], ["glosario", d.glosario]];
   const usados = dat.filter(([, v]) => v).map(([k]) => k);
   out.push(usados.length ? `Datos: ${usados.join(", ")}` : "Datos: ninguno");
   out.push(`Contenido: ${o.contenidos.length ? o.contenidos.map((c) => CONTENIDOS[c]).join(", ") : "se infiere"}`);

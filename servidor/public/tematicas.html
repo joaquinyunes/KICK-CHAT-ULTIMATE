@@ -5,39 +5,44 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>StreamChat – Temáticas</title>
 <link rel="stylesheet" href="css/main.css" />
+<link rel="stylesheet" href="css/client-nav.css" />
 <link rel="stylesheet" href="css/chat.css" />
 <link rel="stylesheet" href="css/tematicas.css" />
-<link rel="stylesheet" href="css/kd.css" />
-<script>try{if(localStorage.getItem('kd_theme')==='light')document.documentElement.classList.add('kd-light')}catch(e){}</script>
 </head>
-<body class="kd">
-  <header id="chat-header" class="kd-top"></header>
+<body class="chat-page">
+  <div class="pl-feed" aria-hidden="true">
+    <div class="pl-feed-col"></div><div class="pl-feed-col"></div>
+    <div class="pl-feed-col"></div><div class="pl-feed-col"></div>
+  </div>
+  <div class="pl-feeds-overlay"></div>
+  <header id="chat-header" class="app-header"></header>
+  <div id="client-nav"></div>
 
-  <main class="kd-main">
+  <main class="chat-shell">
 
     <!-- ═══ CANAL ═══ -->
-    <section class="kd-card hl kd-channel">
-      <div class="kd-ch-id">
-        <span class="kd-avatar-lg"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg></span>
-        <a id="tm-channel" class="sp-channel" href="/ajustes">sin configurar</a>
-      </div>
-      <div class="kd-tiles">
-        <div class="kd-tile"><span>Enviados</span><b id="tm-sent">0</b></div>
-        <div class="kd-tile fail"><span>Fallidos</span><b id="tm-failed">0</b></div>
-      </div>
-      <div class="kd-ch-r">
-        <button id="tm-stop-all" class="kd-btn kd-btn-red" type="button">■ Parar todo</button>
+    <section class="send-panel">
+      <div class="sp-line sp-line-main">
+        <div class="sp-target">
+          <span class="sp-k">Canal destino</span>
+          <a id="tm-channel" class="sp-channel" href="/ajustes">sin configurar</a>
+        </div>
+        <div class="sp-metrics">
+          <div class="sp-metric"><b id="tm-sent">0</b><span class="sp-k">enviados</span></div>
+          <div class="sp-metric sp-metric-fail"><b id="tm-failed">0</b><span class="sp-k">fallidos</span></div>
+        </div>
+        <div class="sp-master">
+          <button id="tm-stop-all" class="btn btn-danger" type="button">■ Parar todo</button>
+        </div>
       </div>
     </section>
 
     <!-- ═══ EN VIVO: mensaje suelto, sale ya ═══ -->
-    <section class="kd-card live-panel tm-live">
-      <div class="kd-card-head">
-        <span class="kd-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></span>
-        <div>
-          <div class="kd-card-title">En vivo</div>
-          <div class="kd-card-sub">Escribí y Enter: sale al chat ahora. Podés usar {variables}.</div>
-        </div>
+    <section class="live-panel tm-live">
+      <div class="lp-head">
+        <span class="cc-dot dot-live"></span>
+        <span class="cc-name">En vivo</span>
+        <span class="lp-note">escribí y Enter: sale al chat ahora · podés usar {variables}</span>
       </div>
       <div class="tm-live-row">
         <input id="tm-live-input" type="text" maxlength="500" placeholder="ej: que locura lo que pago {slot}" autocomplete="off" spellcheck="false">
@@ -47,9 +52,13 @@
     </section>
 
     <!-- ═══ SECCIONES ═══ -->
+    <div class="tm-search">
+      <input id="tm-search" type="text" placeholder="🔍 Buscar una sección o un mensaje…" autocomplete="off" spellcheck="false" aria-label="Buscar en las temáticas">
+      <div id="tm-results" class="tm-results" hidden></div>
+    </div>
     <nav id="tm-tabs" class="tm-tabs" aria-label="Secciones"></nav>
 
-    <section id="tm-sec" class="kd-card tm-sec">
+    <section id="tm-sec" class="tm-sec">
       <p id="tm-desc" class="tm-desc"></p>
 
       <!-- Slots: cómo viene -->
@@ -89,6 +98,7 @@
         <div class="tm-edit-top">
           <input id="tm-edit-name" class="tm-edit-name" type="text" maxlength="40" placeholder="Nombre de la sección" spellcheck="false">
           <span id="tm-edit-count" class="tm-edit-count"></span>
+          <button id="tm-edit-dup" class="btn btn-ghost btn-sm" type="button" title="Crea una sección tuya con estos mensajes para editarla sin tocar la original">⧉ Duplicar como mía</button>
           <button id="tm-edit-reset" class="btn btn-ghost btn-sm" type="button">↺ Restaurar originales</button>
           <button id="tm-edit-del" class="btn btn-ghost btn-sm" type="button">🗑 Borrar sección</button>
         </div>
@@ -99,14 +109,10 @@
     </section>
 
     <!-- ═══ REGISTRO ═══ -->
-    <section class="kd-card tm-log-panel">
-      <div class="kd-card-head">
-        <span class="kd-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span>
-        <div>
-          <div class="kd-card-title">Registro de envíos</div>
-          <div class="kd-card-sub">Cada mensaje que sale al chat, en vivo</div>
-        </div>
-        <div class="kd-head-r"><button id="tm-clear-log" class="kd-link-btn" type="button">Limpiar</button></div>
+    <section class="panel tm-log-panel">
+      <div class="panel-head">
+        <span class="panel-title">Registro de envíos</span>
+        <button id="tm-clear-log" class="btn btn-ghost btn-xs" type="button">Limpiar</button>
       </div>
       <div id="tm-log" class="send-log">
         <div class="empty-state">Todavía no se envió nada.</div>
@@ -115,6 +121,8 @@
 
   </main>
 
+  <div class="pl-feeds-spacer"></div>
+  <script src="js/pl-mascot.js"></script>
   <script type="module" src="js/tematicas-ui.js"></script>
 </body>
 </html>

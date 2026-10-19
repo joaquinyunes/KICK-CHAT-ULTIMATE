@@ -1,7 +1,7 @@
 import { sendMessage } from './bridge-client.js';
 import { renderNav, renderAuthHeader, requireAuth, startStatusLoop } from './client-nav.js';
 import { SECCIONES, VARIABLES } from './tematicas/index.js';
-import { parseHilos, varsIn, resolve, buildHilos, countMsgs, pickHilo, parseNoticias, VAR_RE, varKey } from './tematicas/engine.js';
+import { parseHilos, varsIn, resolve, buildHilos, countMsgs, pickHilo, parseNoticias, VAR_RE, varKey, norm } from './tematicas/engine.js';
 
 // Temáticas: una sección por momento del stream (Saludos, Noticias, Slots, Cierre + las propias).
 // La sección elegida es la que se envía. Los mensajes vienen en hilos (uno abre, otros responden)
@@ -21,6 +21,7 @@ const defaults = () => ({ v: 3, sel: 'saludos', modos: {}, vars: {}, noticias: '
 let state = defaults();
 let used = new Set();
 const run = { running: false, timer: null, sending: false, queue: [], cola: [], newsIdx: 0, lastUser: '', enRafaga: false };
+let query = '';   // buscador: filtra pestañas y lista mensajes que coinciden
 let sentTotal = 0;
 let failedTotal = 0;
 
@@ -224,11 +225,38 @@ function stop() {
 }
 
 // ─── Render ─────────────────────────────────────────────────────────────────
+/** Todos los textos de una sección (todos sus modos), con los cambios del usuario. */
+const textosDe = (s) => (s.modos ? s.modos.map((m) => [m[0], texto(s, m[0])]) : [['base', texto(s)]]);
+
 function renderTabs() {
-  $('tm-tabs').innerHTML = allSecs().map((s) =>
+  const q = norm(query);
+  const list = allSecs().filter((s) => !q || s.id === state.sel || norm(s.nombre).includes(q) || textosDe(s).some(([, t]) => norm(t).includes(q)));
+  $('tm-tabs').innerHTML = list.map((s) =>
     `<button type="button" class="tm-tab${s.id === state.sel ? ' active' : ''}${s.id === state.sel && run.running ? ' running' : ''}" data-id="${esc(s.id)}">` +
     `<span class="tm-dot"></span>${esc(s.emoji || '✨')} ${esc(s.nombre)}</button>`
   ).join('') + '<button type="button" class="tm-tab tm-tab-add" data-add="1">+ Nueva sección</button>';
+}
+
+/** Mensajes que contienen lo buscado (máx. 15); click = ir a esa sección y modo. */
+function renderResults() {
+  const box = $('tm-results');
+  const q = norm(query);
+  box.hidden = q.length < 2;
+  if (box.hidden) return;
+  const hits = [];
+  for (const s of allSecs()) {
+    for (const [modo, t] of textosDe(s)) {
+      for (const l of parseHilos(t).flat()) {
+        if (norm(l).includes(q)) hits.push({ s, modo, l });
+        if (hits.length >= 15) break;
+      }
+      if (hits.length >= 15) break;
+    }
+    if (hits.length >= 15) break;
+  }
+  box.innerHTML = hits.length
+    ? hits.map((h) => `<button type="button" class="tm-hit" data-id="${esc(h.s.id)}" data-modo="${esc(h.modo)}"><span class="tm-hit-sec">${esc(h.s.emoji || '✨')} ${esc(h.s.nombre)}</span><span class="tm-hit-txt">${esc(h.l)}</span></button>`).join('')
+    : '<div class="tm-preview-empty">No hay mensajes con eso. Probá con otra palabra.</div>';
 }
 
 function renderSec() {
@@ -355,8 +383,10 @@ function selectSec(id) {
   if (run.running) setStatus(`Enviando ${sec().nombre}…`);
 }
 
+const AYUDA = '# Un mensaje por renglón. Para armar una conversación separá con una línea ---\n# El primer renglón abre y los demás responden. Lo que empieza con # no se envía.\n# Podés usar {slot} {streamer} {premio}… y se crea un campo arriba.\n';
+
 function newSec() {
-  const s = { id: uid(), nombre: 'Nueva sección', emoji: '✨', textos: { base: '' } };
+  const s = { id: uid(), nombre: 'Nueva sección', emoji: '✨', textos: { base: AYUDA } };
   state.custom.push(s);
   selectSec(s.id);
   $('tm-edit').open = true;
@@ -434,6 +464,27 @@ function wire() {
     if (!b) return;
     if (b.dataset.add) newSec();
     else if (b.dataset.id !== state.sel) selectSec(b.dataset.id);
+  });
+
+  $('tm-search').addEventListener('input', (e) => { query = e.target.value; renderTabs(); renderResults(); });
+  $('tm-results').addEventListener('click', (e) => {
+    const b = e.target.closest('.tm-hit');
+    if (!b) return;
+    if (secById(b.dataset.id)?.modos) state.modos[b.dataset.id] = b.dataset.modo;
+    query = ''; $('tm-search').value = ''; renderResults();
+    selectSec(b.dataset.id);
+  });
+
+  $('tm-edit-dup').addEventListener('click', () => {
+    const s = sec();
+    const modo = s.modos ? s.modos.find((m) => m[0] === modoOf(s)) : null;
+    const nombre = `${s.nombre}${modo ? ' · ' + modo[1].replace(/^\S+\s/, '') : ''} (copia)`.slice(0, 40);
+    const n = { id: uid(), nombre, emoji: s.emoji || '✨', textos: { base: texto(s) } };
+    if (s.usaNoticias) n.usaNoticias = true;
+    state.custom.push(n);
+    selectSec(n.id);
+    $('tm-edit').open = true;
+    $('tm-edit-name').focus();
   });
 
   $('tm-modos').addEventListener('click', (e) => {

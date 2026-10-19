@@ -52,6 +52,12 @@
   #pb-out { flex:1; min-height:260px; width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:10px 12px; color:var(--text); font-family:var(--font-mono); font-size:12px; line-height:1.45; resize:none; }
   .incluye { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
   .tag { font-size:10px; padding:2px 8px; border-radius:20px; background:var(--surface2); border:1px solid var(--border); color:var(--text-muted); }
+  .pb-tools { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0 0; }
+  .pb-tools .stat { font-size:11px; color:var(--text-muted); flex:1; min-width:180px; }
+  .pb-tools .stat[data-type="error"] { color:var(--danger); }
+  .pb-tools .stat[data-type="ok"] { color:var(--success); }
+  .pb-tools [hidden] { display:none !important; }
+  .pb-sel { width:auto; flex:none; background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:5px 8px; font:inherit; font-size:12px; }
   #pb-status { min-height:16px; font-size:11px; color:var(--text-muted); margin:6px 0 0; }
   #pb-status[data-type="error"] { color:var(--danger); }
   #pb-status[data-type="ok"] { color:var(--success); }
