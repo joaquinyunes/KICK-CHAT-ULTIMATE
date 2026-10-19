@@ -1,6 +1,8 @@
 import { sendMessage } from './bridge-client.js';
 import { renderNav, renderAuthHeader, requireAuth, startStatusLoop } from './client-nav.js';
 import { SECCIONES, VARIABLES } from './tematicas/index.js';
+import { SITUACIONES, sitById, detectar } from './contexto.js';
+import { cargar as cargarGlosario, filtrarPorSituacion } from './glosario.js';
 import { parseHilos, varsIn, resolve, buildHilos, countMsgs, pickHilo, parseNoticias, VAR_RE, varKey, norm } from './tematicas/engine.js';
 
 // Temáticas: una sección por momento del stream (Saludos, Noticias, Slots, Cierre + las propias).
@@ -16,7 +18,7 @@ const uid = () => 's' + Date.now().toString(36) + Math.random().toString(36).sli
 const $ = (id) => document.getElementById(id);
 
 // ─── Estado ─────────────────────────────────────────────────────────────────
-const defaults = () => ({ v: 3, sel: 'saludos', modos: {}, vars: {}, noticias: '', min: 4, max: 9, orden: {}, custom: [], overrides: {}, used: [] });
+const defaults = () => ({ v: 3, sel: 'saludos', sit: '', modos: {}, vars: {}, noticias: '', min: 4, max: 9, orden: {}, custom: [], overrides: {}, used: [] });
 
 let state = defaults();
 let used = new Set();
@@ -67,14 +69,27 @@ function migrate() {
 }
 
 // ─── Secciones ──────────────────────────────────────────────────────────────
-const allSecs = () => [...SECCIONES, ...state.custom];
+// "Mi glosario" no vive en SECCIONES: sus mensajes salen de lo que el usuario cargó en /glosario,
+// filtrados por la situación elegida (sin IA). Se lee del navegador y se refresca al volver a la pestaña.
+const GLOSARIO_SEC = { id: 'glosario', nombre: 'Mi glosario', emoji: '📚', dinamico: true, textos: {} };
+let glos = [];
+let glosMemo = { n: -1, sit: null, texto: '', por: 'todo', total: 0 };
+function glosInfo() {
+  if (glosMemo.n !== glos.length || glosMemo.sit !== state.sit) {
+    const { lista, por } = filtrarPorSituacion(glos, sitById(state.sit));
+    glosMemo = { n: glos.length, sit: state.sit, texto: lista.map((i) => i.t).join('\n'), por, total: lista.length };
+  }
+  return glosMemo;
+}
+const allSecs = () => [...SECCIONES, GLOSARIO_SEC, ...state.custom];
 const secById = (id) => allSecs().find((s) => s.id === id) || null;
-const isBuiltin = (id) => SECCIONES.some((s) => s.id === id);
+const isBuiltin = (id) => id === GLOSARIO_SEC.id || SECCIONES.some((s) => s.id === id);
 const sec = () => secById(state.sel) || SECCIONES[0];
 const modoOf = (s) => (s.modos ? (state.modos[s.id] || s.modos[0][0]) : 'base');
 const enOrden = () => state.orden[state.sel] === 'orden';
 
 function texto(s, modo = modoOf(s)) {
+  if (s.dinamico) return glosInfo().texto;
   const ov = state.overrides[s.id];
   if (ov && typeof ov[modo] === 'string') return ov[modo];
   return (s.textos && s.textos[modo]) || '';
@@ -88,7 +103,13 @@ function nextNoticia() {
 }
 
 /** Hilos listos de la sección elegida (para noticias, con la noticia que toca). */
-function hilos(noticia = noticias()[0] || '') { return buildHilos(texto(sec()), state.vars, noticia); }
+let hMemo = { t: null, v: '', n: '', out: [] };
+function hilos(noticia = noticias()[0] || '') {
+  const t = texto(sec());
+  const v = JSON.stringify(state.vars);
+  if (hMemo.t !== t || hMemo.v !== v || hMemo.n !== noticia) hMemo = { t, v, n: noticia, out: buildHilos(t, state.vars, noticia) };
+  return hMemo.out;
+}
 
 /** Variables de la sección (todos sus modos, así no aparecen y desaparecen al cambiar). */
 function secVars() {
@@ -164,6 +185,7 @@ function setStatus(text, kind) {
 
 function motivoVacio() {
   const s = sec();
+  if (s.dinamico) return glos.length ? 'No hay mensajes con esa situación: probá otra.' : 'Tu glosario está vacío: cargalo en la página Glosario.';
   if (s.usaNoticias && !noticias().length) return 'Pegá al menos una noticia.';
   if (!parseHilos(texto(s)).length) return 'Esta sección no tiene mensajes: agregalos en “Editar”.';
   return 'No hay mensajes listos: completá los campos de arriba.';
@@ -226,7 +248,7 @@ function stop() {
 
 // ─── Render ─────────────────────────────────────────────────────────────────
 /** Todos los textos de una sección (todos sus modos), con los cambios del usuario. */
-const textosDe = (s) => (s.modos ? s.modos.map((m) => [m[0], texto(s, m[0])]) : [['base', texto(s)]]);
+const textosDe = (s) => (s.dinamico ? [] : s.modos ? s.modos.map((m) => [m[0], texto(s, m[0])]) : [['base', texto(s)]]);
 
 function renderTabs() {
   const q = norm(query);
@@ -261,7 +283,8 @@ function renderResults() {
 
 function renderSec() {
   const s = sec();
-  $('tm-desc').textContent = s.desc || 'Sección propia: editá sus mensajes abajo.';
+  if (s.dinamico) { const g = glosInfo(); $('tm-desc').textContent = `${glos.length.toLocaleString('es-AR')} entradas de tu glosario · ${g.total.toLocaleString('es-AR')} para ${state.sit ? '“' + sitById(state.sit).label + '”' : 'cualquier situación'} (elegidas por ${g.por}). Se editan en la página Glosario.`; }
+  else $('tm-desc').textContent = s.desc || 'Sección propia: editá sus mensajes abajo.';
 
   const modos = $('tm-modos');
   modos.hidden = !s.modos;
@@ -349,6 +372,8 @@ function renderMetrics() {
 // ─── Editor ─────────────────────────────────────────────────────────────────
 function renderEditor() {
   const s = sec();
+  $('tm-edit').hidden = !!s.dinamico;
+  if (s.dinamico) return;
   const builtin = isBuiltin(s.id);
   const ta = $('tm-edit-lines');
   if (document.activeElement !== ta) ta.value = texto(s);
@@ -393,6 +418,39 @@ function newSec() {
   const n = $('tm-edit-name');
   n.focus();
   n.select();
+}
+
+// ─── Situación (contexto sin IA) ────────────────────────────────────────────
+function renderSit() {
+  $('tm-sit').innerHTML = SITUACIONES.map((x) =>
+    `<button type="button" class="tm-sit-btn${state.sit === x.id ? ' on' : ''}" data-sit="${x.id}" title="${x.tecla ? 'Tecla ' + x.tecla : 'Sin atajo'}">` +
+    `${x.emoji} ${esc(x.label)}${x.tecla ? ` <kbd>${x.tecla}</kbd>` : ''}</button>`).join('');
+}
+
+/** Elige la situación: filtra "Mi glosario" y, si estás en una sección de plantillas, salta a la que corresponde. */
+function aplicarSituacion(id) {
+  const x = sitById(id);
+  if (!x) return;
+  state.sit = state.sit === id ? '' : id;
+  if (state.sit && sec().id !== GLOSARIO_SEC.id && secById(x.seccion)) {
+    if (x.modo !== 'base') state.modos[x.seccion] = x.modo;
+    selectSec(x.seccion);
+  } else {
+    save();
+    renderSec();
+    rebuild(true);
+  }
+  renderSit();
+}
+
+function detectarContexto(texto) {
+  const msg = $('tm-ctx-msg');
+  const r = detectar(texto);
+  if (!r.length) { msg.textContent = 'No reconozco nada: elegí la situación con los botones.'; msg.className = 'cc-status err'; return; }
+  const top = r[0];
+  if (state.sit !== top.sit.id) aplicarSituacion(top.sit.id);
+  msg.textContent = `Detecté ${top.sit.emoji} ${top.sit.label} (${top.hits.join(', ')})${r[1] ? ` · también suena a ${r[1].sit.label}` : ''}.`;
+  msg.className = 'cc-status ok';
 }
 
 // ─── Envío manual (EN VIVO y "Así saldría") ─────────────────────────────────
@@ -466,6 +524,20 @@ function wire() {
     else if (b.dataset.id !== state.sel) selectSec(b.dataset.id);
   });
 
+  $('tm-sit').addEventListener('click', (e) => { const b = e.target.closest('[data-sit]'); if (b) aplicarSituacion(b.dataset.sit); });
+  $('tm-ctx').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); detectarContexto(e.target.value); } });
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.altKey || e.metaKey || e.repeat) return;
+    const t = e.target;
+    if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
+    const x = SITUACIONES.find((y) => y.tecla && y.tecla === e.key);
+    if (x) { e.preventDefault(); aplicarSituacion(x.id); }
+  });
+  // si cargaste palabras en otra pestaña, al volver se actualiza solo
+  window.addEventListener('focus', () => {
+    const nuevo = cargarGlosario();
+    if (nuevo.length !== glos.length) { glos = nuevo; if (sec().dinamico) { renderSec(); rebuild(true); } }
+  });
   $('tm-search').addEventListener('input', (e) => { query = e.target.value; renderTabs(); renderResults(); });
   $('tm-results').addEventListener('click', (e) => {
     const b = e.target.closest('.tm-hit');
@@ -598,7 +670,9 @@ window.addEventListener('DOMContentLoaded', async () => {
   renderNav('tematicas');
   startStatusLoop();
   load();
+  glos = cargarGlosario();
   wire();
+  renderSit();
   $('tm-min').value = state.min;
   $('tm-max').value = state.max;
   renderTabs();

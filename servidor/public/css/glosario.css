@@ -1,0 +1,43 @@
+/* GLOSARIO — reutiliza panel / btn de main.css y chat.css */
+[hidden] { display: none !important; }
+.chat-shell { overflow-y: auto; }
+.gl-count { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); }
+.gl-help { margin: 6px 0 0; font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+.gl-help code { font-family: var(--font-mono); color: var(--signal); background: var(--surface2); padding: 1px 5px; border-radius: 4px; }
+.gl-help a { color: var(--signal); }
+.gl-ta, .gl-in, .gl-sel {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text); font-family: inherit; font-size: 13px; padding: 8px 10px; line-height: 1.5;
+}
+.gl-ta { resize: vertical; font-family: var(--font-mono); font-size: 12px; }
+.gl-ta:focus, .gl-in:focus, .gl-sel:focus { outline: none; border-color: var(--signal); }
+.gl-row { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; margin: 8px 0; }
+.gl-row .gl-in { flex: 1 1 280px; width: auto; }
+.gl-row .gl-sel { width: auto; flex: none; }
+.gl-modo { display: inline-flex; gap: 12px; font-size: 13px; color: var(--text-secondary); }
+.gl-num { font-size: 13px; color: var(--text-secondary); display: inline-flex; gap: 6px; align-items: center; }
+.gl-num input { width: 70px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 6px 8px; font: inherit; }
+.gl-status { font-size: 12px; color: var(--text-secondary); min-height: 16px; }
+.gl-status[data-type="ok"] { color: var(--success); }
+.gl-status[data-type="error"] { color: var(--danger); }
+
+.gl-cats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.gl-cat {
+  cursor: pointer; padding: 4px 11px; border-radius: 999px; font: inherit; font-size: 12px; font-weight: 600;
+  background: var(--surface); border: 1px solid var(--border); color: var(--text-secondary);
+}
+.gl-cat:hover { border-color: var(--line-bright); color: var(--text); }
+.gl-cat[aria-pressed="true"] { background: var(--signal-glow); border-color: rgba(61,220,151,.45); color: var(--signal); }
+.gl-cat b { font-family: var(--font-mono); font-weight: 600; margin-left: 4px; opacity: .8; }
+
+.gl-list { display: flex; flex-direction: column; gap: 3px; margin-top: 8px; max-height: 360px; overflow-y: auto; }
+.gl-it { display: flex; gap: 10px; align-items: baseline; padding: 4px 8px; border-radius: 6px; background: var(--surface2); border: 1px solid var(--border); font-size: 13px; }
+.gl-it .gl-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gl-it .gl-c { flex: none; font-size: 11px; font-weight: 700; color: var(--signal); }
+.gl-it .gl-s { flex: none; max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--text-muted); }
+.gl-it button { flex: none; cursor: pointer; border: 0; background: transparent; color: var(--text-muted); font-size: 13px; }
+.gl-it button:hover { color: var(--danger); }
+.gl-empty { font-size: 12px; color: var(--text-muted); font-style: italic; padding: 6px 2px; }
+
+.chat-shell > * { flex-shrink: 0; }
+.gl-ta { min-height: 110px; }

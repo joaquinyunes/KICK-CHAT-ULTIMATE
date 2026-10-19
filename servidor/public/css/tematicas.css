@@ -6,6 +6,19 @@
 [hidden] { display: none !important; }
 .tm-warn { color: var(--warn); }
 
+/* ── situación (contexto sin IA) ── */
+.tm-sit { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.tm-sit-btn {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer; padding: 7px 12px; border-radius: 8px;
+  background: var(--surface2); border: 1px solid var(--border); color: var(--text-secondary); font: inherit; font-size: 13px; font-weight: 600;
+}
+.tm-sit-btn:hover { border-color: var(--line-bright); color: var(--text); }
+.tm-sit-btn.on { background: var(--signal-glow); border-color: rgba(61,220,151,.5); color: var(--signal); }
+.tm-sit-btn kbd { font-family: var(--font-mono); font-size: 10px; padding: 0 5px; border-radius: 4px; border: 1px solid var(--border); color: var(--text-muted); }
+.tm-ctx-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.tm-ctx-row input { flex: 1 1 320px; min-width: 0; font-size: 13px; }
+.tm-ctx-row .cc-status { flex: 1 1 200px; min-height: 16px; }
+
 /* ── buscador ── */
 .tm-search { flex-shrink: 0; display: flex; flex-direction: column; gap: 6px; }
 .tm-search input { width: 100%; max-width: 420px; }

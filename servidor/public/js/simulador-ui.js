@@ -1,4 +1,6 @@
 import { renderNav, renderAuthHeader, requireAuth, startStatusLoop } from './client-nav.js';
+import { cargar as cargarGlosario, filtrarPorSituacion, elegir } from './glosario.js';
+import { detectar, sitById } from './contexto.js';
 
 // Armador de prompt: pegás datos, elegís qué incluir y devuelve SOLO el prompt para pegarlo en otra IA.
 // No llama a ningún modelo ni envía nada a Kick. El texto del prompt lo compone el servidor
@@ -9,7 +11,7 @@ const STORE_VERSION = 4; // v4: el formato por defecto pasó a "hilos" (mensaje 
 
 const DATOS = [
   { key: 'contexto', titulo: 'Contexto del stream', rows: 4, hint: 'Qué se ve y qué se oye. Lo más reciente, al final.', ph: 'Ej: quien streamea muestra su ticket en vivo y comenta los partidos.' },
-  { key: 'glosario', titulo: 'Mis palabras (glosario)', rows: 5, hint: 'Una palabra o frase por línea. Si querés, agregá el significado: "pagó = salió premio". El chat las va a usar con naturalidad.', ph: 'rekt\nal horno = perdió todo\nse prendió\npagó = salió premio' },
+  { key: 'glosario', titulo: 'Mis palabras (glosario)', rows: 5, hint: 'Las palabras que va a usar el chat. Escribilas acá o traé una tanda de tu glosario grande (se elige según el contexto, sin IA).', ph: 'rekt\nal horno = perdió todo\nse prendió\npagó = salió premio' },
   { key: 'transcripcion', titulo: 'Transcripción', rows: 4, hint: 'Opcional. Con o sin timestamps: el chat solo reacciona a los momentos relevantes.', ph: '00:12 …' },
   { key: 'evento', titulo: 'Último evento', rows: 2, hint: 'Lo último que pasó (un gol, una muerte, se cayó una pata del ticket…).', ph: '' },
   { key: 'estado', titulo: 'Marcador, tiempo y estadísticas', rows: 3, hint: 'Solo lo que esté confirmado.', ph: 'Ej: Fiorentina 0-1 Napoli, entretiempo' },
@@ -167,7 +169,11 @@ function contextoTools(ta) {
   const ia = btn('✨ Resumir con IA', 'btn btn-primary btn-sm');
   const undo = btn('↩ Deshacer'); undo.hidden = true;
   const st = document.createElement('span'); st.className = 'stat'; st.setAttribute('aria-live', 'polite');
-  box.append(traer, sel, ia, undo, st);
+  const det = document.createElement('details'); det.className = 'pb-ia';
+  const sum = document.createElement('summary'); sum.textContent = '✨ IA opcional (apagada: no se usa salvo que la toques)';
+  const detRow = document.createElement('div'); detRow.className = 'pb-tools'; detRow.append(sel, ia, undo);
+  det.append(sum, detRow);
+  box.append(traer, st, det);
   let previo = null;
   const msg = (t, type) => { st.textContent = t; if (type) st.dataset.type = type; else delete st.dataset.type; };
 
@@ -223,6 +229,7 @@ function sugerirPalabras(texto, yaEstan) {
   return (repetidas.length >= 8 ? repetidas : todas).slice(0, 30).map(([w]) => w);
 }
 
+const usadas = new Set();   // lo que ya se trajo del glosario (no repite hasta agotar)
 function glosarioTools(ta) {
   const box = document.createElement('div'); box.className = 'pb-tools';
   const sug = btn('💡 Sugerir palabras de mi texto');
@@ -242,7 +249,23 @@ function glosarioTools(ta) {
       chips.appendChild(c);
     }
   });
-  box.append(sug, cnt, chips);
+  const traer = btn('📚 Traer de mi glosario');
+  const un = btn('↩ Deshacer'); un.hidden = true;
+  let previo = null;
+  traer.addEventListener('click', () => {
+    const todo = cargarGlosario();
+    if (!todo.length) { cnt.textContent = 'Tu glosario está vacío: cargalo en la página Glosario.'; return; }
+    const r = detectar(state.datos.contexto || '')[0];
+    const sit = r ? r.sit : null;
+    const { lista, por } = filtrarPorSituacion(todo, sit);
+    const sel = elegir(lista, 40, { used: usadas });
+    previo = ta.value; un.hidden = false;
+    guardarCampo(ta, 'glosario', sel.map((i) => i.t + (i.s ? ' = ' + i.s : '')).join('\n'));
+    contar();
+    cnt.textContent = `${sel.length} de ${lista.length.toLocaleString('es-AR')}${sit ? ' para “' + sit.label + '” (detectada en el contexto)' : ''} · por ${por}`;
+  });
+  un.addEventListener('click', () => { if (previo !== null) guardarCampo(ta, 'glosario', previo); un.hidden = true; contar(); });
+  box.append(traer, un, sug, cnt, chips);
   return box;
 }
 

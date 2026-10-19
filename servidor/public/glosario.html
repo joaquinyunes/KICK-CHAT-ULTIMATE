@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StreamChat – Glosario</title>
+<link rel="stylesheet" href="css/main.css" />
+<link rel="stylesheet" href="css/client-nav.css" />
+<link rel="stylesheet" href="css/chat.css" />
+<link rel="stylesheet" href="css/glosario.css" />
+</head>
+<body class="chat-page">
+  <div class="pl-feed" aria-hidden="true">
+    <div class="pl-feed-col"></div><div class="pl-feed-col"></div>
+    <div class="pl-feed-col"></div><div class="pl-feed-col"></div>
+  </div>
+  <div class="pl-feeds-overlay"></div>
+  <header id="chat-header" class="app-header"></header>
+  <div id="client-nav"></div>
+
+  <main class="chat-shell">
+
+    <section class="panel gl-top">
+      <div class="panel-head">
+        <span class="panel-title">📚 Mi glosario</span>
+        <span id="gl-count" class="gl-count">0 entradas</span>
+      </div>
+      <p class="gl-help">Tus palabras y frases, guardadas en este navegador. <b>No usa IA ni APIs: no gasta nada.</b> Se usan en <a href="/tematicas">Temáticas</a> (sección “Mi glosario”) y en el generador de acá abajo.</p>
+      <div id="gl-cats" class="gl-cats"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><span class="panel-title">1 · Cargar palabras</span></div>
+      <textarea id="gl-paste" class="gl-ta" rows="6" spellcheck="false"
+        placeholder="Una por línea. Ejemplos:&#10;rekt&#10;bonus|se prendio&#10;al horno = perdio todo&#10;premio|PAGO x500 = grito de festejo"></textarea>
+      <div class="gl-row">
+        <label class="btn btn-secondary btn-sm gl-file">📄 Elegir archivo .txt / .csv<input id="gl-file" type="file" accept=".txt,.csv,text/plain" hidden></label>
+        <div class="gl-modo" role="group" aria-label="Qué hacer con lo que ya hay">
+          <label><input type="radio" name="gl-modo" value="agregar" checked> Agregar</label>
+          <label><input type="radio" name="gl-modo" value="reemplazar"> Reemplazar todo</label>
+        </div>
+        <button id="gl-import" class="btn btn-primary" type="button">⬆ Importar</button>
+        <span id="gl-status" class="gl-status" role="status" aria-live="polite"></span>
+      </div>
+      <p class="gl-help">Formatos (se pueden mezclar): <code>texto</code> · <code>categoria|texto</code> · <code>texto = significado</code>. Con categorías el generador elige mejor; sin categorías filtra por palabras clave. Los repetidos se saltean solos.</p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><span class="panel-title">2 · Generar sin IA</span></div>
+      <div class="gl-row">
+        <input id="gl-ctx" class="gl-in" type="text" placeholder="Opcional: pegá lo que pasa (ej: cayeron tres scatters) y detecto la situación" autocomplete="off" spellcheck="false">
+        <select id="gl-sit" class="gl-sel" aria-label="Situación"></select>
+        <label class="gl-num">Cantidad <input id="gl-n" type="number" min="1" max="500" value="40"></label>
+        <button id="gl-gen" class="btn btn-primary" type="button">🎲 Generar</button>
+      </div>
+      <div id="gl-gen-info" class="gl-status" role="status" aria-live="polite"></div>
+      <textarea id="gl-out" class="gl-ta" rows="8" spellcheck="false" readonly placeholder="Acá salen las líneas, una por renglón, sin repetir."></textarea>
+      <div class="gl-row">
+        <button id="gl-copy" class="btn btn-secondary btn-sm" type="button" disabled>📋 Copiar</button>
+        <button id="gl-dl" class="btn btn-secondary btn-sm" type="button" disabled>⬇ Descargar .txt</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <span class="panel-title">3 · Buscar y limpiar</span>
+        <span>
+          <button id="gl-export" class="btn btn-ghost btn-xs" type="button">⬇ Exportar todo</button>
+          <button id="gl-clear" class="btn btn-ghost btn-xs" type="button">🗑 Vaciar todo</button>
+        </span>
+      </div>
+      <input id="gl-q" class="gl-in" type="text" placeholder="🔍 Buscar en tus palabras…" autocomplete="off" spellcheck="false">
+      <div id="gl-list" class="gl-list"></div>
+    </section>
+
+  </main>
+
+  <div class="pl-feeds-spacer"></div>
+  <script src="js/pl-mascot.js"></script>
+  <script type="module" src="js/glosario-ui.js"></script>
+</body>
+</html>

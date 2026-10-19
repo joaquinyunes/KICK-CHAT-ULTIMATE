@@ -103,6 +103,9 @@ app.get("/kc", (_req: Request, res: Response) => {
 app.get("/tematicas", (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "..", "public", "tematicas.html"));
 });
+app.get("/glosario", (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, "..", "public", "glosario.html"));
+});
 app.get("/video", (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "..", "public", "video.html"));
 });

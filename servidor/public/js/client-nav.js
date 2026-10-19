@@ -9,6 +9,7 @@ import { onStatusChange, ping } from './bridge-client.js';
 const NAV_ITEMS = [
   { id: 'chat',      label: 'Chat',      ico: '💬', url: '/chat' },
   { id: 'tematicas', label: 'Temáticas', ico: '🎯', url: '/tematicas' },
+  { id: 'glosario',  label: 'Glosario',  ico: '📚', url: '/glosario' },
   { id: 'video',     label: 'Video',     ico: '⏱️', url: '/video' },
   { id: 'kc',        label: 'Contexto',  ico: '🎥', url: '/kc' },
   { id: 'simulador', label: 'Simulador', ico: '🤖', url: '/simulador' },
@@ -215,6 +216,7 @@ export function currentPage() {
   if (clean === 'vods') return 'vods';
   if (clean === 'kick20') return 'kick20';
   if (clean === 'tematicas') return 'tematicas';
+  if (clean === 'glosario') return 'glosario';
   if (clean === 'video') return 'video';
   if (clean === 'kc') return 'kc';
   return 'chat';

@@ -52,6 +52,20 @@
     </section>
 
     <!-- ═══ SECCIONES ═══ -->
+    <!-- ═══ SITUACIÓN: sin IA, en un toque (teclas 1-9 y 0) ═══ -->
+    <section class="live-panel tm-sit-panel">
+      <div class="lp-head">
+        <span class="cc-dot dot-live"></span>
+        <span class="cc-name">Qué está pasando</span>
+        <span class="lp-note">tocá una situación (o su tecla) y se elige la sección · sin IA</span>
+      </div>
+      <div id="tm-sit" class="tm-sit" role="group" aria-label="Situación"></div>
+      <div class="tm-ctx-row">
+        <input id="tm-ctx" type="text" maxlength="300" placeholder="O pegá lo que pasa (ej: cayeron tres scatters) y Enter: detecto la situación" autocomplete="off" spellcheck="false">
+        <span id="tm-ctx-msg" class="cc-status"></span>
+      </div>
+    </section>
+
     <div class="tm-search">
       <input id="tm-search" type="text" placeholder="🔍 Buscar una sección o un mensaje…" autocomplete="off" spellcheck="false" aria-label="Buscar en las temáticas">
       <div id="tm-results" class="tm-results" hidden></div>
