@@ -4,6 +4,7 @@ import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import { rateLimit } from "express-rate-limit";
 import path from "path";
+import { timingSafeEqual } from "crypto";
 import { env } from "./config/env";
 import { startKcIngest } from "./services/kc-ingest.service";
 import { startKcPipeline, killPipelineSync } from "./services/kc-supervisor.service";
@@ -28,6 +29,17 @@ import actionsRoutes from "./routes/actions.routes";
 import { requirePageAuth } from "./middleware/auth-page.middleware";
 
 const app = express();
+
+// App de escritorio: solo responde a la ventana de Electron, que manda el token de este arranque.
+// Un navegador u otro proceso local que consulte el puerto recibe 403 y no puede leer ni los estáticos.
+if (env.DESKTOP_TOKEN) {
+  const expected = Buffer.from(env.DESKTOP_TOKEN);
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const given = Buffer.from(String(req.headers["x-desktop-token"] ?? ""));
+    if (given.length === expected.length && timingSafeEqual(given, expected)) return next();
+    res.status(403).end();
+  });
+}
 
 // Detrás de un reverse proxy (nginx, Fly, Railway…): confiar en 1 hop
 // para que req.ip / rate-limit / audit log usen la IP real del cliente.
@@ -216,7 +228,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 async function bootstrap(): Promise<void> {
   logger.info(TAG, "Inicializando base de datos...");
   await initDatabase();
-  server = app.listen(env.PORT, () => {
+  server = app.listen(env.PORT, env.HOST, () => {
     markReady();
     logger.info(TAG, "StreamChat Bridge en puerto " + env.PORT);
   });

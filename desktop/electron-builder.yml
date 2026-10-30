@@ -1,0 +1,41 @@
+appId: com.joaquinyunes.kickchatultimate
+productName: KICK-CHAT-ULTIMATE
+copyright: joaquinyunes
+directories:
+  app: build/app
+  output: release
+asar: true
+# tesseract.js lanza workers y carga .wasm: necesita archivos reales en disco (código de terceros, no propio).
+asarUnpack:
+  - node_modules/tesseract.js/**
+  - node_modules/tesseract.js-core/**
+  - node_modules/@tesseract.js-data/**
+files:
+  - "**/*"
+  - "!**/*.map"
+  - "!**/{README,readme,CHANGELOG,changelog}*"
+extraResources:
+  - from: build/python-dist
+    to: kc
+  - from: build/bin
+    to: bin
+compression: maximum
+win:
+  target:
+    - target: nsis
+      arch: x64
+  icon: assets/icon.ico
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+# Fusibles de Electron: sin modo Node, sin inspector, y solo se carga el código desde un asar con su hash comprobado.
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  grantFileProtocolExtraPrivileges: false

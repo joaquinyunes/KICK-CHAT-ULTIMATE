@@ -1,0 +1,117 @@
+{
+ "confidence": 86,
+ "width": 1280,
+ "height": 720,
+ "lines": [
+  {
+   "text": "bet365",
+   "confidence": 91,
+   "bbox": {
+    "x0": 25,
+    "y0": 18,
+    "x1": 94,
+    "y1": 34
+   }
+  },
+  {
+   "text": "EN VIVO - Futbol - UEFA Champions League",
+   "confidence": 78,
+   "bbox": {
+    "x0": 815,
+    "y0": 18,
+    "x1": 1255,
+    "y1": 39
+   }
+  },
+  {
+   "text": "Real Madrid 2 - 1 Manchester City",
+   "confidence": 95,
+   "bbox": {
+    "x0": 181,
+    "y0": 106,
+    "x1": 1102,
+    "y1": 160
+   }
+  },
+  {
+   "text": "67' - 22 parte - LIVE",
+   "confidence": 80,
+   "bbox": {
+    "x0": 493,
+    "y0": 180,
+    "x1": 787,
+    "y1": 211
+   }
+  },
+  {
+   "text": "Real Madrid",
+   "confidence": 96,
+   "bbox": {
+    "x0": 261,
+    "y0": 301,
+    "x1": 419,
+    "y1": 323
+   }
+  },
+  {
+   "text": "Empate",
+   "confidence": 91,
+   "bbox": {
+    "x0": 563,
+    "y0": 303,
+    "x1": 663,
+    "y1": 329
+   }
+  },
+  {
+   "text": "Manchester City",
+   "confidence": 95,
+   "bbox": {
+    "x0": 806,
+    "y0": 301,
+    "x1": 1021,
+    "y1": 329
+   }
+  },
+  {
+   "text": "1.45",
+   "confidence": 94,
+   "bbox": {
+    "x0": 300,
+    "y0": 339,
+    "x1": 382,
+    "y1": 370
+   }
+  },
+  {
+   "text": "4.20",
+   "confidence": 96,
+   "bbox": {
+    "x0": 570,
+    "y0": 339,
+    "x1": 654,
+    "y1": 370
+   }
+  },
+  {
+   "text": "6.75",
+   "confidence": 96,
+   "bbox": {
+    "x0": 871,
+    "y0": 339,
+    "x1": 955,
+    "y1": 370
+   }
+  },
+  {
+   "text": "Proximo gol - Mercado 1X2 - Apuesta simple €10.00",
+   "confidence": 83,
+   "bbox": {
+    "x0": 341,
+    "y0": 459,
+    "x1": 940,
+    "y1": 483
+   }
+  }
+ ]
+}

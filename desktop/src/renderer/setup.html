@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>Configuración</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font: 14px/1.5 "Segoe UI", sans-serif; background: #0d0f14; color: #e6e8ee; margin: 0; padding: 20px 24px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p.hint { color: #8b92a5; margin: 0 0 14px; }
+  label { display: block; margin: 10px 0 3px; color: #b7bdcc; }
+  input[type=text], input[type=password] { width: 100%; box-sizing: border-box; padding: 7px 9px; background: #151821; border: 1px solid #2a2f3d; border-radius: 6px; color: inherit; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .check { margin-top: 12px; display: flex; gap: 8px; align-items: center; }
+  .box { margin-top: 16px; padding: 10px 12px; background: #151821; border: 1px solid #2a2f3d; border-radius: 6px; }
+  code { color: #7dd3fc; user-select: all; }
+  button { padding: 8px 16px; border: 0; border-radius: 6px; background: #53fc18; color: #07140a; font-weight: 600; cursor: pointer; }
+  button.ghost { background: #232838; color: #e6e8ee; }
+  .actions { margin-top: 18px; display: flex; gap: 8px; justify-content: flex-end; }
+</style>
+</head>
+<body>
+<h1>Configuración</h1>
+<p class="hint">Se guarda cifrada en tu usuario de Windows. Todo es opcional: puedes completarlo después desde el menú Archivo.</p>
+
+<label for="clientId">Kick Client ID <span class="hint">(dev.kick.com)</span></label>
+<input id="clientId" type="text" autocomplete="off">
+<label for="clientSecret">Kick Client Secret</label>
+<input id="clientSecret" type="password" autocomplete="off">
+<label for="gemini">Gemini API key <span class="hint">(resúmenes y comentarista)</span></label>
+<input id="gemini" type="password" autocomplete="off">
+<label for="openrouter">OpenRouter API key <span class="hint">(simulador de chat)</span></label>
+<input id="openrouter" type="password" autocomplete="off">
+<label for="slug">Canal de Kick</label>
+<input id="slug" type="text" autocomplete="off" placeholder="tu-canal">
+<div class="check"><input id="pipeline" type="checkbox"><label for="pipeline" style="margin:0">Activar el pipeline de contexto (captura, resumen y comentarista)</label></div>
+
+<div class="box">Acceso al panel: usuario <code>admin</code> · contraseña <code id="pass"></code></div>
+
+<div class="actions">
+  <button class="ghost" id="skip">Ahora no</button>
+  <button id="save">Guardar y abrir</button>
+</div>
+<script>
+  const $ = (id) => document.getElementById(id);
+  window.desktop.getConfig().then((c) => {
+    $("clientId").value = c.kickClientId; $("clientSecret").value = c.kickClientSecret;
+    $("gemini").value = c.geminiKey; $("openrouter").value = c.openrouterKey;
+    $("slug").value = c.channelSlug; $("pipeline").checked = c.pipelineEnabled;
+    $("pass").textContent = c.adminPassword;
+  });
+  $("save").onclick = () => window.desktop.saveConfig({
+    kickClientId: $("clientId").value.trim(), kickClientSecret: $("clientSecret").value.trim(),
+    geminiKey: $("gemini").value.trim(), openrouterKey: $("openrouter").value.trim(),
+    channelSlug: $("slug").value.trim(), pipelineEnabled: $("pipeline").checked,
+  });
+  $("skip").onclick = () => window.desktop.saveConfig(null);
+</script>
+</body>
+</html>

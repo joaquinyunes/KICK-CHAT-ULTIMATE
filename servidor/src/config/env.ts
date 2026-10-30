@@ -13,6 +13,10 @@ dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 const schema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3000),
+  // Interfaz donde escucha. La app de escritorio lo fija en 127.0.0.1.
+  HOST: z.string().default("0.0.0.0"),
+  // App de escritorio: token por arranque que debe llevar toda petición (cabecera x-desktop-token).
+  DESKTOP_TOKEN: z.string().optional(),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).optional(),
 
   // Clave maestra AES-256-GCM. Recomendado: 64 hex chars (32 bytes).
@@ -38,6 +42,8 @@ const schema = z.object({
 
   // Workers Python (VOD viewer / senders)
   PYTHON_PATH: z.string().optional(),
+  // App de escritorio: runtime del pipeline Python ya compilado (reemplaza a Python + .py).
+  KC_EXE: z.string().optional().default(""),
 
   // Auto-refresh / batch hook
   KICK_COMENTARIO_MODO: z.enum(["bloque", "linea"]).optional().default("bloque"),

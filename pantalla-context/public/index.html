@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pantalla Contexto</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1>Pantalla Contexto</h1>
+      <p class="muted">Comparte tu pantalla, elige una zona y obtén el contexto de lo que está pasando.</p>
+      <p id="backendInfo" class="backend muted">Comprobando analizador…</p>
+      <p id="exportInfo" class="backend muted"></p>
+    </div>
+    <div class="top-actions">
+      <button id="copyApiBtn" class="btn small" type="button" title="URL que cualquier IA o bot puede leer para saber el contexto actual">Copiar URL para otra IA</button>
+      <button id="copyOverlayBtn" class="btn small" type="button" title="Copia la URL para usarla como Fuente de navegador en OBS">Copiar URL del overlay (OBS)</button>
+    </div>
+  </header>
+
+  <div id="banner" class="banner" role="alert" hidden></div>
+
+  <main class="layout">
+    <section class="stage" aria-label="Pantalla compartida">
+      <div class="toolbar">
+        <label class="field inline">
+          <span>Compartir</span>
+          <select id="surfaceSelect" aria-label="Qué quieres compartir">
+            <option value="any">Lo que elija en el navegador</option>
+            <option value="browser">Una pestaña</option>
+            <option value="window">Una ventana</option>
+            <option value="monitor">Toda la pantalla</option>
+          </select>
+        </label>
+        <button id="shareBtn" class="btn primary" type="button">Compartir pantalla</button>
+        <button id="switchBtn" class="btn" type="button" hidden title="Elige otra pantalla, ventana o pestaña sin perder tus ajustes">Cambiar de pantalla o pestaña</button>
+        <button id="selectBtn" class="btn" type="button" disabled>Seleccionar zona</button>
+        <button id="fullBtn" class="btn" type="button" disabled>Pantalla completa</button>
+      </div>
+      <p id="sourceInfo" class="source muted" aria-live="polite"></p>
+      <p id="selectionInfo" class="source muted" aria-live="polite"></p>
+
+      <div class="viewport">
+        <div id="placeholder" class="placeholder">
+          <p>Aquí verás tu pantalla.</p>
+          <p class="muted">Pulsa «Compartir pantalla» y elige una ventana, pestaña o monitor.</p>
+        </div>
+        <div id="frame" class="frame" hidden>
+          <video id="video" muted playsinline></video>
+          <canvas id="selectionCanvas" aria-label="Arrastra para seleccionar una zona"></canvas>
+        </div>
+      </div>
+
+      <div class="controls">
+        <label class="field">
+          <span>Tipo de contenido</span>
+          <select id="modeSelect"></select>
+        </label>
+        <label class="field">
+          <span>Idioma</span>
+          <select id="languageSelect">
+            <option value="es">Español</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+        <label class="field grow">
+          <span>Pista opcional</span>
+          <input id="noteInput" type="text" maxlength="200" placeholder="p. ej. «estoy en un casino online» o «Champions League»">
+        </label>
+      </div>
+
+      <div class="controls">
+        <button id="analyzeBtn" class="btn primary" type="button" disabled>Analizar ahora</button>
+        <label class="check"><input id="autoCheck" type="checkbox" disabled> Vigilar automáticamente</label>
+        <label class="check">como mucho cada
+          <select id="intervalSelect" aria-label="Separación mínima entre análisis">
+            <option value="5">5 s</option>
+            <option value="10" selected>10 s</option>
+            <option value="20">20 s</option>
+            <option value="30">30 s</option>
+            <option value="60">60 s</option>
+          </select>
+        </label>
+        <label class="check">refrescar aunque no cambie
+          <select id="heartbeatSelect" aria-label="Refresco periódico">
+            <option value="0" selected>nunca</option>
+            <option value="60">cada 1 min</option>
+            <option value="120">cada 2 min</option>
+            <option value="300">cada 5 min</option>
+          </select>
+        </label>
+      </div>
+      <div class="controls">
+        <label class="check"><input id="changesCheck" type="checkbox" checked> Solo analizar cuando algo cambie (ahorra CPU y cuota)</label>
+        <label class="check"><input id="publishCheck" type="checkbox" checked> Publicar en el overlay</label>
+      </div>
+
+      <p class="privacy muted">Cada análisis envía la imagen (solo la zona elegida) al analizador. Con un motor local no sale de tu red; con uno en la nube sí sale. No se guarda en el servidor. Evita incluir contraseñas, datos bancarios o información privada en la zona.</p>
+    </section>
+
+    <section class="result" aria-label="Contexto detectado">
+      <p id="status" class="status" role="status" aria-live="polite">Sin análisis todavía.</p>
+
+      <article id="card" class="card" hidden>
+        <div class="card-head">
+          <span id="categoryBadge" class="badge"></span>
+          <span id="verifyBadge" class="vbadge"></span>
+        </div>
+        <p id="verifyText" class="verify muted"></p>
+        <h2 id="cardTitle"></h2>
+        <p id="cardSummary" class="summary"></p>
+        <p id="cardChanges" class="changes" hidden></p>
+        <dl id="entities" class="entities"></dl>
+        <div id="chatBox" class="chat">
+          <p id="chatLine"></p>
+          <button id="copyChatBtn" class="btn small" type="button">Copiar</button>
+        </div>
+        <div class="ai-share">
+          <button id="copyAiBtn" class="btn small primary" type="button" title="Texto listo para pegar en ChatGPT, Claude, Gemini o cualquier otra IA">Copiar contexto para otra IA</button>
+          <span class="muted">Pégalo en cualquier chat de IA para que sepa qué estás viendo.</span>
+        </div>
+        <details id="textBox" hidden>
+          <summary>Texto leído en pantalla</summary>
+          <pre id="screenText"></pre>
+        </details>
+        <details id="whyBox" hidden>
+          <summary>¿Por qué lo digo?</summary>
+          <ul id="reasonsList"></ul>
+          <ul id="evidenceList" class="evidence"></ul>
+        </details>
+        <details id="uncertainBox" hidden>
+          <summary>No se pudo confirmar</summary>
+          <ul id="uncertainList"></ul>
+        </details>
+        <div class="card-foot">
+          <img id="shot" class="shot" alt="Captura analizada" hidden>
+          <span id="meta" class="muted"></span>
+        </div>
+      </article>
+
+      <section id="activityBox" class="activity" hidden>
+        <h3>Actividad</h3>
+        <pre id="activityText"></pre>
+        <button id="copyActivityBtn" class="btn small" type="button">Copiar actividad para otra IA</button>
+      </section>
+
+      <section id="historyBox" class="history" hidden>
+        <h3>Historial</h3>
+        <ol id="historyList"></ol>
+      </section>
+    </section>
+  </main>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

@@ -1054,13 +1054,15 @@ print(json.dumps(mons))
 `;
 
 export function kcMonitors(_req: Request, res: Response): void {
-  const py = findPython();
+  const exe = (process.env.KC_EXE || "").trim();
+  const py = exe && fs.existsSync(exe) ? exe : findPython();
   const cap = getCaptureConfig();
   if (!py) {
     res.json({ success: true, monitors: [], selected: cap, note: "No se encontró Python" });
     return;
   }
-  execFile(py, ["-c", MONITOR_SNIPPET], { timeout: 8000 }, (err, stdout) => {
+  const args = py === exe ? ["--kc-module", "monitores"] : ["-c", MONITOR_SNIPPET];
+  execFile(py, args, { timeout: 8000, windowsHide: true }, (err, stdout) => {
     if (err) {
       res.json({ success: true, monitors: [], selected: cap, note: "No se pudieron enumerar los monitores (¿no es Windows?)" });
       return;

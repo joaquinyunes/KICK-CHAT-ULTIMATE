@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>Licencia</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font: 14px/1.5 "Segoe UI", sans-serif; background: #0d0f14; color: #e6e8ee; margin: 0; padding: 22px 26px; }
+  h1 { font-size: 18px; margin: 0 0 6px; }
+  p { color: #8b92a5; margin: 0 0 14px; }
+  .id { display: flex; gap: 8px; align-items: center; background: #151821; border: 1px solid #2a2f3d; border-radius: 6px; padding: 8px 10px; }
+  .id code { flex: 1; font-size: 16px; letter-spacing: 1px; color: #7dd3fc; user-select: all; }
+  textarea { width: 100%; box-sizing: border-box; height: 96px; margin-top: 6px; padding: 8px; background: #151821; border: 1px solid #2a2f3d; border-radius: 6px; color: inherit; font: 12px Consolas, monospace; resize: none; }
+  label { display: block; margin-top: 14px; color: #b7bdcc; }
+  button { padding: 8px 16px; border: 0; border-radius: 6px; background: #53fc18; color: #07140a; font-weight: 600; cursor: pointer; }
+  button.ghost { background: #232838; color: #e6e8ee; }
+  .actions { margin-top: 16px; display: flex; justify-content: flex-end; gap: 8px; }
+  #err { color: #ff6b6b; min-height: 20px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<h1>Activar licencia</h1>
+<p id="reason">Para usar la aplicación necesitas una licencia.</p>
+<label>1. Envía este ID de tu equipo a quien te da el acceso</label>
+<div class="id"><code id="machine"></code><button class="ghost" id="copy">Copiar</button></div>
+<label for="key">2. Pega aquí la clave que te devuelva</label>
+<textarea id="key" spellcheck="false" placeholder="KCU1...."></textarea>
+<div id="err"></div>
+<div class="actions"><button class="ghost" id="quit">Salir</button><button id="ok">Activar</button></div>
+<script>
+  const $ = (id) => document.getElementById(id);
+  window.license.info().then((i) => { $("machine").textContent = i.machine; if (i.reason) $("reason").textContent = i.reason; });
+  $("copy").onclick = () => window.license.copy($("machine").textContent);
+  $("quit").onclick = () => window.license.submit(null);
+  $("ok").onclick = async () => {
+    $("err").textContent = "";
+    const r = await window.license.submit($("key").value);
+    if (r && !r.ok) $("err").textContent = r.reason;
+  };
+</script>
+</body>
+</html>

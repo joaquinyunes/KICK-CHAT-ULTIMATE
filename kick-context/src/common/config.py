@@ -145,7 +145,21 @@ def leer_categoria_prompt() -> str:
     return cat if cat in CATEGORIAS_PROMPT else CATEGORIA_PROMPT_DEFAULT
 
 
+def _embebido(path: Path):
+    """Texto incrustado en el ejecutable (app de escritorio): ahí los prompts
+    no quedan como archivos sueltos. None = no hay copia incrustada."""
+    try:
+        import kc_embedded
+        rel = Path(path).resolve().relative_to(Path(__file__).resolve().parent.parent).as_posix()
+    except (ImportError, ValueError, OSError):
+        return None
+    return kc_embedded.FILES.get(rel)
+
+
 def _leer_texto(path: Path) -> str:
+    emb = _embebido(path)
+    if emb is not None:
+        return emb.strip()
     try:
         if path.is_file():
             return path.read_text(encoding="utf-8").strip()

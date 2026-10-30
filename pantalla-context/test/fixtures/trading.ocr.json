@@ -1,0 +1,47 @@
+{
+ "confidence": 81,
+ "width": 1280,
+ "height": 720,
+ "lines": [
+  {
+   "text": "BTC/USDT 1h Binance 67,420.50 +2.35%",
+   "confidence": 89,
+   "bbox": {
+    "x0": 25,
+    "y0": 19,
+    "x1": 579,
+    "y1": 41
+   }
+  },
+  {
+   "text": "Open 66,120.00 High 67,800.10 Low 65,990.00 Close 67,420.50",
+   "confidence": 96,
+   "bbox": {
+    "x0": 31,
+    "y0": 94,
+    "x1": 938,
+    "y1": 122
+   }
+  },
+  {
+   "text": "Vol 1,245.8 BTC RSI 61.2 MA(50) 65,880",
+   "confidence": 84,
+   "bbox": {
+    "x0": 30,
+    "y0": 162,
+    "x1": 613,
+    "y1": 190
+   }
+  },
+  {
+   "text": "BLUE cc",
+   "confidence": 0,
+   "bbox": {
+    "x0": 30,
+    "y0": 241,
+    "x1": 648,
+    "y1": 323
+   }
+  }
+ ]
+}

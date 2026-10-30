@@ -47,6 +47,12 @@ export function kcDataDir(): string {
   return custom || path.resolve(process.cwd(), "..", "kick-context-data");
 }
 
+/** Runtime compilado del pipeline (app de escritorio). Vacío = modo desarrollo con Python + .py. */
+function kcExe(): string {
+  const exe = (env.KC_EXE || "").trim();
+  return exe && fs.existsSync(exe) ? exe : "";
+}
+
 function orchestratorScript(): string {
   return path.join(kcDir(), "src", "modulo10_orquestador", "orquestador.py");
 }
@@ -172,14 +178,15 @@ function scheduleRestart(): void {
 function spawnPipeline(): void {
   if (child) return;
 
+  const exe = kcExe();
   const script = orchestratorScript();
-  if (!fs.existsSync(script)) {
+  if (!exe && !fs.existsSync(script)) {
     state.lastError = `No se encontró el orquestador: ${script}`;
     logger.error(TAG, state.lastError);
     return;
   }
 
-  const py = findPython();
+  const py = exe || findPython();
   if (!py) {
     state.lastError = "No se encontró Python (probé python, python3, py). Instalá Python 3.11 o seteá PYTHON_PATH.";
     logger.error(TAG, state.lastError);
@@ -196,7 +203,8 @@ function spawnPipeline(): void {
   stopping = false;
   state.lastError = "";
 
-  const proc = spawn(py, [script], {
+  fs.mkdirSync(path.join(kcDir(), "src"), { recursive: true });
+  const proc = spawn(py, exe ? ["--kc-module", "orquestador"] : [script], {
     cwd: path.join(kcDir(), "src"),
     env: {
       ...process.env,
@@ -333,9 +341,9 @@ let checksCache: { at: number; checks: KcCheck[] } | null = null;
 export async function getKcChecks(force = false): Promise<KcCheck[]> {
   if (!force && checksCache && Date.now() - checksCache.at < 15_000) return checksCache.checks;
 
-  const py = findPython();
+  const py = kcExe() || findPython();
   const [requests, ffmpeg] = await Promise.all([
-    py ? probe(py, ["-c", "import requests"]) : Promise.resolve(false),
+    kcExe() ? Promise.resolve(true) : py ? probe(py, ["-c", "import requests"]) : Promise.resolve(false),
     probe("ffmpeg", ["-version"]),
   ]);
   const checks: KcCheck[] = [

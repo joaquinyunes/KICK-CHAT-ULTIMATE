@@ -1,0 +1,196 @@
+{
+  "casino": {
+    "category": "casino",
+    "title": "Sweet Bonanza",
+    "facts": {
+      "Juego": "Sweet Bonanza",
+      "Proveedor": "Pragmatic Play",
+      "Sitio": "Stake",
+      "Saldo": "€148.30",
+      "Apuesta": "€2.00",
+      "Ganancia": "€36.50",
+      "Giros gratis": "8",
+      "Multiplicador": "x25"
+    }
+  },
+  "roulette": {
+    "category": "casino",
+    "title": "Lightning Roulette",
+    "facts": {
+      "Juego": "Lightning Roulette",
+      "Proveedor": "Evolution",
+      "Saldo": "$512.00",
+      "Apuesta": "$25.00"
+    }
+  },
+  "casino_hard": {
+    "category": "casino",
+    "title": "Gates of Olympus",
+    "facts": {
+      "Juego": "Gates of Olympus",
+      "Proveedor": "Pragmatic Play",
+      "Saldo": "$320.50",
+      "Apuesta": "$4.00",
+      "Ganancia": "$0.00"
+    }
+  },
+  "small_text": {
+    "category": "casino",
+    "title": "Sugar Rush",
+    "facts": {
+      "Juego": "Sugar Rush",
+      "Saldo": "€75.20",
+      "Apuesta": "€0.50",
+      "Ganancia": "€1.20"
+    }
+  },
+  "sports": {
+    "category": "sports_betting",
+    "title": "Real Madrid 2-1 Manchester City",
+    "facts": {
+      "Marcador": "2-1",
+      "Minuto": "67'",
+      "Competición": "UEFA Champions League",
+      "Cuotas": "Real Madrid 1.45"
+    }
+  },
+  "basket": {
+    "category": "sports_live",
+    "title": "Lakers 98-102 Boston Celtics",
+    "facts": {
+      "Marcador": "98-102",
+      "Competición": "NBA",
+      "Minuto": "Q4 03:21"
+    }
+  },
+  "game": {
+    "category": "video_game",
+    "title": "Valorant",
+    "facts": {
+      "Juego": "Valorant",
+      "Ronda": "14",
+      "Kills": "18",
+      "Deaths": "9",
+      "HP": "100"
+    }
+  },
+  "game_hard": {
+    "category": "video_game",
+    "title": "Fortnite",
+    "facts": {
+      "Juego": "Fortnite",
+      "HP": "87",
+      "Shield": "100",
+      "Eliminations": "7"
+    }
+  },
+  "trading": {
+    "category": "trading",
+    "title": "BTC/USDT 1h",
+    "facts": {
+      "Par": "BTC/USDT",
+      "Temporalidad": "1h",
+      "RSI": "61.2"
+    }
+  },
+  "code": {
+    "category": "coding",
+    "title": "main.js",
+    "facts": {
+      "Archivo": "main.js",
+      "Lenguaje": "JavaScript",
+      "App": "Visual Studio Code",
+      "Error": "TypeError",
+      "Comando": "npm test",
+      "Proyecto": "pantalla-context"
+    }
+  },
+  "terminal": {
+    "category": "terminal",
+    "title": "git status",
+    "facts": {
+      "Comando": "git status",
+      "Resultado": "174 pasan"
+    }
+  },
+  "browser_news": {
+    "category": "browsing",
+    "title": "El Gobierno aprueba el presupuesto",
+    "facts": {
+      "Sitio": "elpais.com"
+    }
+  },
+  "email": {
+    "category": "email",
+    "facts": {
+      "App": "Gmail",
+      "Vista": "Bandeja de entrada"
+    }
+  },
+  "spreadsheet": {
+    "category": "documents",
+    "title": "hoja de cálculo",
+    "facts": {
+      "App": "Excel",
+      "Archivo": "Presupuesto 2026.xlsx",
+      "Tipo": "hoja de cálculo"
+    }
+  },
+  "chat": {
+    "category": "chat",
+    "facts": {
+      "App": "Discord",
+      "Canal": "#general"
+    }
+  },
+  "meeting": {
+    "category": "meeting",
+    "facts": {
+      "App": "Google Meet",
+      "Reunión": "Reunión semanal de producto"
+    }
+  },
+  "video": {
+    "category": "video_media",
+    "title": "configurar OBS Studio",
+    "facts": {
+      "Plataforma": "YouTube",
+      "Progreso": "12:34 / 25:10",
+      "Vistas": "1.2M"
+    }
+  },
+  "twitch": {
+    "category": "streaming",
+    "facts": {
+      "Plataforma": "Twitch",
+      "Espectadores": "48,213",
+      "Sección": "Just Chatting",
+      "Canal": "xQc"
+    }
+  },
+  "slot_review": {
+    "category": "browsing",
+    "negative": "reseña de un slot: NO es jugar",
+    "facts": {}
+  },
+  "sports_news": {
+    "category": "browsing",
+    "negative": "crónica de un partido: NO es un marcador en vivo",
+    "facts": {}
+  },
+  "lorem": {
+    "category": "other",
+    "negative": "texto sin actividad reconocible",
+    "facts": {}
+  },
+  "blank": {
+    "category": "other",
+    "negative": "pantalla vacía",
+    "facts": {}
+  },
+  "noise": {
+    "category": "other",
+    "negative": "sin texto",
+    "facts": {}
+  }
+}

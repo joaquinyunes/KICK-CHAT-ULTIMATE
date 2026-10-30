@@ -1,0 +1,68 @@
+{
+  "name": "pantalla-contexto",
+  "version": "0.4.0",
+  "description": "Mira tu pantalla, entiende qué haces y exporta SOLO el contexto verificado a otra IA. Gratis y local (OCR integrado, sin Ollama ni claves).",
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./index.d.ts",
+  "bin": {
+    "pantalla-contexto": "bin/pantalla-contexto.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./client": {
+      "types": "./client.d.ts",
+      "default": "./src/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "bin",
+    "src",
+    "public",
+    "server.js",
+    "analyzer.js",
+    "mcp.js",
+    "index.d.ts",
+    "client.d.ts",
+    ".env.example",
+    "README.md"
+  ],
+  "private": true,
+  "engines": {
+    "node": ">=22.9"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js",
+    "analyzer": "node --env-file-if-exists=.env analyzer.js",
+    "mcp": "node --env-file-if-exists=.env mcp.js",
+    "test": "node --test \"test/*.test.js\"",
+    "bench": "node scripts/bench.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
+    "@tesseract.js-data/eng": "^1.0.0",
+    "@tesseract.js-data/spa": "^1.0.0",
+    "jpeg-js": "^0.4.4",
+    "tesseract.js": "^7.0.0"
+  },
+  "keywords": [
+    "screen",
+    "screen-context",
+    "ocr",
+    "tesseract",
+    "mcp",
+    "streamer",
+    "obs",
+    "context",
+    "local-first",
+    "no-api-key"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joaquinyunes/pantalla-context.git"
+  }
+}

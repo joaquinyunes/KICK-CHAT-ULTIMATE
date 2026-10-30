@@ -25,6 +25,7 @@ Notas:
     - Requiere que cada módulo ya tenga sus dependencias instaladas.
 """
 
+import os
 import subprocess
 import sys
 import time
@@ -135,7 +136,12 @@ class ProcesoAdministrado:
         nombre = self.definicion["nombre"]
         script = self.definicion["script"]
         config.log(MODULO, f"Iniciando {nombre} ({script})...")
-        self.proceso = subprocess.Popen([sys.executable, str(script)])
+        if os.environ.get("KC_EXE"):
+            # App de escritorio: un solo ejecutable que despacha por nombre de módulo.
+            cmd = [os.environ["KC_EXE"], "--kc-module", Path(script).stem]
+        else:
+            cmd = [sys.executable, str(script)]
+        self.proceso = subprocess.Popen(cmd)
         self.iniciado_en = time.time()
 
     def detener(self, motivo: str = ""):

@@ -146,6 +146,12 @@ casino/apuestas/IRL, opcionalmente variados por Gemini), M12 arma el lote de
 30 líneas con Gemini cada ~60 s, y KCU lo absorbe y lo envía. Sirve para ver el
 flujo entero — contexto → 30 líneas → envío — sin transmitir.
 
+## App de escritorio (Windows)
+
+`desktop/` empaqueta servidor + pipeline de contexto + Pantalla Contexto (`pantalla-context/`) en un instalador
+autocontenido, con el código propio compilado (bytecode V8 y binario nativo) y sin archivos fuente sueltos.
+Construcción, qué protege y sus límites: [`desktop/README.md`](desktop/README.md).
+
 ## Arquitectura
 
 Ver [`ARCHITECTURE.md`](ARCHITECTURE.md).
@@ -166,6 +172,8 @@ servidor/            API Express + TS (código principal)
   scripts/           Utilidades CLI
   *.py               Workers Python (VOD viewer, senders)
 streamchat-client/   Cliente Electron (opcional)
+desktop/              App de escritorio: empaqueta todo en un instalador (Electron + Nuitka)
+pantalla-context/     Pantalla Contexto: visor + OCR local que exporta el contexto verificado
 kick-context/        Pipeline de contexto (12 módulos Python) — lo supervisa el server
 kick-context-data/   Datos y logs del pipeline (git-ignored, se crea solo)
 stream-context/      (obsoleto — reemplazado por kick-context/; se puede borrar)
